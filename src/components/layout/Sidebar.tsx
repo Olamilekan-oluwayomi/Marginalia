@@ -2,23 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Plus, Search, Settings, UserRound } from "lucide-react";
+import { BookOpen, FileText, Plus, Settings, UserRound } from "lucide-react";
 
 const navigation = [
   {
+    label: "New research",
+    icon: Plus,
+    href: "/",
+  },
+  {
     label: "Research",
-    icon: Search,
+    icon: BookOpen,
     href: "/research",
   },
   {
     label: "Documents",
     icon: FileText,
     href: "/documents",
-  },
-  {
-    label: "New",
-    icon: Plus,
-    href: "/",
   },
   {
     label: "Settings",
@@ -91,7 +91,9 @@ export function Sidebar() {
             >
               <Icon size={17} strokeWidth={1.7} />
 
-              <span className="font-ui text-[10px]">{item.label}</span>
+              <span className="whitespace-nowrap font-ui text-[10px]">
+                {item.label}
+              </span>
             </Link>
           );
         })}

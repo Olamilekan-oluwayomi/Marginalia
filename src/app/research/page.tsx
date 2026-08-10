@@ -1,24 +1,9 @@
 import { ArrowRight, FileText, Plus } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
-
-const workspaces = [
-  {
-    title: "Rainfall variability and seasonal onset",
-    description:
-      "Investigating rainfall onset, peak and retreat dates across the study region.",
-    documents: 3,
-    updated: "Today",
-  },
-  {
-    title: "Climate change literature review",
-    description:
-      "Collection of papers examining recent climate variability and trends.",
-    documents: 7,
-    updated: "Yesterday",
-  },
-];
+import { workspaces } from "@/data/research";
 
 export default function ResearchPage() {
   return (
@@ -49,40 +34,39 @@ export default function ResearchPage() {
         <section className="mt-10">
           <div className="space-y-0">
             {workspaces.map((workspace) => (
-              <article
-                key={workspace.title}
-                className="group border-b border-rule py-7 last:border-b-0"
+              <Link
+                key={workspace.id}
+                href={`/research/${workspace.id}`}
+                aria-label={`Open ${workspace.title}`}
+                className="group flex items-start justify-between gap-4 border-b border-rule py-7 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
               >
-                <div className="flex items-start justify-between gap-4 sm:gap-8">
-                  <div className="min-w-0 max-w-2xl">
-                    <h2 className="break-words font-reading text-2xl text-ink">
-                      {workspace.title}
-                    </h2>
+                <div className="min-w-0 max-w-2xl">
+                  <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
+                    {workspace.title}
+                  </h2>
 
-                    <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
-                      {workspace.description}
-                    </p>
+                  <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
+                    {workspace.description}
+                  </p>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                      <span className="flex items-center gap-2 font-mono text-xs text-muted">
-                        <FileText size={14} strokeWidth={1.5} />
-                        {workspace.documents} documents
-                      </span>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <span className="flex items-center gap-2 font-mono text-xs text-muted">
+                      <FileText size={14} strokeWidth={1.5} />
+                      {workspace.documents} documents
+                    </span>
 
-                      <span className="font-mono text-xs text-muted">
-                        Updated {workspace.updated}
-                      </span>
-                    </div>
+                    <span className="font-mono text-xs text-muted">
+                      Updated {workspace.updated}
+                    </span>
                   </div>
-
-                  <button
-                    aria-label={`Open ${workspace.title}`}
-                    className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted transition-opacity md:opacity-0 md:group-hover:bg-paper-raised md:group-hover:text-pine md:group-hover:opacity-100"
-                  >
-                    <ArrowRight size={17} strokeWidth={1.6} />
-                  </button>
                 </div>
-              </article>
+
+                <ArrowRight
+                  size={17}
+                  strokeWidth={1.6}
+                  className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
+                />
+              </Link>
             ))}
           </div>
         </section>
