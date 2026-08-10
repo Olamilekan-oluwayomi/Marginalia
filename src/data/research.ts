@@ -33,26 +33,34 @@ export const workspaces: ResearchWorkspace[] = [
   },
 ];
 
-export type RecentDocument = {
+export type ResearchDocument = {
   title: string;
   type: string;
+  pages: number;
   added: string;
+  status: string;
 };
 
-export const recentDocuments: RecentDocument[] = [
+export const documents: ResearchDocument[] = [
   {
     title: "Rainfall Onset, Peak and Retreat Dates",
     type: "PDF",
+    pages: 24,
     added: "10 Aug 2026",
+    status: "Ready",
   },
   {
     title: "Climate Variability and Seasonal Rainfall",
     type: "PDF",
+    pages: 18,
     added: "9 Aug 2026",
+    status: "Ready",
   },
   {
     title: "Rainfall Patterns in West Africa",
     type: "PDF",
+    pages: 32,
     added: "7 Aug 2026",
+    status: "Ready",
   },
 ];

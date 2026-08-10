@@ -1,4 +1,4 @@
-# Research Assistant — Design System
+# Marginalia — Design System
 
 **Concept:** the product is a reading and annotating tool, not a chat app. No bubbles, no avatars, no rounded pill everything. Answers are typeset like a manuscript; citations are footnoted in a margin rail, not stacked as link chips.
 

@@ -51,6 +51,7 @@ export function Sidebar() {
                 href={item.href}
                 title={item.label}
                 aria-label={item.label}
+                aria-current={active ? "page" : undefined}
                 className={`flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
                   active
                     ? "bg-paper-raised text-pine"
@@ -85,6 +86,7 @@ export function Sidebar() {
               key={item.label}
               href={item.href}
               aria-label={item.label}
+              aria-current={active ? "page" : undefined}
               className={`flex flex-1 flex-col items-center justify-center gap-1 transition-colors ${
                 active ? "bg-paper-raised text-pine" : "text-muted"
               }`}
