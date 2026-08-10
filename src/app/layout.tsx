@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Newsreader, Work_Sans } from "next/font/google";
+import { ProfileProvider } from "@/components/profile/ProfileProvider";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
 
 const newsreader = Newsreader({
@@ -20,9 +22,19 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Research Assistant",
-  description: "Read, research, and understand your documents with AI.",
+  title: "Marginalia",
+  description: "Research, read, connect.",
 };
+
+const themeScript = `(function () {
+  var storageKey = "research-assistant-theme";
+  var stored = null;
+  try { stored = window.localStorage.getItem(storageKey); } catch (e) {}
+  var theme = stored === "light" || stored === "dark" ? stored : "system";
+  var dark = theme === "dark" ||
+    (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.classList.toggle("dark", dark);
+})();`;
 
 export default function RootLayout({
   children,
@@ -30,11 +42,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${newsreader.variable} ${workSans.variable} ${plexMono.variable}`}
       >
-        {children}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <ThemeProvider>
+          <ProfileProvider>{children}</ProfileProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

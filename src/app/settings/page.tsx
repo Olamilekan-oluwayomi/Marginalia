@@ -1,11 +1,13 @@
 import { AppShell } from "@/components/layout/AppShell";
+import { ProfileForm } from "@/components/profile/ProfileForm";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { ChevronDown } from "lucide-react";
 
 export default function SettingsPage() {
   return (
-    <AppShell>
+    <AppShell title="Settings">
       <div className="mx-auto max-w-3xl">
         <header className="border-b border-rule pb-8">
           <Label>Preferences</Label>
@@ -22,43 +24,7 @@ export default function SettingsPage() {
           <section className="py-10">
             <Label>Profile</Label>
 
-            <div className="mt-6 grid gap-6">
-              <div>
-                <label
-                  htmlFor="name"
-                  className="font-ui text-sm font-medium text-ink"
-                >
-                  Name
-                </label>
-
-                <input
-                  id="name"
-                  type="text"
-                  defaultValue="Olamilekan"
-                  className="mt-2 w-full rounded-md border border-rule bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors focus:border-pine"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="email"
-                  className="font-ui text-sm font-medium text-ink"
-                >
-                  Email
-                </label>
-
-                <input
-                  id="email"
-                  type="email"
-                  defaultValue="researcher@example.com"
-                  className="mt-2 w-full rounded-md border border-rule bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors focus:border-pine"
-                />
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <Button>Save changes</Button>
-            </div>
+            <ProfileForm />
           </section>
 
           {/* Research preferences */}
@@ -117,6 +83,23 @@ export default function SettingsPage() {
             </div>
           </section>
 
+          {/* Appearance */}
+          <section className="py-10">
+            <Label>Appearance</Label>
+
+            <div className="mt-6">
+              <h2 className="font-ui text-sm font-medium text-ink">Theme</h2>
+
+              <p className="mt-1 font-ui text-sm text-muted">
+                Choose how Marginalia looks on your device.
+              </p>
+
+              <div className="mt-3">
+                <ThemeToggle />
+              </div>
+            </div>
+          </section>
+
           {/* Account */}
           <section className="py-10">
             <Label>Account</Label>
@@ -125,7 +108,7 @@ export default function SettingsPage() {
               <h2 className="font-ui text-sm font-medium text-ink">Sign out</h2>
 
               <p className="mt-1 font-ui text-sm text-muted">
-                Sign out of your Research Assistant account on this device.
+                Sign out of your Marginalia account on this device.
               </p>
 
               <div className="mt-4">

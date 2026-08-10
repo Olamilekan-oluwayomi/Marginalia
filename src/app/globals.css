@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+
   --paper: #edeeea;
   --paper-raised: #f5f5f2;
 
@@ -20,6 +22,25 @@
   --radius-md: 4px;
 
   --shadow-input: 0 1px 2px rgba(31, 36, 33, 0.06);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --paper: #1d211f;
+  --paper-raised: #252a27;
+
+  --ink: #e8e9e5;
+  --ink-soft: #c5c9c3;
+  --muted: #8e958d;
+
+  --rule: #383e3a;
+
+  --pine: #6f9e91;
+  --pine-dim: #547e73;
+
+  --ochre: #d0aa52;
+  --error: #d16a5d;
 }
 
 @theme inline {
@@ -76,6 +97,17 @@ button {
 ::selection {
   background: var(--ochre);
   color: var(--ink);
+}
+
+.dark ::selection {
+  color: var(--paper);
+}
+
+/* Focus visibility */
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
 }
 
 /* Motion */

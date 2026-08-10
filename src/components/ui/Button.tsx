@@ -12,8 +12,9 @@ export function Button({
   const base = "rounded-md px-5 py-3 text-sm font-medium transition-colors";
 
   const variants = {
-    primary: "bg-pine text-white hover:bg-pine-dim",
-    secondary: "border border-rule bg-paper-raised text-ink hover:border-pine",
+    primary: "bg-pine text-paper hover:bg-pine-dim active:bg-pine-dim",
+    secondary:
+      "border border-rule bg-paper-raised text-ink hover:border-pine active:bg-paper",
   };
 
   return (
