@@ -1,0 +1,24 @@
+"use client";
+
+import { useProfile } from "./ProfileProvider";
+
+function greetingForHour(hour: number): string {
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  if (hour >= 17 && hour < 22) return "Good evening";
+  return "Good night";
+}
+
+export function Greeting() {
+  const { name } = useProfile();
+  const greeting = greetingForHour(new Date().getHours());
+
+  // The greeting depends on the visitor's local time, which the server can't
+  // know — suppressHydrationWarning lets React adopt the client value without
+  // warning about the intentional difference.
+  return (
+    <span suppressHydrationWarning>
+      {greeting}, {name}
+    </span>
+  );
+}

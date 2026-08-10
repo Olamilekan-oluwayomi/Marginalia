@@ -1,22 +1,23 @@
 import { ArrowRight, FileText, Plus } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
+import { Greeting } from "@/components/profile/Greeting";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
-import { recentDocuments, workspaces } from "@/data/research";
+import { documents, workspaces } from "@/data/research";
 
 export default function Home() {
   return (
-    <AppShell>
+    <AppShell title="Workspace">
       <div className="mx-auto max-w-5xl">
         <header className="border-b border-rule pb-8">
           <Label>Workspace</Label>
 
           <h1 className="mt-3 font-reading text-4xl leading-tight">
-            Good morning
+            <Greeting />
           </h1>
 
-          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="font-ui text-sm text-muted">
               Continue your research or start something new.
             </p>
@@ -39,7 +40,7 @@ export default function Home() {
                 key={workspace.id}
                 href={`/research/${workspace.id}`}
                 aria-label={`Open ${workspace.title}`}
-                className="group flex items-start justify-between gap-4 border-b border-rule py-6 transition-colors hover:bg-paper-raised sm:gap-8"
+                className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-6 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
               >
                 <div className="min-w-0 max-w-2xl">
                   <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
@@ -64,7 +65,7 @@ export default function Home() {
                 <ArrowRight
                   size={17}
                   strokeWidth={1.6}
-                  className="mt-1 shrink-0 text-muted transition-colors group-hover:text-pine"
+                  className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
                 />
               </Link>
             ))}
@@ -75,12 +76,12 @@ export default function Home() {
           <Label>Recent documents</Label>
 
           <div>
-            {recentDocuments.map((document) => (
+            {documents.map((document) => (
               <Link
                 key={document.title}
                 href="/documents"
                 aria-label={`Open ${document.title}`}
-                className="group flex items-start justify-between gap-4 border-b border-rule py-5 transition-colors hover:bg-paper-raised"
+                className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-5 transition-colors last:border-b-0 hover:bg-paper-raised"
               >
                 <div className="flex min-w-0 items-start gap-4">
                   <div className="mt-0.5 shrink-0 text-pine">
@@ -101,7 +102,7 @@ export default function Home() {
                 <ArrowRight
                   size={17}
                   strokeWidth={1.6}
-                  className="mt-1 shrink-0 text-muted transition-colors group-hover:text-pine"
+                  className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
                 />
               </Link>
             ))}
