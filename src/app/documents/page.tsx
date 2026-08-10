@@ -2,34 +2,11 @@ import { FileText, MoreHorizontal, Plus } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
-
-const documents = [
-  {
-    title: "Rainfall Onset, Peak and Retreat Dates",
-    type: "PDF",
-    pages: 24,
-    added: "10 Aug 2026",
-    status: "Ready",
-  },
-  {
-    title: "Climate Variability and Seasonal Rainfall",
-    type: "PDF",
-    pages: 18,
-    added: "9 Aug 2026",
-    status: "Ready",
-  },
-  {
-    title: "Rainfall Patterns in West Africa",
-    type: "PDF",
-    pages: 32,
-    added: "7 Aug 2026",
-    status: "Ready",
-  },
-];
+import { documents } from "@/data/research";
 
 export default function DocumentsPage() {
   return (
-    <AppShell>
+    <AppShell title="Documents">
       <div className="mx-auto max-w-5xl">
         <header className="flex flex-col items-start gap-4 border-b border-rule pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
@@ -40,7 +17,9 @@ export default function DocumentsPage() {
             </h1>
 
             <p className="mt-3 font-ui text-sm text-muted">
-              3 documents in your research library
+              {documents.length}{" "}
+              {documents.length === 1 ? "document" : "documents"} in your
+              research library
             </p>
           </div>
 

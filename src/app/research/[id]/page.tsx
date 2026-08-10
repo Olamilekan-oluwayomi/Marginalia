@@ -22,7 +22,7 @@ export default async function ResearchConversationPage({
   if (!workspace) notFound();
 
   return (
-    <AppShell>
+    <AppShell title={workspace.title}>
       <div className="mx-auto max-w-6xl">
         <header className="border-b border-rule pb-8">
           <Label>Research</Label>

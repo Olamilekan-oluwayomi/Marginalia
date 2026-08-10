@@ -7,7 +7,7 @@ import { workspaces } from "@/data/research";
 
 export default function ResearchPage() {
   return (
-    <AppShell>
+    <AppShell title="Research">
       <div className="mx-auto max-w-5xl">
         <header className="flex flex-col items-start gap-4 border-b border-rule pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
@@ -38,7 +38,7 @@ export default function ResearchPage() {
                 key={workspace.id}
                 href={`/research/${workspace.id}`}
                 aria-label={`Open ${workspace.title}`}
-                className="group flex items-start justify-between gap-4 border-b border-rule py-7 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
+                className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-7 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
               >
                 <div className="min-w-0 max-w-2xl">
                   <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
