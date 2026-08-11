@@ -4,9 +4,60 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Greeting } from "@/components/profile/Greeting";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
-import { documents, workspaces } from "@/data/research";
+import { fileTypeFromName } from "@/lib/document-format";
+import { formatDisplayDate } from "@/lib/dates";
+import {
+  createSupabaseClient,
+  getAllDocuments,
+  getResearchListWithCounts,
+  type DocumentRow,
+  type ResearchListWithCounts,
+} from "@/lib/research";
 
-export default function Home() {
+type ResearchListItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  documentCount: number;
+  updatedAt: string;
+};
+
+type RecentDocumentItem = {
+  id: string;
+  title: string;
+  fileType: string;
+  addedAt: string;
+};
+
+const RECENT_DOCUMENT_LIMIT = 4;
+
+function toResearchListItem(item: ResearchListWithCounts): ResearchListItem {
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    documentCount: item.document_count,
+    updatedAt: item.updated_at,
+  };
+}
+
+function toRecentDocumentItem(item: DocumentRow): RecentDocumentItem {
+  return {
+    id: item.id,
+    title: item.title,
+    fileType: fileTypeFromName(item.file_name),
+    addedAt: formatDisplayDate(item.created_at),
+  };
+}
+
+export default async function Home() {
+  const supabase = await createSupabaseClient();
+  const { data, error } = await getResearchListWithCounts(supabase);
+  const { data: docsData, error: docsError } = await getAllDocuments(supabase);
+  const research = error ? [] : data.map(toResearchListItem);
+  const documents = docsError ? [] : docsData.map(toRecentDocumentItem);
+  const recentDocuments = documents.slice(0, RECENT_DOCUMENT_LIMIT);
+
   return (
     <AppShell title="Workspace">
       <div className="mx-auto max-w-5xl">
@@ -22,7 +73,7 @@ export default function Home() {
               Continue your research or start something new.
             </p>
 
-            <Button>
+            <Button href="/research/new">
               <span className="flex items-center gap-2">
                 <Plus size={16} strokeWidth={1.8} />
                 New research
@@ -34,79 +85,149 @@ export default function Home() {
         <section className="mt-10">
           <Label>Recent research</Label>
 
-          <div className="mt-0">
-            {workspaces.map((workspace) => (
-              <Link
-                key={workspace.id}
-                href={`/research/${workspace.id}`}
-                aria-label={`Open ${workspace.title}`}
-                className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-6 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
-              >
-                <div className="min-w-0 max-w-2xl">
-                  <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
-                    {workspace.title}
-                  </h2>
+          {error ? (
+            <div
+              role="alert"
+              className="border-b border-rule px-4 py-10"
+            >
+              <h2 className="font-reading text-xl text-error">
+                Research couldn&rsquo;t be loaded.
+              </h2>
 
-                  <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
-                    {workspace.description}
-                  </p>
+              <p className="mt-3 font-ui text-sm text-muted">
+                Try refreshing the page.
+              </p>
+            </div>
+          ) : research.length === 0 ? (
+            <div className="border-b border-rule px-4 py-10">
+              <h2 className="font-reading text-xl text-ink">
+                Your research desk is empty.
+              </h2>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                    <span className="font-mono text-xs text-muted">
-                      {workspace.documents} documents
-                    </span>
+              <p className="mt-3 font-ui text-sm text-muted">
+                Start a research workspace to begin exploring a question.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-0">
+              {research.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/research/${item.id}`}
+                  aria-label={`Open ${item.title}`}
+                  className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-6 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
+                >
+                  <div className="min-w-0 max-w-2xl">
+                    <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
+                      {item.title}
+                    </h2>
 
-                    <span className="font-mono text-xs text-muted">
-                      Updated {workspace.updated}
-                    </span>
+                    {item.description ? (
+                      <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
+                        {item.description}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                      <span className="font-mono text-xs text-muted">
+                        {item.documentCount}{" "}
+                        {item.documentCount === 1 ? "document" : "documents"}
+                      </span>
+
+                      <span className="font-mono text-xs text-muted">
+                        Updated {formatDisplayDate(item.updatedAt)}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <ArrowRight
-                  size={17}
-                  strokeWidth={1.6}
-                  className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
-                />
-              </Link>
-            ))}
-          </div>
+                  <ArrowRight
+                    size={17}
+                    strokeWidth={1.6}
+                    className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
+                  />
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="mt-12">
           <Label>Recent documents</Label>
 
-          <div>
-            {documents.map((document) => (
-              <Link
-                key={document.title}
-                href="/documents"
-                aria-label={`Open ${document.title}`}
-                className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-5 transition-colors last:border-b-0 hover:bg-paper-raised"
-              >
-                <div className="flex min-w-0 items-start gap-4">
-                  <div className="mt-0.5 shrink-0 text-pine">
-                    <FileText size={18} strokeWidth={1.6} />
+          {docsError ? (
+            <div
+              role="alert"
+              className="border-b border-rule px-4 py-10"
+            >
+              <h2 className="font-reading text-xl text-error">
+                Documents couldn&rsquo;t be loaded.
+              </h2>
+
+              <p className="mt-3 font-ui text-sm text-muted">
+                Try refreshing the page.
+              </p>
+            </div>
+          ) : recentDocuments.length === 0 ? (
+            <div className="border-b border-rule px-4 py-10">
+              <h2 className="font-reading text-xl text-ink">
+                No documents yet.
+              </h2>
+
+              <p className="mt-3 font-ui text-sm text-muted">
+                Add a document to begin building your research library.
+              </p>
+            </div>
+          ) : (
+            <div>
+              {recentDocuments.map((document) => (
+                <Link
+                  key={document.id}
+                  href="/documents"
+                  aria-label={`Open ${document.title}`}
+                  className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-5 transition-colors last:border-b-0 hover:bg-paper-raised"
+                >
+                  <div className="flex min-w-0 items-start gap-4">
+                    <div className="mt-0.5 shrink-0 text-pine">
+                      <FileText size={18} strokeWidth={1.6} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <h2 className="break-words font-reading text-lg text-ink transition-colors group-hover:text-pine-dim">
+                        {document.title}
+                      </h2>
+
+                      <p className="mt-1 font-mono text-xs text-muted">
+                        {document.fileType} · Added {document.addedAt}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <h2 className="break-words font-reading text-lg text-ink transition-colors group-hover:text-pine-dim">
-                      {document.title}
-                    </h2>
+                  <ArrowRight
+                    size={17}
+                    strokeWidth={1.6}
+                    className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
+                  />
+                </Link>
+              ))}
 
-                    <p className="mt-1 font-mono text-xs text-muted">
-                      {document.type} · Added {document.added}
-                    </p>
-                  </div>
-                </div>
+              {documents.length > recentDocuments.length ? (
+                <Link
+                  href="/documents"
+                  className="group flex items-center justify-between gap-4 px-4 py-5 transition-colors hover:bg-paper-raised"
+                >
+                  <span className="font-ui text-sm text-ink transition-colors group-hover:text-pine-dim">
+                    View all documents
+                  </span>
 
-                <ArrowRight
-                  size={17}
-                  strokeWidth={1.6}
-                  className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
-                />
-              </Link>
-            ))}
-          </div>
+                  <ArrowRight
+                    size={17}
+                    strokeWidth={1.6}
+                    className="shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
+                  />
+                </Link>
+              ) : null}
+            </div>
+          )}
         </section>
 
         <section className="mt-16 border-t border-rule pt-8">

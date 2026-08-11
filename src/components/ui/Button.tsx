@@ -1,7 +1,9 @@
+import Link from "next/link";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "google";
+  href?: string;
 };
 
 const GOOGLE_ICON = (
@@ -29,6 +31,7 @@ export function Button({
   variant = "primary",
   className = "",
   children,
+  href,
   ...props
 }: ButtonProps) {
   const base =
@@ -42,6 +45,8 @@ export function Button({
       "inline-flex items-center justify-center gap-2 border border-rule bg-paper-raised text-ink hover:border-pine active:bg-paper",
   };
 
+  const classes = `${base} ${variants[variant]} ${className}`;
+
   const content: ReactNode =
     variant === "google" ? (
       <>
@@ -52,11 +57,16 @@ export function Button({
       children
     );
 
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {content}
+      </Link>
+    );
+  }
+
   return (
-    <button
-      className={`${base} ${variants[variant]} ${className}`}
-      {...props}
-    >
+    <button className={classes} {...props}>
       {content}
     </button>
   );
