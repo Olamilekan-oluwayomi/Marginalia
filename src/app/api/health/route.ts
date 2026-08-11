@@ -4,17 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  // Development-only Supabase connectivity check.
-  // Queries a table that does not exist: a successful round-trip to the
-  // project returns a PostgREST "relation does not exist" error, which is
-  // the expected proof that the client and project are wired correctly.
+  // Development-only Supabase connectivity check. A successful round-trip to
+  // the project (a query that returns without error) proves the client and
+  // project are wired correctly.
   const supabase = await createClient();
 
-  const { error } = await supabase.from("_phase_4_1_health_check").select("*").limit(1);
+  const { error } = await supabase.from("profiles").select("id").limit(1);
 
   const response = {
-    ok: Boolean(error && (error.code === "PGRST205" || error.code === "42P01")),
-    detail: error?.message ?? "unexpected: no error returned",
+    ok: !error,
+    detail: error?.message ?? "ok",
     code: error?.code ?? null,
   };
 
