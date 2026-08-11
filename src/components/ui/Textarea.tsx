@@ -1,6 +1,6 @@
-import type { TextareaHTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 
-type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
+type TextareaProps = ComponentProps<"textarea">;
 
 export function Textarea({ className = "", ...props }: TextareaProps) {
   return (
