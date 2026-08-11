@@ -65,13 +65,14 @@ export function Sidebar() {
         </nav>
 
         <div className="flex justify-center border-t border-rule py-4">
-          <button
+          <Link
+            href="/settings"
             title="Profile"
             aria-label="Profile"
             className="flex h-10 w-10 items-center justify-center rounded-md text-muted hover:bg-paper-raised hover:text-ink"
           >
             <UserRound size={17} strokeWidth={1.7} />
-          </button>
+          </Link>
         </div>
       </aside>
 

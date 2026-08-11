@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Monitor, Moon, Sun, UserRound } from "lucide-react";
-import { useProfile } from "@/components/profile/ProfileProvider";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { AccountMenu } from "@/components/layout/AccountMenu";
 import { useTheme } from "@/components/theme/ThemeProvider";
 
 type HeaderProps = {
@@ -18,7 +18,6 @@ const themeIcons = {
 
 export function Header({ title, showTitle = true }: HeaderProps) {
   const { theme, setTheme } = useTheme();
-  const { name } = useProfile();
 
   const ThemeIcon = themeIcons[theme];
   const next = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
@@ -54,15 +53,7 @@ export function Header({ title, showTitle = true }: HeaderProps) {
           <ThemeIcon size={17} strokeWidth={1.7} />
         </button>
 
-        <Link
-          href="/settings"
-          aria-label={`Profile: ${name}`}
-          title={`Profile: ${name}`}
-          className="flex h-9 items-center gap-2 rounded-md px-2 text-muted transition-colors hover:bg-paper-raised hover:text-ink"
-        >
-          <UserRound size={18} strokeWidth={1.7} />
-          <span className="hidden font-ui text-sm text-ink md:block">{name}</span>
-        </Link>
+        <AccountMenu />
       </div>
     </header>
   );

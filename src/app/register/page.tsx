@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
 import { RegisterForm } from "@/components/auth/RegisterForm";
 import { Label } from "@/components/ui/Label";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/get-user";
 
 export const metadata: Metadata = {
   title: "Create your research workspace",
@@ -15,10 +15,8 @@ type RegisterPageProps = {
 
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const params = await searchParams;
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
 
-  if (data.user) {
+  if (await getCurrentUser()) {
     redirect("/");
   }
 

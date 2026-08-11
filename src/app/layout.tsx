@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Newsreader, Work_Sans } from "next/font/google";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ProfileProvider } from "@/components/profile/ProfileProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import "./globals.css";
@@ -48,7 +49,9 @@ export default function RootLayout({
       >
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ThemeProvider>
-          <ProfileProvider>{children}</ProfileProvider>
+          <AuthProvider>
+            <ProfileProvider>{children}</ProfileProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
