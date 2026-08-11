@@ -5,17 +5,21 @@ import { Button } from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 
 type GoogleSignInProps = {
+  source: "register" | "login";
   error?: string;
+  redirectTo?: string;
 };
 
-export function GoogleSignIn({ error }: GoogleSignInProps) {
+export function GoogleSignIn({ source, error, redirectTo }: GoogleSignInProps) {
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const message =
-    error === "oauth_failed" || failed
-      ? "We couldn't sign you in with Google. Please try again."
-      : null;
+    error === "account_not_found"
+      ? "No account was found for this Google account. Please register first."
+      : error === "oauth_failed" || failed
+        ? "We couldn't sign you in with Google. Please try again."
+        : null;
 
   async function handleSignIn() {
     if (pending) {
@@ -24,6 +28,14 @@ export function GoogleSignIn({ error }: GoogleSignInProps) {
 
     setPending(true);
     setFailed(false);
+
+    document.cookie = `oauth_origin=${source}; path=/; samesite=lax; max-age=600`;
+
+    if (redirectTo) {
+      document.cookie = `auth_destination=${encodeURIComponent(
+        redirectTo
+      )}; path=/; samesite=lax; max-age=600`;
+    }
 
     const supabase = createClient();
     const { data, error: signInError } = await supabase.auth.signInWithOAuth({

@@ -39,7 +39,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
             Build a private space for reading, organizing, and exploring your sources.
           </p>
 
-          <GoogleSignIn error={params.error} />
+          <GoogleSignIn source="register" error={params.error} />
 
           <RegisterForm />
         </div>
