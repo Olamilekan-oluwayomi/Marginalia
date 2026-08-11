@@ -1,89 +1,73 @@
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { Button } from "@/components/ui/Button";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Label } from "@/components/ui/Label";
-import { ChevronDown } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth/get-user";
 
-export default function SettingsPage() {
+function signInMethodLabel(provider: unknown): string | null {
+  if (provider === "email") {
+    return "Email";
+  }
+  if (provider === "google") {
+    return "Google";
+  }
+  return null;
+}
+
+export default async function SettingsPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const email = user.email ?? "";
+  const method = signInMethodLabel(user.app_metadata?.provider);
+
   return (
     <AppShell title="Settings">
       <div className="mx-auto max-w-3xl">
         <header className="border-b border-rule pb-8">
-          <Label>Preferences</Label>
+          <Label>Settings</Label>
 
           <h1 className="mt-3 font-reading text-4xl leading-tight">Settings</h1>
 
           <p className="mt-3 font-ui text-sm text-muted">
-            Manage your account and research preferences.
+            Manage your account and appearance.
           </p>
         </header>
 
         <div className="divide-y divide-rule">
-          {/* Profile */}
           <section className="py-10">
-            <Label>Profile</Label>
+            <Label>Account</Label>
 
-            <ProfileForm />
-          </section>
+            <div className="mt-6">
+              <h2 className="font-ui text-sm font-medium text-ink">Profile</h2>
 
-          {/* Research preferences */}
-          <section className="py-10">
-            <Label>Research preferences</Label>
+              <p className="mt-1 font-ui text-sm text-muted">
+                Your display name and the email tied to this workspace.
+              </p>
 
-            <div className="mt-6 space-y-6">
-              <div>
-                <h2 className="font-ui text-sm font-medium text-ink">
-                  Answer style
-                </h2>
+              <ProfileForm email={email} />
 
-                <p className="mt-1 font-ui text-sm text-muted">
-                  Choose how detailed your research answers should be.
-                </p>
-
-                <div className="relative mt-3 w-full sm:w-fit">
-                  <select
-                    defaultValue="balanced"
-                    className="w-full appearance-none rounded-md border border-rule bg-paper-raised py-3 pl-4 pr-10 font-ui text-sm text-ink outline-none focus:border-pine sm:w-auto"
-                  >
-                    <option value="concise">Concise</option>
-                    <option value="balanced">Balanced</option>
-                    <option value="detailed">Detailed</option>
-                  </select>
-
-                  <ChevronDown
-                    size={16}
-                    strokeWidth={1.8}
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted"
-                  />
+              <dl className="mt-8 space-y-3 border-t border-rule pt-6">
+                <div className="flex items-baseline justify-between gap-6">
+                  <dt className="font-ui text-sm text-muted">Account status</dt>
+                  <dd className="font-ui text-sm text-ink">Authenticated</dd>
                 </div>
-              </div>
 
-              <div>
-                <h2 className="font-ui text-sm font-medium text-ink">
-                  Citations
-                </h2>
-
-                <p className="mt-1 font-ui text-sm text-muted">
-                  Always show source references alongside research answers.
-                </p>
-
-                <label className="mt-3 flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="h-4 w-4 accent-pine"
-                  />
-
-                  <span className="font-ui text-sm text-ink">
-                    Show citations
-                  </span>
-                </label>
-              </div>
+                {method ? (
+                  <div className="flex items-baseline justify-between gap-6">
+                    <dt className="font-ui text-sm text-muted">Sign-in method</dt>
+                    <dd className="font-ui text-sm text-ink">{method}</dd>
+                  </div>
+                ) : null}
+              </dl>
             </div>
           </section>
 
-          {/* Appearance */}
           <section className="py-10">
             <Label>Appearance</Label>
 
@@ -94,25 +78,27 @@ export default function SettingsPage() {
                 Choose how Marginalia looks on your device.
               </p>
 
-              <div className="mt-3">
+              <div className="mt-4">
                 <ThemeToggle />
               </div>
             </div>
           </section>
 
-          {/* Account */}
           <section className="py-10">
-            <Label>Account</Label>
+            <Label>Session</Label>
 
             <div className="mt-6">
-              <h2 className="font-ui text-sm font-medium text-ink">Sign out</h2>
+              <h2 className="font-ui text-sm font-medium text-ink">
+                Sign out of this workspace
+              </h2>
 
               <p className="mt-1 font-ui text-sm text-muted">
-                Sign out of your Marginalia account on this device.
+                You are signed in as{" "}
+                <span className="font-medium text-ink">{email}</span>.
               </p>
 
               <div className="mt-4">
-                <Button variant="secondary">Sign out</Button>
+                <LogoutButton />
               </div>
             </div>
           </section>
