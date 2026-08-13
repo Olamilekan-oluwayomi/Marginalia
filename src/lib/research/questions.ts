@@ -47,11 +47,45 @@ export async function getQuestions(
   return ok(data ?? []);
 }
 
+/**
+ * Counts questions created on a research within the last `windowMinutes`
+ * minutes. Used by the question action as a light application-level rate
+ * limit so a burst of questions cannot drain provider budget. RLS-scoped.
+ */
+export async function getRecentQuestionCount(
+  supabase: Supabase,
+  researchId: string,
+  windowMinutes: number
+): Promise<AppResult<number>> {
+  const idError = requireUuid(researchId, "Research id");
+  if (idError) {
+    return fail(validationError(idError.message), 0);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, 0);
+  }
+
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+
+  const { count, error } = await supabase
+    .from("research_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("research_id", researchId)
+    .gte("created_at", since);
+
+  if (error) {
+    return fail(toAppError(error), 0);
+  }
+
+  return ok(count ?? 0);
+}
+
 export async function getQuestionById(
   supabase: Supabase,
   questionId: string
-): Promise<AppResult<ResearchQuestionRow | null>> {
-  const idError = requireUuid(questionId, "Question id");
+): Promise<AppResult<ResearchQuestionRow | null>> {  const idError = requireUuid(questionId, "Question id");
   if (idError) {
     return fail(validationError(idError.message), null);
   }
@@ -107,6 +141,7 @@ export async function createQuestion(
       research_id: researchId,
       user_id: session.user.id,
       question: input.question.trim(),
+      include_web: input.includeWeb ?? false,
     })
     .select("*")
     .single();

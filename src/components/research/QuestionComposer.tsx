@@ -67,6 +67,15 @@ export function QuestionComposer({ researchId }: { researchId: string }) {
         </p>
       ) : null}
 
+      <label className="mt-4 flex items-center gap-2 text-sm text-muted">
+        <input
+          type="checkbox"
+          name="includeWeb"
+          className="size-4 accent-pine"
+        />
+        Search the web for sources before answering
+      </label>
+
       <div className="mt-3 flex justify-end">
         <Button type="submit" disabled={pending}>
           {pending ? "Asking..." : "Ask question"}

@@ -1,16 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { runAfterResponse } from "@/lib/research/background";
 import {
   createQuestion,
   createSource,
   createSupabaseClient,
   generateAnswer,
   getQuestionById,
+  getRecentQuestionCount,
   optionalDate,
   optionalText,
   requireText,
   tryTransitionQuestionStatus,
+  type Supabase,
 } from "@/lib/research";
 
 const QUESTION_MAX_LENGTH = 1000;
@@ -19,8 +22,31 @@ const URL_MAX_LENGTH = 500;
 const PUBLISHER_MAX_LENGTH = 200;
 const CONTENT_MAX_LENGTH = 200_000;
 
-const GENERATION_ERROR_MESSAGE =
-  "We couldn't generate this answer. Please try again.";
+/**
+ * Application-level guard: at most this many questions may be asked on a
+ * research within the window below. A burst of questions would otherwise each
+ * make a full provider round trip.
+ */
+const QUESTION_WINDOW_MINUTES = 5;
+const QUESTION_WINDOW_LIMIT = 20;
+
+/**
+ * Runs answer generation after the current response has been sent, then
+ * revalidates the workspace route so the next polled render shows the
+ * terminal state. The action itself returns immediately; generation failures
+ * surface through the question status (`failed`) rather than the action's
+ * return value, so the UI can offer a retry.
+ */
+function scheduleGeneration(
+  supabase: Supabase,
+  researchId: string,
+  questionId: string
+): void {
+  runAfterResponse(async () => {
+    await generateAnswer(supabase, { questionId, researchId });
+    revalidatePath(`/research/${researchId}`);
+  });
+}
 
 export type AskQuestionState = {
   fieldErrors: { question?: string };
@@ -34,6 +60,7 @@ export async function askQuestionAction(
   formData: FormData
 ): Promise<AskQuestionState> {
   const question = (formData.get("question") as string | null)?.trim() ?? "";
+  const includeWeb = formData.get("includeWeb") === "on";
 
   const questionError = requireText(
     question,
@@ -49,7 +76,33 @@ export async function askQuestionAction(
   }
 
   const supabase = await createSupabaseClient();
-  const result = await createQuestion(supabase, researchId, { question });
+
+  const recentResult = await getRecentQuestionCount(
+    supabase,
+    researchId,
+    QUESTION_WINDOW_MINUTES
+  );
+  if (recentResult.error) {
+    if (recentResult.error.code === "UNAUTHORIZED") {
+      return {
+        fieldErrors: {},
+        formError: "You need to be signed in to do that.",
+        success: false,
+      };
+    }
+  } else if (recentResult.data >= QUESTION_WINDOW_LIMIT) {
+    return {
+      fieldErrors: {},
+      formError:
+        "You've asked a lot of questions recently. Wait a bit and try again.",
+      success: false,
+    };
+  }
+
+  const result = await createQuestion(supabase, researchId, {
+    question,
+    includeWeb,
+  });
 
   if (result.error) {
     if (result.error.code === "UNAUTHORIZED") {
@@ -68,15 +121,12 @@ export async function askQuestionAction(
 
   const questionId = result.data!.id;
 
-  const generation = await generateAnswer(supabase, {
-    questionId,
-    researchId,
-  });
+  scheduleGeneration(supabase, researchId, questionId);
 
   revalidatePath(`/research/${researchId}`);
   return {
     fieldErrors: {},
-    formError: generation.error ? GENERATION_ERROR_MESSAGE : null,
+    formError: null,
     success: true,
   };
 }
@@ -139,15 +189,10 @@ export async function retryAnswerAction(
     };
   }
 
-  const generation = await generateAnswer(supabase, {
-    questionId,
-    researchId,
-  });
+  scheduleGeneration(supabase, researchId, questionId);
 
   revalidatePath(`/research/${researchId}`);
-  return {
-    formError: generation.error ? GENERATION_ERROR_MESSAGE : null,
-  };
+  return { formError: null };
 }
 
 export type RecoverAnswerState = {
@@ -156,11 +201,12 @@ export type RecoverAnswerState = {
 
 /**
  * Recovers a question that appears stuck. A question left in `pending` or
- * `generating` for longer than the render-time staleness threshold almost
- * always means the server-action request that was running it died (the
- * synchronous generation never returns, so a healthy flow always lands on
- * `complete` or `failed`). This moves it back to `failed` through a guarded
- * transition so the user can retry it.
+ * `generating` for longer than the render-time staleness threshold means the
+ * background generation that owned the status transition died (for example
+ * the platform killed the serverless function mid-task, or the process was
+ * interrupted), so a healthy run never lands on `complete` or `failed` in
+ * time. This moves it back to `failed` through a guarded transition so the
+ * user can retry it.
  *
  * The transition is atomic: if the question genuinely is still generating,
  * only one caller wins, and a later real completion simply marks the question

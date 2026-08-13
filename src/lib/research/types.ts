@@ -40,6 +40,12 @@ export type UpdateResearchInput = {
 
 export type CreateQuestionInput = {
   question: string;
+  /**
+   * When true, opt-in web research runs when the answer is generated and the
+   * discovered sources are saved to the research. Persisted on the row so a
+   * retry reproduces the original request.
+   */
+  includeWeb?: boolean;
 };
 
 export type CreateDocumentInput = {

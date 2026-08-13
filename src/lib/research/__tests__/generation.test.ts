@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   createAnswer: vi.fn(),
   createCitation: vi.fn(),
   isAiError: vi.fn(),
+  runWebResearch: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -37,6 +38,9 @@ vi.mock("@/lib/research/questions", () => ({
   tryTransitionQuestionStatus: mocks.tryTransitionQuestionStatus,
   updateQuestionStatus: mocks.updateQuestionStatus,
 }));
+vi.mock("@/lib/research/web-research", () => ({
+  runWebResearch: mocks.runWebResearch,
+}));
 vi.mock("@/lib/research/session", () => ({ requireUser: mocks.requireUser }));
 
 import { generateAnswer } from "@/lib/research/generation";
@@ -47,6 +51,7 @@ const question: ResearchQuestionRow = {
   user_id: "33333333-3333-3333-3333-333333333333",
   question: "What is the capital of France?",
   answer_status: "pending",
+  include_web: false,
   created_at: "2026-08-13T00:00:00.000Z",
 };
 
@@ -65,6 +70,10 @@ beforeEach(() => {
   mocks.retrieveResearchContext.mockResolvedValue({
     error: null,
     data: { items: [], hasBodyContent: false },
+  });
+  mocks.runWebResearch.mockResolvedValue({
+    error: null,
+    data: { items: [], addedCount: 0 },
   });
   mocks.buildResearchPrompt.mockReturnValue("Research question:\nWhat is the capital of France?");
   mocks.generateJson.mockResolvedValue({
@@ -236,5 +245,80 @@ describe("generateAnswer", () => {
 
     expect(result.error?.code).toBe("NOT_FOUND");
     expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
+  it("skips web research for questions that did not request it", async () => {
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.runWebResearch).not.toHaveBeenCalled();
+  });
+
+  it("runs web research and adds discovered items to the context when requested", async () => {
+    mocks.getQuestionById.mockResolvedValue({
+      error: null,
+      data: { ...question, include_web: true },
+    });
+    const webItem = {
+      kind: "source",
+      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      title: "Official Paris travel guide",
+      content: "",
+      metadata: {
+        publisher: "Web search",
+        url: "https://example.com/paris",
+      },
+    } as const;
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+    mocks.buildResearchPrompt.mockReturnValue("Research question:\nWhat is the capital of France?");
+    mocks.generateJson.mockResolvedValue({
+      answer: "Paris is the capital of France.",
+      citations: [],
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.runWebResearch).toHaveBeenCalledWith(
+      fakeSupabase,
+      question.research_id,
+      question.question
+    );
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: expect.arrayContaining([webItem]),
+      })
+    );
+  });
+
+  it("continues with local context when web research fails", async () => {
+    mocks.getQuestionById.mockResolvedValue({
+      error: null,
+      data: { ...question, include_web: true },
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: { code: "PROVIDER_ERROR", message: "Web search failed." },
+      data: null,
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+    expect(mocks.createAnswer).toHaveBeenCalledOnce();
   });
 });

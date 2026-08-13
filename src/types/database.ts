@@ -232,6 +232,7 @@ export type Database = {
           answer_status: string
           created_at: string
           id: string
+          include_web: boolean
           question: string
           research_id: string
           user_id: string
@@ -240,6 +241,7 @@ export type Database = {
           answer_status?: string
           created_at?: string
           id?: string
+          include_web?: boolean
           question: string
           research_id: string
           user_id: string
@@ -248,6 +250,7 @@ export type Database = {
           answer_status?: string
           created_at?: string
           id?: string
+          include_web?: boolean
           question?: string
           research_id?: string
           user_id?: string
