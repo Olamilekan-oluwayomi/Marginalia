@@ -159,6 +159,56 @@ export async function updateQuestionStatus(
   return ok(data);
 }
 
+/**
+ * Atomically moves a question from one of the allowed `from` statuses into
+ * `to`. The UPDATE is guarded by the current `answer_status`, so two
+ * concurrent callers cannot both win: PostgREST applies the WHERE clause
+ * against the latest committed row, so only the first writer matches and the
+ * second updates zero rows. This is what prevents duplicate generations of
+ * the same question through the UI/action path.
+ */
+export async function tryTransitionQuestionStatus(
+  supabase: Supabase,
+  questionId: string,
+  from: readonly AnswerStatus[],
+  to: AnswerStatus
+): Promise<AppResult<{ transitioned: boolean }>> {
+  const idError = requireUuid(questionId, "Question id");
+  if (idError) {
+    return fail(validationError(idError.message), { transitioned: false });
+  }
+
+  if (
+    from.length === 0 ||
+    from.some((status) => !ANSWER_STATUSES.includes(status))
+  ) {
+    return fail(validationError("Status is invalid."), { transitioned: false });
+  }
+  const toError = requireOneOf(to, ANSWER_STATUSES, "Status");
+  if (toError) {
+    return fail(validationError(toError.message), { transitioned: false });
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, { transitioned: false });
+  }
+
+  const { data, error } = await supabase
+    .from("research_questions")
+    .update({ answer_status: to })
+    .eq("id", questionId)
+    .in("answer_status", from)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return fail(toAppError(error), { transitioned: false });
+  }
+
+  return ok({ transitioned: Boolean(data) });
+}
+
 export async function deleteQuestion(
   supabase: Supabase,
   questionId: string

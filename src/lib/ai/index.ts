@@ -31,6 +31,17 @@ export type GenerateTextInput = {
   maxOutputTokens?: number;
 };
 
+export type GenerateJsonInput = Omit<GenerateTextInput, "prompt"> & {
+  /** The user-facing request text. */
+  prompt: string;
+  /**
+   * JSON Schema that the provider must make the response conform to. Passed
+   * through to the Gemini `responseJsonSchema` option; the provider enforces
+   * the shape during generation.
+   */
+  schema?: Record<string, unknown>;
+};
+
 /**
  * Generates text through the configured AI provider.
  *
@@ -55,7 +66,7 @@ export async function generateText(
     });
 
     const text = response.text ?? "";
-    if (text.length === 0) {
+    if (text.trim().length === 0) {
       throw aiError(
         "PROVIDER_ERROR",
         "The AI provider returned an empty response."
@@ -63,6 +74,54 @@ export async function generateText(
     }
 
     return text;
+  } catch (error) {
+    throw toAiError(error);
+  }
+}
+
+/**
+ * Generates JSON through the configured AI provider.
+ *
+ * Unlike `generateText`, the provider is asked to produce a JSON object that
+ * conforms to `input.schema`. The raw response text is parsed here so callers
+ * receive an already-validated value; a response that is not valid JSON
+ * becomes an `INVALID_RESPONSE` error rather than leaking raw provider text.
+ */
+export async function generateJson(input: GenerateJsonInput): Promise<unknown> {
+  try {
+    const client = getAiClient();
+
+    const response = await client.models.generateContent({
+      model: input.model ?? DEFAULT_MODEL,
+      contents: input.prompt,
+      config: {
+        ...(input.system !== undefined && { systemInstruction: input.system }),
+        ...(input.maxOutputTokens !== undefined && {
+          maxOutputTokens: input.maxOutputTokens,
+        }),
+        responseMimeType: "application/json",
+        ...(input.schema !== undefined && {
+          responseJsonSchema: input.schema,
+        }),
+      },
+    });
+
+    const text = response.text ?? "";
+    if (text.trim().length === 0) {
+      throw aiError(
+        "PROVIDER_ERROR",
+        "The AI provider returned an empty response."
+      );
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw aiError(
+        "INVALID_RESPONSE",
+        "The AI provider returned malformed JSON."
+      );
+    }
   } catch (error) {
     throw toAiError(error);
   }

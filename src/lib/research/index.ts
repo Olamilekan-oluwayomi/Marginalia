@@ -9,4 +9,6 @@ export * from "./documents";
 export * from "./sources";
 export * from "./answers";
 export * from "./citations";
+export * from "./context";
+export * from "./generation";
 export * from "./workspace";

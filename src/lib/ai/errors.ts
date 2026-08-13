@@ -1,4 +1,7 @@
-export type AiErrorCode = "NOT_CONFIGURED" | "PROVIDER_ERROR";
+export type AiErrorCode =
+  | "NOT_CONFIGURED"
+  | "PROVIDER_ERROR"
+  | "INVALID_RESPONSE";
 
 export type AiError = {
   code: AiErrorCode;
