@@ -18,6 +18,7 @@ import {
 const TITLE_MAX_LENGTH = 300;
 const URL_MAX_LENGTH = 500;
 const PUBLISHER_MAX_LENGTH = 200;
+const CONTENT_MAX_LENGTH = 200_000;
 
 function validateCreateInput(input: CreateSourceInput): string | null {
   const titleError = requireText(input.title, "Title", TITLE_MAX_LENGTH);
@@ -39,6 +40,10 @@ function validateCreateInput(input: CreateSourceInput): string | null {
   const dateError = optionalDate(input.retrieved_at, "Retrieved at");
   if (dateError) {
     return dateError.message;
+  }
+  const contentError = optionalText(input.content, "Content", CONTENT_MAX_LENGTH);
+  if (contentError) {
+    return contentError.message;
   }
   return null;
 }
@@ -99,6 +104,7 @@ export async function createSource(
       url: input.url?.trim() || null,
       publisher: input.publisher?.trim() || null,
       retrieved_at: input.retrieved_at || null,
+      content: input.content?.trim() || null,
     })
     .select("*")
     .single();

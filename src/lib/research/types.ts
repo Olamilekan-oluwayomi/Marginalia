@@ -55,6 +55,8 @@ export type CreateSourceInput = {
   url?: string;
   publisher?: string;
   retrieved_at?: string;
+  /** Optional body text that makes the source citable in answers. */
+  content?: string;
 };
 
 export type CreateAnswerInput = {

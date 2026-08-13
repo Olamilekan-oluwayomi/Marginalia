@@ -5,6 +5,8 @@ import { Citation } from "@/components/research/Citation";
 import { MarginNote } from "@/components/research/MarginNote";
 import { QuestionComposer } from "@/components/research/QuestionComposer";
 import { RetryAnswer } from "@/components/research/RetryAnswer";
+import { StuckAnswerRecovery } from "@/components/research/StuckAnswerRecovery";
+import { AddSourceForm } from "@/components/research/AddSourceForm";
 import { Label } from "@/components/ui/Label";
 import { formatDisplayDate } from "@/lib/dates";
 import { fileTypeFromName } from "@/lib/document-format";
@@ -177,13 +179,6 @@ export default async function ResearchWorkspacePage({
                         <p className="mt-2 font-reading text-[1.0625rem] leading-[1.65] text-ink-soft">
                           {question.question}
                         </p>
-
-                        {isWaiting ? (
-                          <span
-                            aria-hidden="true"
-                            className="query-loading mt-2 block h-px bg-ochre"
-                          />
-                        ) : null}
                       </div>
 
                       {paragraphs.length > 0 ? (
@@ -240,9 +235,30 @@ export default async function ResearchWorkspacePage({
                             Ask the question again to try once more.
                           </p>
                         </div>
-                      ) : (
-                        <p className="sr-only">Working on this answer.</p>
-                      )}
+                      ) : isWaiting ? (
+                        <div
+                          className="mt-3"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          <p className="font-ui text-xs text-muted">
+                            {question.answer_status === "generating"
+                              ? "Reading your research and writing an answer…"
+                              : "Waiting to start…"}
+                          </p>
+
+                          <span
+                            aria-hidden="true"
+                            className="query-loading mt-2 block h-px bg-ochre"
+                          />
+
+                          <StuckAnswerRecovery
+                            researchId={research.id}
+                            questionId={question.id}
+                            createdAt={question.created_at}
+                          />
+                        </div>
+                      ) : null}
                     </article>
                   );
                 })}
@@ -309,6 +325,7 @@ export default async function ResearchWorkspacePage({
                   source.retrieved_at
                     ? `Retrieved ${formatDisplayDate(source.retrieved_at)}`
                     : undefined,
+                  source.content ? "Citable" : "Metadata only",
                 ].filter((part): part is string => Boolean(part));
 
                 return (
@@ -333,6 +350,19 @@ export default async function ResearchWorkspacePage({
             </div>
           </section>
         ) : null}
+
+        <section className="mt-16 border-t border-rule pt-8">
+          <Label>Add a source</Label>
+
+          <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-muted">
+            Link a website or paper, and paste its body text so it can be
+            cited in generated answers.
+          </p>
+
+          <div className="mt-4 max-w-3xl">
+            <AddSourceForm researchId={id} />
+          </div>
+        </section>
       </div>
     </AppShell>
   );

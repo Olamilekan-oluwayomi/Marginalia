@@ -113,6 +113,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          content: string | null
           created_at: string
           file_name: string
           file_path: string
@@ -126,6 +127,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          content?: string | null
           created_at?: string
           file_name: string
           file_path: string
@@ -139,6 +141,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          content?: string | null
           created_at?: string
           file_name?: string
           file_path?: string
@@ -268,6 +271,7 @@ export type Database = {
       }
       sources: {
         Row: {
+          content: string | null
           created_at: string
           id: string
           publisher: string | null
@@ -278,6 +282,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          content?: string | null
           created_at?: string
           id?: string
           publisher?: string | null
@@ -288,6 +293,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          content?: string | null
           created_at?: string
           id?: string
           publisher?: string | null
