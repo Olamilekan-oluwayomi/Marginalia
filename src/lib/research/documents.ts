@@ -105,6 +105,41 @@ export async function getAllDocuments(
   return ok(data ?? []);
 }
 
+/**
+ * Fetches a single document by id. Ownership is enforced by RLS
+ * (`documents_select_own`), so a caller can never reach another user's
+ * document; a non-owned id resolves to NOT_FOUND.
+ */
+export async function getDocumentById(
+  supabase: Supabase,
+  documentId: string
+): Promise<AppResult<DocumentRow | null>> {
+  const idError = requireUuid(documentId, "Document id");
+  if (idError) {
+    return fail(validationError(idError.message), null);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, null);
+  }
+
+  const { data, error } = await supabase
+    .from("documents")
+    .select("*")
+    .eq("id", documentId)
+    .maybeSingle();
+
+  if (error) {
+    return fail(toAppError(error), null);
+  }
+  if (!data) {
+    return fail(notFound("Document not found."), null);
+  }
+
+  return ok(data);
+}
+
 export async function createDocument(
   supabase: Supabase,
   researchId: string,
@@ -120,6 +155,13 @@ export async function createDocument(
     return fail(validationError(validationMessage), null);
   }
 
+  if (input.id !== undefined) {
+    const documentIdError = requireUuid(input.id, "Document id");
+    if (documentIdError) {
+      return fail(validationError(documentIdError.message), null);
+    }
+  }
+
   const session = await requireUser(supabase);
   if ("error" in session) {
     return fail(session.error, null);
@@ -128,6 +170,7 @@ export async function createDocument(
   const { data, error } = await supabase
     .from("documents")
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       research_id: researchId,
       user_id: session.user.id,
       title: input.title.trim(),
@@ -146,11 +189,44 @@ export async function createDocument(
   return ok(data);
 }
 
+/**
+ * Claims a document for processing with an atomic `pending -> processing`
+ * transition. Returns `true` when this caller won the claim, `false` when the
+ * document was already claimed or no longer pending (another worker owns it).
+ * The status pre-condition runs inside the database update, so two concurrent
+ * callers can never both transition the same document; the loser must not
+ * proceed.
+ */
 export async function setDocumentProcessing(
   supabase: Supabase,
   documentId: string
-): Promise<AppResult<null>> {
-  return setDocumentStatus(supabase, documentId, "processing");
+): Promise<AppResult<boolean>> {
+  const idError = requireUuid(documentId, "Document id");
+  if (idError) {
+    return fail(validationError(idError.message), false);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, false);
+  }
+
+  const { data, error } = await supabase
+    .from("documents")
+    .update({ status: "processing" })
+    .eq("id", documentId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return fail(toAppError(error), false);
+  }
+  if (!data) {
+    return ok(false);
+  }
+
+  return ok(true);
 }
 
 export async function setDocumentReady(
