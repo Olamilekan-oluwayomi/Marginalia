@@ -52,8 +52,12 @@ function toRecentDocumentItem(item: DocumentRow): RecentDocumentItem {
 
 export default async function Home() {
   const supabase = await createSupabaseClient();
-  const { data, error } = await getResearchListWithCounts(supabase);
-  const { data: docsData, error: docsError } = await getAllDocuments(supabase);
+  const [researchResult, documentsResult] = await Promise.all([
+    getResearchListWithCounts(supabase),
+    getAllDocuments(supabase),
+  ]);
+  const { data, error } = researchResult;
+  const { data: docsData, error: docsError } = documentsResult;
   const research = error ? [] : data.map(toResearchListItem);
   const documents = docsError ? [] : docsData.map(toRecentDocumentItem);
   const recentDocuments = documents.slice(0, RECENT_DOCUMENT_LIMIT);

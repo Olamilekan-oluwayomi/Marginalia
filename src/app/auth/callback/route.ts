@@ -35,7 +35,8 @@ function sessionCookieName(): string {
 
 async function rejectUnknownLogin(
   request: NextRequest,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  errorParam = "account_not_found"
 ) {
   try {
     await supabase.auth.signOut();
@@ -52,7 +53,7 @@ async function rejectUnknownLogin(
   names.forEach((name) => cookieStore.set(name, "", { maxAge: 0, path: "/" }));
 
   const response = NextResponse.redirect(
-    new URL("/login?error=account_not_found", request.url)
+    new URL(`/login?error=${errorParam}`, request.url)
   );
   request.cookies.getAll().forEach(({ name }) =>
     response.cookies.delete(name)
@@ -85,25 +86,7 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (source === "register") {
-      if (user && user.user_metadata?.app_registered !== true) {
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: { app_registered: true },
-        });
-        if (metadataError) {
-          console.error("Failed to mark Google registration:", metadataError);
-        }
-      }
-
-      return buildRedirect(request, readDestination(request));
-    }
-
-    const registeredThroughApp =
-      user?.identities?.some((identity) => identity.provider === "email") ===
-        true ||
-      user?.user_metadata?.app_registered === true;
-
-    if (!user || !registeredThroughApp) {
+    if (!user) {
       return rejectUnknownLogin(request, supabase);
     }
 
@@ -113,11 +96,47 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profileError || !profile) {
-      if (profileError) {
-        console.error("Failed to verify application profile:", profileError);
+    if (profileError) {
+      console.error("Failed to verify application profile:", profileError);
+      return rejectUnknownLogin(request, supabase, "profile_check_failed");
+    }
+
+    if (!profile) {
+      const selfHealDisplayName =
+        user.user_metadata?.display_name ??
+        user.user_metadata?.name ??
+        "New Researcher";
+
+      const { error: selfHealError } = await supabase
+        .from("profiles")
+        .upsert(
+          { id: user.id, display_name: selfHealDisplayName },
+          { onConflict: "id", ignoreDuplicates: true }
+        );
+
+      if (selfHealError) {
+        console.error("profile_self_heal_failed:", selfHealError);
+        return rejectUnknownLogin(request, supabase);
       }
-      return rejectUnknownLogin(request, supabase);
+
+      const { data: healedProfile, error: recheckError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (recheckError) {
+        console.error("profile_self_heal_failed:", recheckError);
+        return rejectUnknownLogin(request, supabase);
+      }
+
+      if (!healedProfile) {
+        console.error(
+          "profile_self_heal_failed:",
+          "profile row still missing after self-heal insert"
+        );
+        return rejectUnknownLogin(request, supabase);
+      }
     }
 
     return buildRedirect(request, readDestination(request));

@@ -17,9 +17,11 @@ export function GoogleSignIn({ source, error, redirectTo }: GoogleSignInProps) {
   const message =
     error === "account_not_found"
       ? "No account was found for this Google account. Please register first."
-      : error === "oauth_failed" || failed
-        ? "We couldn't sign you in with Google. Please try again."
-        : null;
+      : error === "profile_check_failed"
+        ? "We couldn't verify your account just now. Please try signing in again."
+        : error === "oauth_failed" || failed
+          ? "We couldn't sign you in with Google. Please try again."
+          : null;
 
   async function handleSignIn() {
     if (pending) {

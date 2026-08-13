@@ -28,22 +28,33 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     null
   );
   const lastUserId = useRef<string | null>(null);
+  const userId = user?.id ?? null;
+  const userRef = useRef(user);
 
   useEffect(() => {
-    if (loading || !user) {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    if (loading) {
       return;
     }
 
-    if (lastUserId.current === user.id) {
+    if (!userId) {
+      lastUserId.current = null;
       return;
     }
-    lastUserId.current = user.id;
+
+    if (lastUserId.current === userId) {
+      return;
+    }
+    lastUserId.current = userId;
 
     let cancelled = false;
+    const id = userId;
     const supabase = createClient();
-    const userId = user.id;
 
-    const metadata = user.user_metadata;
+    const metadata = userRef.current?.user_metadata;
     const fallbackName =
       typeof metadata?.display_name === "string" && metadata.display_name.trim()
         ? metadata.display_name.trim()
@@ -56,7 +67,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         const { data } = await supabase
           .from("profiles")
           .select("display_name")
-          .eq("id", userId)
+          .eq("id", id)
           .maybeSingle();
 
         if (cancelled) {
@@ -64,12 +75,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         }
 
         setProfile({
-          userId,
+          userId: id,
           name: data?.display_name?.trim() || fallbackName,
         });
       } catch {
         if (!cancelled) {
-          setProfile({ userId, name: fallbackName });
+          setProfile({ userId: id, name: fallbackName });
         }
       }
     }
@@ -79,7 +90,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, loading]);
+  }, [loading, userId]);
 
   const name = profile && user && profile.userId === user.id ? profile.name : "";
   const email = user ? user.email ?? "" : "";

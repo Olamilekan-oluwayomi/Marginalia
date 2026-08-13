@@ -36,10 +36,13 @@ function toDocumentListItem(item: DocumentRow): DocumentListItem {
 
 export default async function DocumentsPage() {
   const supabase = await createSupabaseClient();
-  const { data, error } = await getAllDocuments(supabase);
+  const [documentsResult, researchResult] = await Promise.all([
+    getAllDocuments(supabase),
+    getResearchList(supabase),
+  ]);
+  const { data, error } = documentsResult;
   const documents = error ? [] : data.map(toDocumentListItem);
 
-  const researchResult = await getResearchList(supabase);
   const researchOptions = researchResult.error
     ? []
     : researchResult.data.map((research) => ({
