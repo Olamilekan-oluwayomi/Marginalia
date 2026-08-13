@@ -143,9 +143,25 @@ button {
   animation: query-pulse 1.4s ease-in-out infinite;
 }
 
+@keyframes citation-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+
+  30% {
+    background-color: color-mix(in srgb, var(--ochre) 35%, transparent);
+  }
+}
+
+.citation-flash {
+  animation: citation-flash 1.4s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .answer-enter,
-  .query-loading {
+  .query-loading,
+  .citation-flash {
     animation: none;
   }
 }
