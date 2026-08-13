@@ -11,8 +11,9 @@ const initialState: RecoverAnswerState = { formError: null };
 
 /**
  * How long a question may stay in `pending`/`generating` before it is treated
- * as stuck. Generation is synchronous, so a longer wait means the request that
- * owned the status transition died.
+ * as stuck. Generation runs after the response is sent (see
+ * `runAfterResponse`); a wait far longer than a healthy run means the
+ * background task that owned the status transition died.
  */
 const STALE_ANSWER_MS = 5 * 60 * 1000;
 

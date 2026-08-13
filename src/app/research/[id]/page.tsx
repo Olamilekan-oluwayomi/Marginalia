@@ -4,6 +4,7 @@ import { Answer } from "@/components/research/Answer";
 import { Citation } from "@/components/research/Citation";
 import { MarginNote } from "@/components/research/MarginNote";
 import { QuestionComposer } from "@/components/research/QuestionComposer";
+import { QuestionStatusPoller } from "@/components/research/QuestionStatusPoller";
 import { RetryAnswer } from "@/components/research/RetryAnswer";
 import { StuckAnswerRecovery } from "@/components/research/StuckAnswerRecovery";
 import { AddSourceForm } from "@/components/research/AddSourceForm";
@@ -16,6 +17,14 @@ import {
   type CitationRow,
   type ResearchWorkspace,
 } from "@/lib/research";
+
+/**
+ * Generation (context retrieval, optional web research, Gemini) runs after the
+ * response is sent; on serverless platforms this caps how long that background
+ * work may take. 60s fits the deployment's typical provider round trips; the
+ * platform still enforces its own upper bound.
+ */
+export const maxDuration = 60;
 
 type CitationNote = {
   number: number;
@@ -107,8 +116,15 @@ export default async function ResearchWorkspacePage({
   }
   notes.sort((a, b) => a.number - b.number);
 
+  const hasWaitingQuestions = questions.some(
+    (question) =>
+      question.answer_status === "pending" ||
+      question.answer_status === "generating"
+  );
+
   return (
     <AppShell title={research.title}>
+      <QuestionStatusPoller isWaiting={hasWaitingQuestions} />
       <div className="mx-auto max-w-6xl">
         <header className="border-b border-rule pb-8">
           <Label>Research</Label>

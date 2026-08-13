@@ -5,10 +5,15 @@ const mocks = vi.hoisted(() => ({
   getQuestionById: vi.fn(),
   tryTransitionQuestionStatus: vi.fn(),
   generateAnswer: vi.fn(),
+  revalidatePath: vi.fn(),
+  runAfterResponse: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("@/lib/research/background", () => ({
+  runAfterResponse: mocks.runAfterResponse,
+}));
 vi.mock("@/lib/research", () => ({
   createSupabaseClient: mocks.createSupabaseClient,
   getQuestionById: mocks.getQuestionById,
@@ -16,6 +21,7 @@ vi.mock("@/lib/research", () => ({
   generateAnswer: mocks.generateAnswer,
   createQuestion: vi.fn(),
   createSource: vi.fn(),
+  getRecentQuestionCount: vi.fn(),
   optionalDate: () => null,
   optionalText: () => null,
   requireText: () => null,
@@ -49,10 +55,11 @@ beforeEach(() => {
     data: { transitioned: true },
   });
   mocks.generateAnswer.mockResolvedValue({ error: null, data: {} });
+  mocks.runAfterResponse.mockImplementation(() => undefined);
 });
 
 describe("retryAnswerAction", () => {
-  it("retries a failed question owned by the research", async () => {
+  it("schedules generation for a failed question owned by the research", async () => {
     const state = await retryAnswerAction(
       RESEARCH_ID,
       { formError: null },
@@ -66,13 +73,24 @@ describe("retryAnswerAction", () => {
       ["failed"],
       "pending"
     );
+
+    // The action returns immediately; generation runs after the response.
+    expect(mocks.runAfterResponse).toHaveBeenCalledOnce();
+    expect(mocks.generateAnswer).not.toHaveBeenCalled();
+
+    const task = mocks.runAfterResponse.mock.calls[0][0];
+    await task();
+
     expect(mocks.generateAnswer).toHaveBeenCalledWith(expect.anything(), {
       questionId: "question-1",
       researchId: RESEARCH_ID,
     });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(
+      `/research/${RESEARCH_ID}`
+    );
   });
 
-  it("does not reset a question that belongs to another research", async () => {
+  it("does not schedule generation for a question that belongs to another research", async () => {
     mocks.getQuestionById.mockResolvedValue({
       error: null,
       data: { ...question, research_id: "research-other" },
@@ -86,10 +104,10 @@ describe("retryAnswerAction", () => {
 
     expect(state.formError).toContain("does not belong");
     expect(mocks.tryTransitionQuestionStatus).not.toHaveBeenCalled();
-    expect(mocks.generateAnswer).not.toHaveBeenCalled();
+    expect(mocks.runAfterResponse).not.toHaveBeenCalled();
   });
 
-  it("does not reset a question that no longer exists", async () => {
+  it("does not schedule generation for a question that no longer exists", async () => {
     mocks.getQuestionById.mockResolvedValue({
       error: { code: "NOT_FOUND", message: "Question not found." },
       data: null,
@@ -103,6 +121,7 @@ describe("retryAnswerAction", () => {
 
     expect(state.formError).toContain("no longer exists");
     expect(mocks.tryTransitionQuestionStatus).not.toHaveBeenCalled();
+    expect(mocks.runAfterResponse).not.toHaveBeenCalled();
   });
 
   it("surfaces a sign-in error", async () => {
@@ -119,6 +138,7 @@ describe("retryAnswerAction", () => {
 
     expect(state.formError).toContain("signed in");
     expect(mocks.tryTransitionQuestionStatus).not.toHaveBeenCalled();
+    expect(mocks.runAfterResponse).not.toHaveBeenCalled();
   });
 
   it("refuses when the guarded transition does not win", async () => {
@@ -135,5 +155,6 @@ describe("retryAnswerAction", () => {
 
     expect(state.formError).toContain("isn't ready to retry");
     expect(mocks.generateAnswer).not.toHaveBeenCalled();
+    expect(mocks.runAfterResponse).not.toHaveBeenCalled();
   });
 });
