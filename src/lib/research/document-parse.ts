@@ -6,7 +6,7 @@ import { PDFParse } from "pdf-parse";
 const MAX_CONTENT_CHARS = 200_000;
 
 /** Maximum accepted upload size (must stay in sync with the storage bucket limit). */
-export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+export { MAX_UPLOAD_BYTES as MAX_DOCUMENT_BYTES } from "./document-upload";
 
 type DocumentKind = "pdf" | "text";
 

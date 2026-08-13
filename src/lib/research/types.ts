@@ -49,6 +49,11 @@ export type CreateQuestionInput = {
 };
 
 export type CreateDocumentInput = {
+  /**
+   * Optional pre-generated document id, used when the storage path is built
+   * from the document id before the row exists (upload-first flow).
+   */
+  id?: string;
   title: string;
   file_name: string;
   file_path: string;
