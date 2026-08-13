@@ -75,8 +75,8 @@ export default async function DocumentsPage() {
           <Label>Add a document</Label>
 
           <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-muted">
-            Upload a PDF or plain-text file. Its text is extracted so it can be
-            used as evidence in generated answers.
+            Upload a PDF file to add it to your research library. Documents
+            are stored securely and processed automatically after upload.
           </p>
 
           <div className="mt-5">

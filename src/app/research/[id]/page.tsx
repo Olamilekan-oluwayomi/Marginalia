@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { Answer } from "@/components/research/Answer";
@@ -27,6 +28,8 @@ import {
 export const maxDuration = 60;
 
 type CitationNote = {
+  /** Persisted citation row id; the unique key and scroll target. */
+  id: string;
   number: number;
   sourceName: string;
   date: string;
@@ -62,11 +65,59 @@ function toCitationNote(
   }
 
   return {
+    id: citation.id,
     number: citation.citation_number,
     sourceName,
     date,
     excerpt: citation.excerpt ?? undefined,
   };
+}
+
+/**
+ * Renders one answer paragraph with its inline `[n]` citation markers turned
+ * into interactive citation buttons. A marker becomes a button only when the
+ * current answer actually persisted a citation with that number (answer-local
+ * mapping); any other `[n]` is left as plain text.
+ */
+function renderParagraph(
+  paragraph: string,
+  paragraphIndex: number,
+  notesByNumber: Map<number, CitationNote>
+) {
+  const segments = paragraph.split(/(\[\d+\])/g);
+  const children: React.ReactNode[] = [];
+  let segmentIndex = 0;
+
+  for (const segment of segments) {
+    const match = /^\[(\d+)\]$/.exec(segment);
+    const note = match ? notesByNumber.get(Number(match[1])) : undefined;
+    const key = `${segmentIndex}`;
+    segmentIndex += 1;
+
+    if (note) {
+      children.push(
+        <Citation
+          key={`${note.id}-${key}`}
+          index={note.number}
+          sourceName={note.sourceName}
+          retrievedDate={note.date}
+          excerpt={note.excerpt}
+          targetId={note.id}
+        />
+      );
+    } else if (segment.length > 0) {
+      children.push(<Fragment key={`text-${key}`}>{segment}</Fragment>);
+    }
+  }
+
+  return (
+    <p
+      key={paragraphIndex}
+      className={paragraphIndex === 0 ? undefined : "mt-6"}
+    >
+      {children}
+    </p>
+  );
 }
 
 export default async function ResearchWorkspacePage({
@@ -183,6 +234,10 @@ export default async function ResearchWorkspacePage({
                         .map((citation) => toCitationNote(citation, workspace))
                     : [];
 
+                  const notesByNumber = new Map(
+                    answerNotes.map((note) => [note.number, note] as const)
+                  );
+
                   const isWaiting =
                     question.answer_status === "pending" ||
                     question.answer_status === "generating";
@@ -199,28 +254,9 @@ export default async function ResearchWorkspacePage({
 
                       {paragraphs.length > 0 ? (
                         <Answer>
-                          {paragraphs.map((paragraph, index) => (
-                            <p
-                              key={index}
-                              className={index === 0 ? undefined : "mt-6"}
-                            >
-                              {paragraph}
-                            </p>
-                          ))}
-
-                          {answerNotes.length > 0 ? (
-                            <p className="mt-6">
-                              {answerNotes.map((note) => (
-                                <Citation
-                                  key={`${latest!.id}-${note.number}`}
-                                  index={note.number}
-                                  sourceName={note.sourceName}
-                                  retrievedDate={note.date}
-                                  excerpt={note.excerpt}
-                                />
-                              ))}
-                            </p>
-                          ) : null}
+                          {paragraphs.map((paragraph, index) =>
+                            renderParagraph(paragraph, index, notesByNumber)
+                          )}
 
                           {latest!.model ? (
                             <p className="mt-6 font-mono text-xs text-muted">
@@ -290,13 +326,19 @@ export default async function ResearchWorkspacePage({
             <aside className="hidden lg:block">
               <div className="sticky top-12 space-y-8">
                 {notes.map((note) => (
-                  <MarginNote
-                    key={`${note.number}-${note.sourceName}`}
-                    number={note.number}
-                    sourceName={note.sourceName}
-                    retrievedDate={note.date}
-                    excerpt={note.excerpt}
-                  />
+                  <div
+                    key={note.id}
+                    id={`citation-${note.id}`}
+                    tabIndex={-1}
+                    className="scroll-mt-24"
+                  >
+                    <MarginNote
+                      number={note.number}
+                      sourceName={note.sourceName}
+                      retrievedDate={note.date}
+                      excerpt={note.excerpt}
+                    />
+                  </div>
                 ))}
               </div>
             </aside>
