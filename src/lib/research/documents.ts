@@ -194,6 +194,86 @@ async function setDocumentStatus(
   return ok(null);
 }
 
+const CONTENT_MAX_LENGTH = 200_000;
+
+/**
+ * Persists extracted body text for a document. Returns the updated row so
+ * callers can confirm the write actually landed (a zero-row update resolves
+ * to NOT_FOUND) before marking the document ready.
+ */
+export async function setDocumentContent(
+  supabase: Supabase,
+  documentId: string,
+  content: string
+): Promise<AppResult<DocumentRow | null>> {
+  const idError = requireUuid(documentId, "Document id");
+  if (idError) {
+    return fail(validationError(idError.message), null);
+  }
+
+  const contentError = requireText(content, "Content", CONTENT_MAX_LENGTH);
+  if (contentError) {
+    return fail(validationError(contentError.message), null);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, null);
+  }
+
+  const { data, error } = await supabase
+    .from("documents")
+    .update({ content: content.trim() })
+    .eq("id", documentId)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    return fail(toAppError(error), null);
+  }
+  if (!data) {
+    return fail(notFound("Document not found."), null);
+  }
+
+  return ok(data);
+}
+
+/**
+ * Records where a document's source file lives in storage. Best-effort
+ * metadata: a zero-row update does not fail the operation.
+ */
+export async function setDocumentFilePath(
+  supabase: Supabase,
+  documentId: string,
+  filePath: string
+): Promise<AppResult<null>> {
+  const idError = requireUuid(documentId, "Document id");
+  if (idError) {
+    return fail(validationError(idError.message), null);
+  }
+
+  const pathError = requireText(filePath, "File path", FILE_PATH_MAX_LENGTH);
+  if (pathError) {
+    return fail(validationError(pathError.message), null);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, null);
+  }
+
+  const { error } = await supabase
+    .from("documents")
+    .update({ file_path: filePath })
+    .eq("id", documentId);
+
+  if (error) {
+    return fail(toAppError(error), null);
+  }
+
+  return ok(null);
+}
+
 export async function deleteDocument(
   supabase: Supabase,
   documentId: string

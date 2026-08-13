@@ -1,5 +1,6 @@
-import { FileText, MoreHorizontal, Plus } from "lucide-react";
+import { FileText, MoreHorizontal } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
+import { AddDocumentForm } from "@/components/documents/AddDocumentForm";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import {
@@ -11,6 +12,7 @@ import { formatDisplayDate } from "@/lib/dates";
 import {
   createSupabaseClient,
   getAllDocuments,
+  getResearchList,
   type DocumentRow,
 } from "@/lib/research";
 
@@ -37,6 +39,14 @@ export default async function DocumentsPage() {
   const { data, error } = await getAllDocuments(supabase);
   const documents = error ? [] : data.map(toDocumentListItem);
 
+  const researchResult = await getResearchList(supabase);
+  const researchOptions = researchResult.error
+    ? []
+    : researchResult.data.map((research) => ({
+        id: research.id,
+        title: research.title,
+      }));
+
   return (
     <AppShell title="Documents">
       <div className="mx-auto max-w-5xl">
@@ -56,14 +66,20 @@ export default async function DocumentsPage() {
                   } in your research library`}
             </p>
           </div>
-
-          <Button>
-            <span className="flex items-center gap-2">
-              <Plus size={16} strokeWidth={1.8} />
-              Add document
-            </span>
-          </Button>
         </header>
+
+        <section id="add-document" className="mt-8 rounded-md border border-rule bg-paper-raised p-6">
+          <Label>Add a document</Label>
+
+          <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-muted">
+            Upload a PDF or plain-text file. Its text is extracted so it can be
+            used as evidence in generated answers.
+          </p>
+
+          <div className="mt-5">
+            <AddDocumentForm researchOptions={researchOptions} />
+          </div>
+        </section>
 
         <section className="mt-10">
           <div className="hidden grid-cols-[1fr_120px_40px] items-center gap-x-8 border-b border-rule pb-3 sm:grid">
@@ -160,7 +176,9 @@ export default async function DocumentsPage() {
             </p>
 
             <div className="mt-5">
-              <Button variant="secondary">Add your first document</Button>
+              <Button variant="secondary" href="#add-document">
+                Add your first document
+              </Button>
             </div>
           </div>
         </section>
