@@ -1,12 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import {
   addDocumentAction,
   type AddDocumentState,
 } from "@/app/documents/actions";
+import {
+  isPdfFileName,
+  isPdfMime,
+  MAX_UPLOAD_BYTES,
+} from "@/lib/research/document-upload";
 
 export type ResearchOption = {
   id: string;
@@ -18,8 +24,29 @@ const initialState: AddDocumentState = {
   success: false,
 };
 
+const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / (1024 * 1024);
+
 function inputClass() {
   return "mt-2 w-full rounded-md border border-rule bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-pine";
+}
+
+function validateFile(file: File | null): string | null {
+  if (!file) {
+    return "Choose a PDF file to upload.";
+  }
+  if (file.size === 0) {
+    return "That file is empty.";
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return `PDF files must be ${MAX_UPLOAD_MB} MB or smaller.`;
+  }
+  if (!isPdfFileName(file.name)) {
+    return "Only PDF files can be uploaded.";
+  }
+  if (!isPdfMime(file.type)) {
+    return "That file isn't a PDF.";
+  }
+  return null;
 }
 
 export function AddDocumentForm({
@@ -31,6 +58,19 @@ export function AddDocumentForm({
     addDocumentAction,
     initialState
   );
+  const [clientError, setClientError] = useState<string | null>(null);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const input = event.currentTarget.elements.namedItem(
+      "file"
+    ) as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    const error = validateFile(file);
+    setClientError(error);
+    if (error) {
+      event.preventDefault();
+    }
+  }
 
   return (
     <div>
@@ -40,7 +80,7 @@ export function AddDocumentForm({
           it.
         </p>
       ) : (
-        <form action={formAction} noValidate>
+        <form action={formAction} onSubmit={handleSubmit} noValidate>
           <div className="grid max-w-2xl gap-6 sm:grid-cols-2">
             <div>
               <Label htmlFor="document-research">Research</Label>
@@ -70,16 +110,20 @@ export function AddDocumentForm({
                 id="document-file"
                 name="file"
                 type="file"
-                accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+                accept=".pdf,application/pdf"
                 required
                 className={inputClass()}
               />
+
+              <p className="mt-2 font-ui text-xs text-muted">
+                PDF files up to {MAX_UPLOAD_MB} MB.
+              </p>
             </div>
           </div>
 
-          {state.formError ? (
+          {clientError ?? state.formError ? (
             <p role="alert" className="mt-6 font-ui text-sm text-error">
-              {state.formError}
+              {clientError ?? state.formError}
             </p>
           ) : null}
 
@@ -91,7 +135,7 @@ export function AddDocumentForm({
 
           <div className="mt-8">
             <Button type="submit" disabled={pending}>
-              {pending ? "Uploading…" : "Upload document"}
+              {pending ? "Uploading…" : "Upload PDF"}
             </Button>
           </div>
         </form>

@@ -7,20 +7,49 @@ type CitationProps = {
   sourceName?: string;
   retrievedDate?: string;
   excerpt?: string;
+  /** The persisted citation row id; the margin note is keyed by it. */
+  targetId?: string;
   onClick?: () => void;
 };
+
+const FLASH_DURATION_MS = 1500;
+
+function focusCitationTarget(targetId?: string) {
+  if (!targetId) return;
+  const element = document.getElementById(`citation-${targetId}`);
+  if (!element) return;
+
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
+  element.scrollIntoView({
+    behavior: reduceMotion ? "auto" : "smooth",
+    block: "nearest",
+  });
+
+  element.classList.remove("citation-flash");
+  void element.offsetWidth;
+  element.classList.add("citation-flash");
+  window.setTimeout(() => {
+    element.classList.remove("citation-flash");
+  }, FLASH_DURATION_MS);
+
+  element.focus({ preventScroll: true });
+}
 
 export function Citation({
   index,
   sourceName,
   retrievedDate,
   excerpt,
+  targetId,
   onClick,
 }: CitationProps) {
   const [expanded, setExpanded] = useState(false);
 
   const handleClick = () => {
     setExpanded((prev) => !prev);
+    focusCitationTarget(targetId);
     onClick?.();
   };
 
