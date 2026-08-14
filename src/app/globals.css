@@ -160,8 +160,12 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .answer-enter,
-  .query-loading,
+  .query-loading {
+    animation: none;
+  }
+
   .citation-flash {
     animation: none;
+    background-color: color-mix(in srgb, var(--ochre) 35%, transparent);
   }
 }

@@ -330,7 +330,7 @@ export default async function ResearchWorkspacePage({
                     key={note.id}
                     id={`citation-${note.id}`}
                     tabIndex={-1}
-                    className="scroll-mt-24"
+                    className="scroll-mt-24 rounded-md px-3 py-2"
                   >
                     <MarginNote
                       number={note.number}

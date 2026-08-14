@@ -133,6 +133,42 @@ describe("resolveCitations", () => {
     expect(result.rejectedCount).toBe(1);
   });
 
+  it("drops only the citation that points at a metadata-only source and keeps the document citation", () => {
+    const context: ResearchContext = {
+      items: [
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "A document",
+          content: "body text",
+          metadata: { file_name: "a.pdf", mime_type: "application/pdf" },
+        },
+        {
+          kind: "source",
+          id: "src-1",
+          title: "A web result",
+          content: "",
+          metadata: { publisher: "Web search", url: "https://example.com" },
+        },
+      ],
+      hasBodyContent: true,
+    };
+
+    const output: GeneratedAnswerOutput = {
+      answer: "text with [1] and [2]",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 2 },
+      ],
+    };
+
+    const result = resolveCitations(output, context);
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(1);
+  });
+
   it("resolves sources to source_id and keeps citation order", () => {
     const context: ResearchContext = {
       items: [
@@ -168,5 +204,127 @@ describe("resolveCitations", () => {
       { citation_number: 2, source_id: "src-1" },
     ]);
     expect(result.rejectedCount).toBe(0);
+  });
+
+  it("keeps a valid single-item citation and its marker in the answer", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "A significance level of 0.05 was used [1].",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "alpha of 0.05 was used for every trend analysis.")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe("A significance level of 0.05 was used [1].");
+  });
+
+  it("drops an out-of-range citation and removes its dangling marker from the answer", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "A significance level of 0.05 was used [2].",
+      citations: [{ citation_number: 2, evidence: 2 }],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "alpha of 0.05 was used for every trend analysis.")
+    );
+    expect(result.citations).toEqual([]);
+    expect(result.rejectedCount).toBe(1);
+    expect(result.answer).toBe("A significance level of 0.05 was used.");
+  });
+
+  it("resolves evidence 2 to the second context item", () => {
+    const context: ResearchContext = {
+      items: [
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "A document",
+          content: "body",
+          metadata: { file_name: "a.pdf", mime_type: "application/pdf" },
+        },
+        {
+          kind: "source",
+          id: "src-1",
+          title: "A source",
+          content: "body",
+          metadata: { publisher: "Pub", url: "https://example.com" },
+        },
+      ],
+      hasBodyContent: true,
+    };
+
+    const output: GeneratedAnswerOutput = {
+      answer: "The second item supports this [1].",
+      citations: [{ citation_number: 1, evidence: 2 }],
+    };
+
+    const result = resolveCitations(output, context);
+    expect(result.citations).toEqual([
+      { citation_number: 1, source_id: "src-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe("The second item supports this [1].");
+  });
+
+  it("resolves multiple citations against the same document", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "First finding [1], then a second one [2].",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 1 },
+      ],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "body text")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+      { citation_number: 2, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+  });
+
+  it("keeps valid markers and strips an invalid [2] when only evidence 1 exists", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "The level was 0.05 [1] for the trend analysis [2].",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 2 },
+      ],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "alpha of 0.05 was used for every trend analysis.")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(1);
+    expect(result.answer).toBe("The level was 0.05 [1] for the trend analysis.");
+  });
+
+  it("strips a marker that has no corresponding citation entry", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "A claim with no source [3] here.",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "body text")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.answer).toBe("A claim with no source here.");
   });
 });

@@ -60,9 +60,11 @@ const ANSWER_SYSTEM_PROMPT = [
   "If the evidence does not actually support an answer, say plainly what is missing or uncertain instead of speculating.",
   "If the question requires up-to-date or external information you cannot verify, acknowledge that limitation plainly instead of guessing.",
   "Respond with a single JSON object containing exactly two keys.",
-  "The \"answer\" value is your prose reply. After any sentence or clause that draws on specific provided evidence, append an inline citation marker [n] where n is a positive integer.",
-  "The \"citations\" value is an array of objects, each with \"citation_number\" (the integer n used in the answer) and \"evidence\" (the 1-based number of the RESEARCH CONTEXT item supporting it).",
-  "Attach a citation only when the claim comes directly from the body content of a context item you were actually given. Never cite items marked as reference metadata only, never invent an evidence index, and return an empty citations array when nothing is citable.",
+  "The RESEARCH CONTEXT list below the question numbers every item 1, 2, 3, ... (the number shown before [Document] or [Source]).",
+  "The \"answer\" value is your prose reply. After any sentence or clause that draws on specific provided evidence, append an inline citation marker [n] where n is a positive integer; that marker's number is the citation_number.",
+  "The \"citations\" value is an array of objects, each with \"citation_number\" (the marker number n used in the answer) and \"evidence\" (the exact position of the supporting item in the numbered RESEARCH CONTEXT list, as shown before [Document] or [Source]).",
+  "citation_number and evidence are distinct values and may differ. citation_number is only the marker you wrote in the answer. evidence must equal the position of a real item on the numbered RESEARCH CONTEXT list: it must be at least 1 and no greater than the total number of context items shown. If the context contains a single item, the only valid evidence value is 1.",
+  "Attach a citation only when the claim comes directly from the body content of that specific context item. Never cite items marked as reference metadata only, never invent an evidence index that is not on the list, and return an empty citations array when nothing is citable.",
   "Every citation_number in the citations array must match a marker in the answer, and no citation_number may be repeated.",
 ].join(" ");
 
@@ -132,8 +134,9 @@ export type GenerateAnswerInput = {
  *
  * Citation integrity: a citation is persisted only when its evidence index
  * resolves to a context item with real body content. Unresolvable citations
- * are dropped (never fabricated), so today — when no items carry body text —
- * every answer persists with zero citations.
+ * are dropped (never fabricated), and their `[n]` markers are stripped from
+ * the answer before it is persisted, so a citation can never appear in the UI
+ * without a persisted, resolvable evidence mapping.
  *
  * Duplicate prevention: entering `generating` uses an atomic guarded
  * transition (`pending`/`failed` → `generating`), so two concurrent calls on
@@ -258,8 +261,21 @@ export async function generateAnswer(
     return fail(toGenerationError(error), null);
   }
 
+  const { citations, rejectedCount, answer: sanitizedAnswer } = resolveCitations(
+    output,
+    context
+  );
+  if (rejectedCount > 0) {
+    // Never persisted: citations that could not be verified against the
+    // provided context (wrong index or an item with no body content). Their
+    // markers are stripped from the answer below so no dangling [n] is shown.
+    console.warn(
+      `[research-data] dropped ${rejectedCount} citation(s) that did not resolve to provided evidence`
+    );
+  }
+
   const answerResult = await createAnswer(supabase, questionId, researchId, {
-    content: output.answer,
+    content: sanitizedAnswer,
     model: DEFAULT_MODEL,
   });
   if (answerResult.error) {
@@ -273,18 +289,6 @@ export async function generateAnswer(
     return fail(appError("DATABASE_ERROR", GENERATION_ERROR_MESSAGE), null);
   }
   const answer = answerResult.data;
-
-  const { citations, rejectedCount } = resolveCitations(
-    output,
-    context
-  );
-  if (rejectedCount > 0) {
-    // Never persisted: citations that could not be verified against the
-    // provided context (wrong index or an item with no body content).
-    console.warn(
-      `[research-data] dropped ${rejectedCount} citation(s) that did not resolve to provided evidence`
-    );
-  }
 
   for (const citation of citations) {
     const citationResult = await createCitation(

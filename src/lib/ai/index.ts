@@ -15,10 +15,11 @@ export {
  * Default model used when callers do not ask for a specific one. A cheap,
  * fast Flash-tier model keeps default calls inexpensive.
  *
- * `gemini-2.5-flash` was retired for new API keys; `gemini-3.5-flash` is its
- * GA replacement (see https://ai.google.dev/gemini-api/docs/deprecations).
+ * `gemini-2.5-flash` was retired for new API keys and `gemini-3.5-flash`
+ * currently returns 503 UNAVAILABLE ("high demand") for this API key, so the
+ * default is its lite sibling which stays within the same Flash-tier budget.
  */
-export const DEFAULT_MODEL = "gemini-3.5-flash";
+export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 /**
  * Hard ceiling on a single provider call. Generation is bounded here so a

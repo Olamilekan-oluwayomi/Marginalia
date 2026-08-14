@@ -35,8 +35,17 @@ export const ANSWER_OUTPUT_SCHEMA: Record<string, unknown> = {
       items: {
         type: "object",
         properties: {
-          citation_number: { type: "integer" },
-          evidence: { type: "integer" },
+          citation_number: {
+            type: "integer",
+            minimum: 1,
+            description: "The marker number [n] used in the answer text.",
+          },
+          evidence: {
+            type: "integer",
+            minimum: 1,
+            description:
+              "1-based position of the supporting item in the numbered RESEARCH CONTEXT list; must be an existing item (between 1 and the number of context items).",
+          },
         },
         required: ["citation_number", "evidence"],
       },
@@ -121,7 +130,35 @@ export type ResolveCitationsResult = {
   citations: ResolvedCitation[];
   /** Number of generated citations dropped because they could not be verified. */
   rejectedCount: number;
+  /**
+   * The answer text with citation markers for dropped citations removed, so
+   * the persisted answer can never display a dangling `[n]`.
+   */
+  answer: string;
 };
+
+/**
+ * Removes every `[n]` marker whose number is not among the resolved citation
+ * numbers. A marker is only ever valid when its citation resolved to real
+ * evidence; stripping the rest keeps a dropped citation from leaving a
+ * dangling marker in the rendered answer. Runs at the AI boundary, before the
+ * answer is persisted.
+ */
+function stripUnresolvedCitationMarkers(
+  answer: string,
+  resolved: ResolvedCitation[]
+): string {
+  const validNumbers = new Set(
+    resolved.map((citation) => citation.citation_number)
+  );
+  let cleaned = answer.replace(/\[\d+\]/g, (marker) =>
+    validNumbers.has(Number(marker.slice(1, -1))) ? marker : ""
+  );
+  if (cleaned !== answer) {
+    cleaned = cleaned.replace(/[ ]{2,}/g, " ").replace(/[ ]+([.,;:!?])/g, "$1");
+  }
+  return cleaned;
+}
 
 /**
  * Resolves each generated citation's evidence index to the context item it
@@ -130,7 +167,9 @@ export type ResolveCitationsResult = {
  * An evidence index is rejected when it points outside the provided context
  * or at an item without real body content. The model may only cite evidence
  * it was actually given — never an item's reference metadata — so citations
- * to content-less items are dropped, never persisted.
+ * to content-less items are dropped, never persisted. Markers for dropped
+ * citations are also stripped from the answer so no dangling `[n]` can be
+ * rendered.
  */
 export function resolveCitations(
   output: GeneratedAnswerOutput,
@@ -156,5 +195,9 @@ export function resolveCitations(
   }
 
   resolved.sort((a, b) => a.citation_number - b.citation_number);
-  return { citations: resolved, rejectedCount };
+  return {
+    citations: resolved,
+    rejectedCount,
+    answer: stripUnresolvedCitationMarkers(output.answer, resolved),
+  };
 }

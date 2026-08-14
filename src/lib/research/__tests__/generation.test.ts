@@ -321,4 +321,89 @@ describe("generateAnswer", () => {
     expect(mocks.generateJson).toHaveBeenCalledOnce();
     expect(mocks.createAnswer).toHaveBeenCalledOnce();
   });
+
+  it("persists a citation whose evidence resolves to the single context item", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "alpha of 0.05 was used for every trend analysis.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.generateJson.mockResolvedValue({
+      answer: "A significance level of 0.05 was used [1].",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    });
+    mocks.createCitation.mockResolvedValue({ error: null, data: {} });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({
+        content: "A significance level of 0.05 was used [1].",
+      })
+    );
+    expect(mocks.createCitation).toHaveBeenCalledWith(
+      expect.anything(),
+      "44444444-4444-4444-4444-444444444444",
+      expect.objectContaining({
+        citation_number: 1,
+        document_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        source_id: undefined,
+      })
+    );
+  });
+
+  it("does not persist a dropped citation and removes its marker from the saved answer", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "alpha of 0.05 was used for every trend analysis.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.generateJson.mockResolvedValue({
+      answer: "A significance level of 0.05 was used [2].",
+      citations: [{ citation_number: 2, evidence: 2 }],
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.createCitation).not.toHaveBeenCalled();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({
+        content: "A significance level of 0.05 was used.",
+      })
+    );
+  });
 });
