@@ -55,13 +55,21 @@ export function databaseError(
   return appError("DATABASE_ERROR", message);
 }
 
+const APP_ERROR_CODES: readonly AppErrorCode[] = [
+  "UNAUTHORIZED",
+  "NOT_FOUND",
+  "VALIDATION_ERROR",
+  "DATABASE_ERROR",
+];
+
 export function isAppError(error: unknown): error is AppError {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
     "message" in error &&
-    typeof (error as AppError).message === "string"
+    typeof (error as AppError).message === "string" &&
+    (APP_ERROR_CODES as readonly string[]).includes((error as AppError).code)
   );
 }
 
