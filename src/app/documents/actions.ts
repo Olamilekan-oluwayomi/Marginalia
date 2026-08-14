@@ -5,9 +5,12 @@ import { randomUUID } from "node:crypto";
 import {
   createDocument,
   createSupabaseClient,
+  deleteDocumentWithStorage,
+  getDocumentById,
   getResearchById,
   requireUser,
   requireUuid,
+  resetDocumentToPending,
 } from "@/lib/research";
 import {
   isPdfFileName,
@@ -143,4 +146,106 @@ export async function addDocumentAction(
   }
 
   return { formError: null, success: true };
+}
+
+export type DeleteDocumentState = {
+  error: string | null;
+};
+
+/**
+ * Deletes a document and its private source file. The document is read first
+ * (RLS-scoped, so another user's document resolves to NOT_FOUND) to resolve
+ * the research workspace for revalidation; the data layer then removes the
+ * storage object and the database row under the existing security model.
+ */
+export async function deleteDocumentAction(
+  _prevState: DeleteDocumentState,
+  formData: FormData
+): Promise<DeleteDocumentState> {
+  const documentId =
+    (formData.get("documentId") as string | null)?.trim() ?? "";
+
+  const supabase = await createSupabaseClient();
+
+  const documentResult = await getDocumentById(supabase, documentId);
+  if (documentResult.error || !documentResult.data) {
+    return {
+      error:
+        documentResult.error?.code === "UNAUTHORIZED"
+          ? "You need to be signed in to do that."
+          : "This document no longer exists.",
+    };
+  }
+  const researchId = documentResult.data.research_id;
+
+  const result = await deleteDocumentWithStorage(supabase, documentId);
+  if (result.error) {
+    return { error: "We couldn't delete this document. Please try again." };
+  }
+
+  revalidatePath("/documents");
+  revalidatePath(`/research/${researchId}`);
+  return { error: null };
+}
+
+export type RetryDocumentState = {
+  error: string | null;
+  success: boolean;
+};
+
+/**
+ * Retries processing for a document that failed extraction. Only `failed`
+ * documents are eligible: the atomic reset (`failed -> pending`) guarantees
+ * two concurrent retries cannot both run, and the processing pipeline then
+ * re-claims the document (`pending -> processing`) and either marks it
+ * `ready` or leaves it `failed` again.
+ */
+export async function retryDocumentAction(
+  _prevState: RetryDocumentState,
+  formData: FormData
+): Promise<RetryDocumentState> {
+  const documentId =
+    (formData.get("documentId") as string | null)?.trim() ?? "";
+
+  const supabase = await createSupabaseClient();
+
+  const documentResult = await getDocumentById(supabase, documentId);
+  if (documentResult.error || !documentResult.data) {
+    return {
+      error:
+        documentResult.error?.code === "UNAUTHORIZED"
+          ? "You need to be signed in to do that."
+          : "This document no longer exists.",
+      success: false,
+    };
+  }
+  const document = documentResult.data;
+
+  const resetResult = await resetDocumentToPending(supabase, document.id);
+  if (resetResult.error) {
+    return {
+      error: "We couldn't retry this document. Please try again.",
+      success: false,
+    };
+  }
+  if (!resetResult.data) {
+    return {
+      error:
+        "This document isn't ready to retry. Refresh the page to see its current state.",
+      success: false,
+    };
+  }
+
+  const processResult = await processDocument(
+    supabase,
+    document.id,
+    document.research_id
+  );
+  revalidatePath("/documents");
+  revalidatePath(`/research/${document.research_id}`);
+  if (processResult.error) {
+    return { error: processResult.error.message, success: false };
+  }
+
+  return { error: null, success: true };
 }

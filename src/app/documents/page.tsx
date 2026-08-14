@@ -1,12 +1,14 @@
-import { FileText, MoreHorizontal } from "lucide-react";
+import { FileText } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { AddDocumentForm } from "@/components/documents/AddDocumentForm";
+import { DocumentActions } from "@/components/documents/DocumentActions";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import {
   documentStatusClass,
   documentStatusLabel,
   fileTypeFromName,
+  formatFileSize,
 } from "@/lib/document-format";
 import { formatDisplayDate } from "@/lib/dates";
 import {
@@ -20,6 +22,7 @@ type DocumentListItem = {
   id: string;
   title: string;
   fileType: string;
+  fileSize: number | null;
   addedAt: string;
   status: string;
 };
@@ -29,6 +32,7 @@ function toDocumentListItem(item: DocumentRow): DocumentListItem {
     id: item.id,
     title: item.title,
     fileType: fileTypeFromName(item.file_name),
+    fileSize: item.file_size,
     addedAt: formatDisplayDate(item.created_at),
     status: item.status,
   };
@@ -85,7 +89,7 @@ export default async function DocumentsPage() {
         </section>
 
         <section className="mt-10">
-          <div className="hidden grid-cols-[1fr_120px_40px] items-center gap-x-8 border-b border-rule pb-3 sm:grid">
+          <div className="hidden grid-cols-[1fr_120px_auto] items-center gap-x-8 border-b border-rule pb-3 sm:grid">
             <Label>Document</Label>
             <Label>Status</Label>
             <span />
@@ -119,7 +123,7 @@ export default async function DocumentsPage() {
               {documents.map((document) => (
                 <article
                   key={document.id}
-                  className="flex items-start gap-4 border-b border-rule py-5 sm:grid sm:grid-cols-[1fr_120px_40px] sm:items-center sm:gap-x-8"
+                  className="flex items-start gap-4 border-b border-rule py-5 sm:grid sm:grid-cols-[1fr_120px_auto] sm:items-center sm:gap-x-8"
                 >
                   <div className="min-w-0 flex-1 sm:flex-none">
                     <div className="flex min-w-0 items-start gap-4">
@@ -133,7 +137,13 @@ export default async function DocumentsPage() {
                         </h2>
 
                         <p className="mt-1 font-mono text-xs text-muted">
-                          {document.fileType} · Added {document.addedAt}
+                          {[
+                            document.fileType,
+                            formatFileSize(document.fileSize),
+                            `Added ${document.addedAt}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </p>
 
                         <p className="mt-2 font-mono text-xs sm:hidden">
@@ -141,6 +151,14 @@ export default async function DocumentsPage() {
                             {documentStatusLabel(document.status)}
                           </span>
                         </p>
+
+                        <div className="mt-3 sm:hidden">
+                          <DocumentActions
+                            documentId={document.id}
+                            title={document.title}
+                            status={document.status}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -153,12 +171,13 @@ export default async function DocumentsPage() {
                     {documentStatusLabel(document.status)}
                   </p>
 
-                  <button
-                    aria-label={`More options for ${document.title}`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-paper-raised hover:text-ink"
-                  >
-                    <MoreHorizontal size={17} strokeWidth={1.7} />
-                  </button>
+                  <div className="hidden sm:block">
+                    <DocumentActions
+                      documentId={document.id}
+                      title={document.title}
+                      status={document.status}
+                    />
+                  </div>
                 </article>
               ))}
             </div>

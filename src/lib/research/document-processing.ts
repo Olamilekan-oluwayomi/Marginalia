@@ -21,6 +21,27 @@ import {
 import { extractDocumentText } from "./document-parse";
 
 /**
+ * Messages that are intentionally user-facing. Everything else that escapes
+ * the extraction layer is reduced to a generic line so raw PDF parser or
+ * provider details are never shown to users.
+ */
+const SAFE_EXTRACTION_MESSAGES = new Set([
+  "No extractable text found in this document.",
+  "This PDF couldn't be read.",
+]);
+
+function userFacingExtractionMessage(error: unknown): string {
+  if (
+    error instanceof Error &&
+    (SAFE_EXTRACTION_MESSAGES.has(error.message) ||
+      error.message.startsWith("Unsupported document type"))
+  ) {
+    return error.message;
+  }
+  return "We couldn't read that document.";
+}
+
+/**
  * Runs the Phase 8.2 processing pipeline for a single uploaded document:
  *
  *   1. Authenticate the caller.
@@ -130,13 +151,18 @@ export async function processDocument(
       document.file_name
     );
   } catch (error) {
-    console.error("[document-processing] text extraction failed:", error);
+    console.error(
+      "[document-processing] text extraction failed:",
+      error instanceof Error ? error.message : String(error)
+    );
+    if (error instanceof Error && error.cause instanceof Error) {
+      console.error(
+        "[document-processing] text extraction cause:",
+        error.cause.message
+      );
+    }
     await setDocumentFailed(supabase, document.id);
-    const message =
-      error instanceof Error && error.message.length > 0
-        ? error.message
-        : "We couldn't read that document.";
-    return fail(validationError(message), null);
+    return fail(validationError(userFacingExtractionMessage(error)), null);
   }
 
   const contentResult = await setDocumentContent(

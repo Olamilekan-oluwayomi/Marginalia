@@ -26,7 +26,7 @@ export default function DocumentsLoading() {
           </section>
 
           <section className="mt-10">
-            <div className="hidden grid-cols-[1fr_120px_40px] items-center gap-x-8 border-b border-rule pb-3 sm:grid">
+            <div className="hidden grid-cols-[1fr_120px_auto] items-center gap-x-8 border-b border-rule pb-3 sm:grid">
               <div className="query-loading h-3 w-16 rounded-sm bg-paper-raised" />
 
               <div className="query-loading h-3 w-12 rounded-sm bg-paper-raised" />
@@ -35,7 +35,7 @@ export default function DocumentsLoading() {
             {[0, 1, 2].map((index) => (
               <div
                 key={index}
-                className="flex items-start gap-4 border-b border-rule py-5 last:border-b-0 sm:grid sm:grid-cols-[1fr_120px_40px] sm:items-center sm:gap-x-8"
+                className="flex items-start gap-4 border-b border-rule py-5 last:border-b-0 sm:grid sm:grid-cols-[1fr_120px_auto] sm:items-center sm:gap-x-8"
               >
                 <div className="flex min-w-0 flex-1 items-start gap-4 sm:flex-none">
                   <div className="query-loading mt-0.5 h-[18px] w-[18px] shrink-0 rounded-sm bg-paper-raised" />

@@ -350,6 +350,85 @@ export async function setDocumentFilePath(
   return ok(null);
 }
 
+/**
+ * Resets a failed document back to `pending` so its extraction can be
+ * retried. The `failed` pre-condition runs inside the database update, so two
+ * concurrent retries cannot both reset the same document; the loser receives
+ * `false` and must not reprocess. Only `failed` documents may be retried —
+ * pending/processing/ready documents are left untouched.
+ */
+export async function resetDocumentToPending(
+  supabase: Supabase,
+  documentId: string
+): Promise<AppResult<boolean>> {
+  const idError = requireUuid(documentId, "Document id");
+  if (idError) {
+    return fail(validationError(idError.message), false);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, false);
+  }
+
+  const { data, error } = await supabase
+    .from("documents")
+    .update({ status: "pending" })
+    .eq("id", documentId)
+    .eq("status", "failed")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return fail(toAppError(error), false);
+  }
+  if (!data) {
+    return ok(false);
+  }
+
+  return ok(true);
+}
+
+/**
+ * Deletes a document and its private source object. Ownership is enforced by
+ * RLS through `getDocumentById`/`deleteDocument`, so a caller can never reach
+ * another user's document. The storage object is removed using the row's
+ * stored `file_path`, which always begins with the owner's id, so the storage
+ * RLS permits the removal. Removing the object is best-effort: a leftover
+ * object in the private bucket is benign and must never block the user from
+ * deleting their document.
+ */
+export async function deleteDocumentWithStorage(
+  supabase: Supabase,
+  documentId: string
+): Promise<AppResult<null>> {
+  const documentResult = await getDocumentById(supabase, documentId);
+  if (documentResult.error) {
+    return fail(documentResult.error, null);
+  }
+  const document = documentResult.data;
+  if (!document) {
+    return fail(notFound("Document not found."), null);
+  }
+
+  const deleteResult = await deleteDocument(supabase, documentId);
+  if (deleteResult.error) {
+    return deleteResult;
+  }
+
+  const { error: removeError } = await supabase.storage
+    .from("documents")
+    .remove([document.file_path]);
+  if (removeError) {
+    console.error(
+      "[documents] could not remove the deleted document's object:",
+      removeError.message
+    );
+  }
+
+  return ok(null);
+}
+
 export async function deleteDocument(
   supabase: Supabase,
   documentId: string

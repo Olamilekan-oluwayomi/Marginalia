@@ -9,9 +9,15 @@ import { QuestionStatusPoller } from "@/components/research/QuestionStatusPoller
 import { RetryAnswer } from "@/components/research/RetryAnswer";
 import { StuckAnswerRecovery } from "@/components/research/StuckAnswerRecovery";
 import { AddSourceForm } from "@/components/research/AddSourceForm";
+import { DocumentActions } from "@/components/documents/DocumentActions";
 import { Label } from "@/components/ui/Label";
 import { formatDisplayDate } from "@/lib/dates";
-import { fileTypeFromName } from "@/lib/document-format";
+import {
+  documentStatusClass,
+  documentStatusLabel,
+  fileTypeFromName,
+  formatFileSize,
+} from "@/lib/document-format";
 import {
   createSupabaseClient,
   getResearchWorkspace,
@@ -356,15 +362,44 @@ export default async function ResearchWorkspacePage({
                   className="flex items-start justify-between gap-4 border-b border-rule py-4"
                 >
                   <div className="min-w-0">
-                    <h3 className="break-words font-reading text-lg leading-snug text-ink">
-                      {document.title}
-                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <h3 className="break-words font-reading text-lg leading-snug text-ink">
+                        {document.title}
+                      </h3>
+
+                      <span
+                        className={`font-mono text-xs ${documentStatusClass(
+                          document.status
+                        )}`}
+                      >
+                        {documentStatusLabel(document.status)}
+                      </span>
+                    </div>
 
                     <p className="mt-1 font-mono text-xs text-muted">
-                      {fileTypeFromName(document.file_name)} · Added{" "}
-                      {formatDisplayDate(document.created_at)}
+                      {[
+                        fileTypeFromName(document.file_name),
+                        formatFileSize(document.file_size),
+                        `Added ${formatDisplayDate(document.created_at)}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
+
+                    {document.status !== "ready" ? (
+                      <p className="mt-1 font-ui text-xs text-muted">
+                        {document.status === "failed"
+                          ? "Processing failed — this document can&rsquo;t be used as evidence."
+                          : "This document will be searchable once processing finishes."}
+                      </p>
+                    ) : null}
                   </div>
+
+                  <DocumentActions
+                    documentId={document.id}
+                    title={document.title}
+                    status={document.status}
+                  />
                 </div>
               ))}
             </div>

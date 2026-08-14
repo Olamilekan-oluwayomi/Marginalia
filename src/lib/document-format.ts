@@ -6,6 +6,14 @@ export function fileTypeFromName(fileName: string): string {
   return fileName.slice(index + 1).toUpperCase();
 }
 
+/** Human-readable file size, or an empty string when no size is recorded. */
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function documentStatusLabel(status: string): string {
   if (status === "ready") return "Ready";
   if (status === "processing") return "Processing";

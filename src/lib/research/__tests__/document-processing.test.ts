@@ -225,6 +225,60 @@ describe("processDocument", () => {
     expect(mocks.setDocumentContent).not.toHaveBeenCalled();
   });
 
+  it("passes through an unsupported-type extraction message", async () => {
+    mocks.getDocumentById.mockResolvedValue({
+      data: makeDocument(),
+      error: null,
+    });
+    mocks.extractDocumentText.mockRejectedValue(
+      new Error("Unsupported document type (application/x-foo).")
+    );
+    const supabase = storageStub({ data: new Blob(["fake"]), error: null });
+
+    const result = await processDocument(supabase, DOCUMENT_ID, RESEARCH_ID);
+
+    expect(result.error?.message).toBe(
+      "Unsupported document type (application/x-foo)."
+    );
+    expect(mocks.setDocumentFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("never surfaces raw pdf-parse internals to the user", async () => {
+    mocks.getDocumentById.mockResolvedValue({
+      data: makeDocument(),
+      error: null,
+    });
+    mocks.extractDocumentText.mockRejectedValue(
+      new Error("This PDF couldn't be read.", {
+        cause: new Error("unexpected EOF while parsing xref table"),
+      })
+    );
+    const supabase = storageStub({ data: new Blob(["fake"]), error: null });
+
+    const result = await processDocument(supabase, DOCUMENT_ID, RESEARCH_ID);
+
+    expect(result.error?.message).toBe("This PDF couldn't be read.");
+    expect(result.error?.message).not.toContain("xref table");
+    expect(mocks.setDocumentFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("reduces unknown extraction errors to a generic user-safe message", async () => {
+    mocks.getDocumentById.mockResolvedValue({
+      data: makeDocument(),
+      error: null,
+    });
+    mocks.extractDocumentText.mockRejectedValue(
+      new Error("Cannot read properties of undefined (reading 'pages')")
+    );
+    const supabase = storageStub({ data: new Blob(["fake"]), error: null });
+
+    const result = await processDocument(supabase, DOCUMENT_ID, RESEARCH_ID);
+
+    expect(result.error?.message).toBe("We couldn't read that document.");
+    expect(result.error?.message).not.toContain("pages");
+    expect(mocks.setDocumentFailed).toHaveBeenCalledTimes(1);
+  });
+
   it("marks the document failed when persisting content fails", async () => {
     mocks.getDocumentById.mockResolvedValue({
       data: makeDocument(),

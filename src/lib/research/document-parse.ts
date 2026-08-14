@@ -64,6 +64,11 @@ async function extractPdfText(buffer: Uint8Array): Promise<string> {
   try {
     const result = await parser.getText({ pageJoiner: "\n" });
     return result.text;
+  } catch (cause) {
+    // The parser's own error is not user-facing content. Preserve it as the
+    // cause so the processing layer can log the real detail while users only
+    // ever receive a stable, safe message.
+    throw new Error("This PDF couldn't be read.", { cause });
   } finally {
     await parser.destroy();
   }
@@ -72,7 +77,8 @@ async function extractPdfText(buffer: Uint8Array): Promise<string> {
 /**
  * Extracts body text from an uploaded document. Supports PDF and plain text
  * (including Markdown). Throws on unsupported types, empty extractions, or
- * parse failures; the caller decides how to surface the message.
+ * parse failures; the caller decides how to surface the message. Every thrown
+ * message is user-safe: parser internals are never included.
  */
 export async function extractDocumentText(
   buffer: Uint8Array,
