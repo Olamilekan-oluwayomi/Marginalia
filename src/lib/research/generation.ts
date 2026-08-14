@@ -233,8 +233,9 @@ export async function generateAnswer(
 
   let output: GeneratedAnswerOutput;
   try {
+    const prompt = buildResearchPrompt(question.question, context);
     const raw = await generateJson({
-      prompt: buildResearchPrompt(question.question, context),
+      prompt,
       system: ANSWER_SYSTEM_PROMPT,
       model: DEFAULT_MODEL,
       maxOutputTokens: ANSWER_MAX_OUTPUT_TOKENS,

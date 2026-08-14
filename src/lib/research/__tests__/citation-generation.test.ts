@@ -327,4 +327,220 @@ describe("resolveCitations", () => {
     ]);
     expect(result.answer).toBe("A claim with no source here.");
   });
+
+  it("converts a bare sentence-final integer into a clickable marker when it resolves", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "These changes were driven by atmospheric circulation anomalies 1.",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "atmospheric circulation anomalies were linked to these changes.")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe(
+      "These changes were driven by atmospheric circulation anomalies [1]."
+    );
+  });
+
+  it("removes a bare sentence-final integer that resolves to no citation", () => {
+    const output: GeneratedAnswerOutput = {
+      answer: "A claim with no supporting evidence 3.",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "body text")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe("A claim with no supporting evidence.");
+  });
+
+  it("leaves inline numbers and multi-digit sentence-final values untouched", () => {
+    const output: GeneratedAnswerOutput = {
+      answer:
+        "Trends were evaluated at a significance level of 0.05. Recurrence intervals of 1, 5 and 10 years and durations of 1, 5, 10 and 30 days were used 1. The record covers the period from 1961 to 2018.",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    };
+
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "body text")
+    );
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe(
+      "Trends were evaluated at a significance level of 0.05. Recurrence intervals of 1, 5 and 10 years and durations of 1, 5, 10 and 30 days were used [1]. The record covers the period from 1961 to 2018."
+    );
+  });
+
+  it("resolves two independent context items to their own document ids", () => {
+    const context: ResearchContext = {
+      items: [
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "D1",
+          content: "body one",
+          metadata: {},
+        },
+        {
+          kind: "document",
+          id: "doc-2",
+          title: "D2",
+          content: "body two",
+          metadata: {},
+        },
+      ],
+      hasBodyContent: true,
+    };
+
+    const output: GeneratedAnswerOutput = {
+      answer: "First [1] and second [2].",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 2 },
+      ],
+    };
+
+    const result = resolveCitations(output, context);
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+      { citation_number: 2, document_id: "doc-2" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe("First [1] and second [2].");
+  });
+
+  it("rejects zero and negative evidence indexes at resolution time", () => {
+    const context = documentContext("doc-1", "body");
+    for (const evidence of [0, -1, -5]) {
+      const output: GeneratedAnswerOutput = {
+        answer: "text",
+        citations: [{ citation_number: 1, evidence }],
+      };
+      const result = resolveCitations(output, context);
+      expect(result.citations).toEqual([]);
+      expect(result.rejectedCount).toBe(1);
+    }
+  });
+
+  it("rejects an evidence index beyond the last context item", () => {
+    const context: ResearchContext = {
+      items: [
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "D1",
+          content: "body",
+          metadata: {},
+        },
+        {
+          kind: "document",
+          id: "doc-2",
+          title: "D2",
+          content: "body",
+          metadata: {},
+        },
+      ],
+      hasBodyContent: true,
+    };
+
+    const output: GeneratedAnswerOutput = {
+      answer: "text",
+      citations: [{ citation_number: 1, evidence: 3 }],
+    };
+
+    const result = resolveCitations(output, context);
+    expect(result.citations).toEqual([]);
+    expect(result.rejectedCount).toBe(1);
+  });
+
+  it("resolves a document and a web source independently when both carry content", () => {
+    const context: ResearchContext = {
+      items: [
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "D",
+          content: "doc body",
+          metadata: {},
+        },
+        {
+          kind: "source",
+          id: "src-1",
+          title: "S",
+          content: "source body",
+          metadata: { publisher: "Web search", url: "https://example.com" },
+        },
+      ],
+      hasBodyContent: true,
+    };
+
+    const output: GeneratedAnswerOutput = {
+      answer: "text",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 2 },
+      ],
+    };
+
+    const result = resolveCitations(output, context);
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+      { citation_number: 2, source_id: "src-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+  });
+
+  it("maps a same-document primary and secondary passage to the same document id at their own evidence indexes", () => {
+    const context: ResearchContext = {
+      items: [
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "Extreme precipitation paper",
+          content: "In this study, we used daily rainfall data from 52 stations.",
+          metadata: {},
+        },
+        {
+          kind: "document",
+          id: "doc-1",
+          title: "Extreme precipitation paper",
+          content:
+            "The results showed increasing trends in extreme precipitation across most stations.",
+          metadata: {},
+        },
+      ],
+      hasBodyContent: true,
+    };
+
+    const output: GeneratedAnswerOutput = {
+      answer: "The authors used 52 stations [1] and found increasing trends [2].",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 2 },
+      ],
+    };
+
+    const result = resolveCitations(output, context);
+    expect(result.citations).toEqual([
+      { citation_number: 1, document_id: "doc-1" },
+      { citation_number: 2, document_id: "doc-1" },
+    ]);
+    expect(result.rejectedCount).toBe(0);
+    expect(result.answer).toBe(
+      "The authors used 52 stations [1] and found increasing trends [2]."
+    );
+  });
 });

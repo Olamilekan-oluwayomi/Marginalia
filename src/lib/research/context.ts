@@ -8,6 +8,7 @@ import {
 import { getDocuments } from "./documents";
 import { getSources } from "./sources";
 import { requireText, requireUuid } from "./validation";
+import { normalizeUrl } from "@/lib/search/normalize-url";
 
 const QUESTION_MAX_LENGTH = 1000;
 
@@ -48,6 +49,204 @@ const STOPWORDS = new Set([
   "your",
 ]);
 
+/**
+ * Window (in characters) around a keyword hit within which a numeric token is
+ * treated as evidence for a value-seeking question. Tight enough that the
+ * number must genuinely belong to the concept being described.
+ */
+const VALUE_WINDOW = 25;
+
+/**
+ * Words and phrases that mark a question as asking for a precise factual
+ * value — a significance level, threshold, percentage, interval, year or
+ * count. When present, numeric tokens near the question's concepts are treated
+ * as evidence, so a passage carrying the actual value ("statistical
+ * significance level (a = 0.05)") outranks passages that only repeat the
+ * question's words ("significant", "significance") without the number.
+ */
+const VALUE_MARKERS: readonly string[] = [
+  "level",
+  "levels",
+  "value",
+  "values",
+  "threshold",
+  "thresholds",
+  "percentage",
+  "percent",
+  "proportion",
+  "how many",
+  "how much",
+  "which year",
+  "what year",
+  "what value",
+  "what level",
+  "at what",
+  "interval",
+  "intervals",
+  "amount",
+  "amounts",
+  "number of",
+  "confidence level",
+  "significance level",
+];
+
+/**
+ * True when the question asks for a precise factual value. Value markers are
+ * matched as substrings of the lowercased question so that multi-word phrasings
+ * ("at what statistical significance level", "how many stations") trigger the
+ * value-evidence reward. This never hardcodes any specific answer.
+ */
+function isValueSeeking(question: string): boolean {
+  const text = question.toLowerCase();
+  return VALUE_MARKERS.some((marker) => text.includes(marker));
+}
+
+/**
+ * Value-bearing concept phrases. A *phrase* next to a number is the hallmark
+ * of a definitional or methodological statement: "statistical significance
+ * level (a = 0.05)" is evidence, whereas "statistically significant ... 0.05"
+ * (the words apart, no "significance level" phrase) is not. Treating
+ * "significance level" as a phrase rather than as two independent keywords is
+ * what separates the methodology sentence from a passage that merely reports a
+ * correlation.
+ */
+const VALUE_CONCEPTS: readonly (readonly string[])[] = [
+  ["significance", "level"],
+  ["confidence", "level"],
+  ["significance", "threshold"],
+  ["recurrence", "interval"],
+  ["recurrence", "intervals"],
+  ["return", "period"],
+  ["critical", "value"],
+  ["alpha"],
+  ["threshold"],
+  ["thresholds"],
+];
+
+/**
+ * The value concepts the question actually asks about: every entry whose words
+ * (allowing plural forms) appear in the question. A question about a
+ * significance level cannot be hijacked by an unrelated recurrence-interval
+ * statement, because that concept is not active for it.
+ */
+function activeValueConcepts(
+  question: string,
+  base: Set<string>
+): readonly (readonly string[])[] {
+  const text = question.toLowerCase();
+  return VALUE_CONCEPTS.filter((words) =>
+    words.every(
+      (word) =>
+        base.has(word) ||
+        base.has(`${word}s`) ||
+        new RegExp(`\\b${word}s?\\b`).test(text)
+    )
+  );
+}
+
+/**
+ * Concept groups whose related terms become searchable when a question asks
+ * about them. A group is "active" when the question literally uses one of its
+ * terms; when active, every term in the group is matched too, so a document
+ * that talks about "results and conclusions" is found by a question that asks
+ * about "findings". Groups never activate off a synonym — the question itself
+ * must use a group term — so expansion cannot derail an unrelated query.
+ */
+const CONCEPT_TERMS: Record<string, readonly string[]> = {
+  methodology: [
+    "methodology",
+    "method",
+    "methods",
+    "approach",
+    "approaches",
+    "procedure",
+    "procedures",
+    "technique",
+    "techniques",
+    "protocol",
+    "analysis",
+    "analyses",
+    "analyze",
+    "analysed",
+    "analyzing",
+    "assessment",
+    "evaluation",
+    "experiment",
+    "experiments",
+    "simulation",
+    "simulations",
+    "modelled",
+    "modelling",
+  ],
+  findings: [
+    "findings",
+    "finding",
+    "results",
+    "result",
+    "conclusions",
+    "conclusion",
+    "outcomes",
+    "outcome",
+    "effects",
+    "effect",
+    "found",
+    "observed",
+    "revealed",
+    "showed",
+    "shown",
+    "indicated",
+    "demonstrated",
+  ],
+  temporal: [
+    "temporal",
+    "trend",
+    "trends",
+    "variation",
+    "variations",
+    "variability",
+    "change",
+    "changes",
+    "seasonal",
+    "annual",
+    "interannual",
+    "decadal",
+    "increased",
+    "decreased",
+    "increases",
+    "decreases",
+  ],
+  statistical: [
+    "statistical",
+    "statistically",
+    "significance",
+    "significant",
+    "confidence",
+    "correlation",
+    "correlated",
+    "regression",
+    "hypothesis",
+    "null",
+    "alpha",
+    "threshold",
+    "thresholds",
+  ],
+  /**
+   * Terms the paper itself uses to describe its own work, as opposed to the
+   * prior studies it reviews. When a question asks what the authors did, a
+   * passage carrying this self-referential voice ("we", "our", "the authors",
+   * "this study") must outrank a literature review that merely cites other
+   * work. Scored as its own evidence class, apart from concept expansion.
+   */
+  study: [
+    "authors",
+    "author",
+    "we",
+    "our",
+    "study",
+    "herein",
+  ],
+};
+
 export type ResearchContextItem = {
   kind: "document" | "source";
   id: string;
@@ -71,6 +270,34 @@ export type ResearchContext = {
   items: ResearchContextItem[];
   /** True only when at least one item carries real body content. */
   hasBodyContent: boolean;
+};
+
+type KeywordHit = {
+  index: number;
+  keyword: string;
+  kind: "base" | "study" | "expansion";
+};
+
+type Cluster = {
+  start: number;
+  end: number;
+  score: number;
+  distinctBase: number;
+  distinctStudy: number;
+  distinctExpansion: number;
+  phraseCount: number;
+  valueCount: number;
+  conceptValue: number;
+};
+
+type Candidate = {
+  item: ResearchContextItem;
+  /** Combined body + metadata relevance score used for ordering. */
+  score: number;
+  /** The body passage that will be sent to the model for this item. */
+  passage: string;
+  /** Active question concepts covered by the passage and title. */
+  covered: Set<string>;
 };
 
 function hostnameOf(url: string | null | undefined): string {
@@ -118,12 +345,41 @@ function toSourceItem(source: SourceRow): ResearchContextItem {
   };
 }
 
-function haystackOf(item: ResearchContextItem): string {
+/**
+ * Returns the active concept groups for a question and the full set of terms
+ * that become searchable for them. Study-group terms are kept apart from the
+ * concept-expansion set: they identify the paper's own voice ("we", "our",
+ * "the authors") rather than a topic synonym, so they are scored as their own
+ * evidence class.
+ */
+function matchSetsOf(
+  base: Set<string>
+): {
+  expansion: Set<string>;
+  study: Set<string>;
+  concepts: Set<string>;
+} {
+  const expansion = new Set<string>();
+  const study = new Set<string>();
+  const concepts = new Set<string>();
+  for (const [concept, terms] of Object.entries(CONCEPT_TERMS)) {
+    if (!terms.some((term) => base.has(term))) continue;
+    concepts.add(concept);
+    const target = concept === "study" ? study : expansion;
+    for (const term of terms) target.add(term);
+  }
+  return { expansion, study, concepts };
+}
+
+/**
+ * Reference metadata (title and identifying fields) used for both scoring and
+ * the model-facing labels. Documents are identified by title + file name;
+ * sources by title + publisher + url + hostname.
+ */
+function metadataHaystackOf(item: ResearchContextItem): string {
   const { metadata } = item;
   if (item.kind === "document") {
-    // Documents are matched against their extracted body text too, so a
-    // question can find the right uploaded PDF by what it actually says.
-    return [item.title, metadata.file_name ?? "", item.content].join(" ");
+    return [item.title, metadata.file_name ?? ""].join(" ");
   }
   return [
     item.title,
@@ -133,13 +389,27 @@ function haystackOf(item: ResearchContextItem): string {
   ].join(" ");
 }
 
-function relevanceScore(item: ResearchContextItem, keywords: Set<string>): number {
-  const haystack = haystackOf(item).toLowerCase();
-  let score = 0;
-  for (const keyword of keywords) {
-    if (haystack.includes(keyword)) score += 1;
+/**
+ * Collapses source items that resolve to the same normalized URL, keeping the
+ * first occurrence but preferring the copy that carries real body text (a
+ * citable duplicate must never be dropped in favor of a metadata-only one).
+ */
+function dedupeSources(items: ResearchContextItem[]): ResearchContextItem[] {
+  const byKey = new Map<string, ResearchContextItem>();
+  for (const item of items) {
+    const key = item.metadata.url
+      ? normalizeUrl(item.metadata.url)
+      : `item:${item.id}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, item);
+      continue;
+    }
+    if (existing.content.trim().length === 0 && item.content.trim().length > 0) {
+      byKey.set(key, item);
+    }
   }
-  return score;
+  return Array.from(byKey.values());
 }
 
 function truncate(content: string): string {
@@ -147,8 +417,6 @@ function truncate(content: string): string {
     ? content.slice(0, MAX_CONTENT_CHARS)
     : content;
 }
-
-type KeywordHit = { index: number; keyword: string };
 
 /**
  * True when the character at `index` ends a sentence: a `.`, `!` or `?` that
@@ -196,18 +464,40 @@ function nextSentenceStartIndex(content: string, position: number): number {
 }
 
 /**
- * Word-boundary start indexes of every question keyword in the lowercased
- * content, tagged with the keyword that produced each hit. Keywords are
- * already `[a-z0-9]+` tokens, so no escaping is needed.
+ * Word-boundary start indexes of every question keyword (base, study and
+ * expansion) in the lowercased content, tagged with the keyword and its
+ * evidence class. Keywords are already `[a-z0-9]+` tokens, so no escaping
+ * is needed.
  */
-function keywordHits(content: string, keywords: Set<string>): KeywordHit[] {
+function keywordHits(
+  content: string,
+  base: Set<string>,
+  study: Set<string>,
+  expansion: Set<string>
+): KeywordHit[] {
   const haystack = content.toLowerCase();
   const hits: KeywordHit[] = [];
-  for (const keyword of keywords) {
+  for (const keyword of base) {
     const pattern = new RegExp(`\\b${keyword}\\b`, "g");
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(haystack)) !== null) {
-      hits.push({ index: match.index, keyword });
+      hits.push({ index: match.index, keyword, kind: "base" });
+    }
+  }
+  for (const keyword of study) {
+    if (base.has(keyword)) continue;
+    const pattern = new RegExp(`\\b${keyword}\\b`, "g");
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(haystack)) !== null) {
+      hits.push({ index: match.index, keyword, kind: "study" });
+    }
+  }
+  for (const keyword of expansion) {
+    if (base.has(keyword) || study.has(keyword)) continue;
+    const pattern = new RegExp(`\\b${keyword}\\b`, "g");
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(haystack)) !== null) {
+      hits.push({ index: match.index, keyword, kind: "expansion" });
     }
   }
   hits.sort((a, b) => a.index - b.index);
@@ -241,23 +531,122 @@ function phrasesOf(question: string, keywords: Set<string>): string[][] {
 }
 
 /**
- * Returns the `[start, end]` span of the highest-scoring window of keyword
- * hits (all hits within `MAX_CONTENT_CHARS`). Windows are scored by the number
- * of *distinct* question keywords they cover, plus bonuses for exact
- * multi-word phrase matches and for keywords sitting next to a numeric value —
- * the hallmarks of an actual definitional sentence. Counting raw hits instead
- * lets a generic passage that repeats one or two question words many times
- * (e.g. "1-day, 1-yr recurrence interval extreme rainfall events") beat the
- * real methodology sentence, so the score rewards coverage, not repetition.
+ * True when `content` contains a real numeric token within `[from, to)`.
+ * Four-digit years and fragments cut from longer numbers are not values.
+ */
+function hasNumberNear(content: string, from: number, to: number): boolean {
+  const start = Math.max(0, from);
+  const end = Math.min(content.length, to);
+  if (end <= start) return false;
+  const chunk = content.slice(start, end);
+  const numberPattern = /[0-9]+(?:\.[0-9]+)?/g;
+  let match: RegExpExecArray | null;
+  while ((match = numberPattern.exec(chunk)) !== null) {
+    if (/^\d{4}$/.test(match[0])) continue;
+    const tokenIndex = start + match.index;
+    const prev = content.charAt(tokenIndex - 1);
+    const next = content.charAt(tokenIndex + match[0].length);
+    if (/\d/.test(prev) || /\d/.test(next)) continue;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Every occurrence of the active value concept phrases within `[from, to)`,
+ * as absolute content offsets. Used to anchor value-count scoring on the
+ * concept phrase rather than on scattered keyword hits, and to locate a
+ * value-bearing statement for passage selection.
+ */
+function valuePhraseAnchors(
+  content: string,
+  valueConcepts: readonly (readonly string[])[],
+  from: number,
+  to: number
+): { start: number; end: number; concept: number }[] {
+  const start = Math.max(0, from);
+  const end = Math.min(content.length, to);
+  if (end <= start) return [];
+  const scan = content.slice(start, end);
+  const anchors: { start: number; end: number; concept: number }[] = [];
+  for (let concept = 0; concept < valueConcepts.length; concept += 1) {
+    const pattern = new RegExp(
+      `\\b${valueConcepts[concept].join("\\s+")}\\b`,
+      "gi"
+    );
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(scan)) !== null) {
+      anchors.push({
+        start: start + match.index,
+        end: start + match.index + match[0].length,
+        concept,
+      });
+    }
+  }
+  return anchors;
+}
+
+/**
+ * The first active value-concept phrase within `[from, to)` that has a number
+ * next to it, or `null`. A concept phrase next to a number is a
+ * value-bearing statement ("significance level (a = 0.05)"), as opposed to a
+ * passage that merely mentions the words apart from a number.
+ */
+function valueStatementSpan(
+  content: string,
+  valueConcepts: readonly (readonly string[])[],
+  from: number,
+  to: number
+): { start: number; end: number } | null {
+  for (const anchor of valuePhraseAnchors(content, valueConcepts, from, to)) {
+    if (
+      hasNumberNear(
+        content,
+        anchor.start - VALUE_WINDOW,
+        anchor.end + VALUE_WINDOW
+      )
+    ) {
+      return { start: anchor.start, end: anchor.end };
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the highest-scoring window of keyword hits (all hits within
+ * `MAX_CONTENT_CHARS`). Windows are scored by the number of *distinct* question
+ * keywords they cover — base keywords carrying full weight, self-referential
+ * study evidence partial weight, concept-expanded terms less — plus bonuses
+ * for exact multi-word phrase matches and, for value-seeking questions, for
+ * distinct numeric tokens sitting next to a keyword hit (the hallmarks of an
+ * actual definitional sentence). Counting raw hits instead lets a generic
+ * passage that repeats one or two question words many times (e.g. "1-day, 1-yr
+ * recurrence interval extreme rainfall events") beat the real methodology
+ * sentence, so the score rewards coverage, not repetition.
+ *
+ * For value-seeking questions a further bonus rewards an active value concept
+ * phrase ("significance level", "recurrence intervals", ...) appearing as a
+ * phrase next to a number. This makes the methodological statement
+ * "statistical significance level (a = 0.05)" outrank a passage that only has
+ * "statistically significant ... 0.05" nearby, whose words never form the
+ * concept phrase.
  */
 function bestCluster(
   hits: KeywordHit[],
   phrases: string[][],
-  content: string
-): [number, number] {
+  content: string,
+  valueSeeking: boolean,
+  valueConcepts: readonly (readonly string[])[]
+): Cluster {
   let bestStart = hits[0].index;
   let bestEnd = hits[0].index;
   let bestScore = -Infinity;
+  let bestBase = 0;
+  let bestStudy = 0;
+  let bestExpansion = 0;
+  let bestPhraseCount = 0;
+  let bestValueCount = 0;
+  let bestConceptValue = 0;
   let left = 0;
 
   for (let right = 0; right < hits.length; right += 1) {
@@ -268,9 +657,33 @@ function bestCluster(
     const windowHits = hits.slice(left, right + 1);
     const windowStart = hits[left].index;
     const windowEnd = hits[right].index;
-    const span = content.slice(windowStart, windowEnd);
+    const span = content.slice(
+      windowStart,
+      Math.min(content.length, windowEnd + VALUE_WINDOW)
+    );
 
-    const distinct = new Set(windowHits.map((hit) => hit.keyword)).size;
+    let distinctBase = 0;
+    let distinctStudy = 0;
+    let distinctExpansion = 0;
+    const baseSeen = new Set<string>();
+    const studySeen = new Set<string>();
+    const expansionSeen = new Set<string>();
+    for (const hit of windowHits) {
+      if (hit.kind === "base") {
+        if (!baseSeen.has(hit.keyword)) {
+          baseSeen.add(hit.keyword);
+          distinctBase += 1;
+        }
+      } else if (hit.kind === "study") {
+        if (!studySeen.has(hit.keyword)) {
+          studySeen.add(hit.keyword);
+          distinctStudy += 1;
+        }
+      } else if (!expansionSeen.has(hit.keyword)) {
+        expansionSeen.add(hit.keyword);
+        distinctExpansion += 1;
+      }
+    }
 
     let phraseCount = 0;
     for (const phrase of phrases) {
@@ -278,29 +691,111 @@ function bestCluster(
       if (pattern.test(span)) phraseCount += 1;
     }
 
-    let numericKeywords = 0;
-    const numericSeen = new Set<string>();
-    for (const hit of windowHits) {
-      if (numericSeen.has(hit.keyword)) continue;
-      const around = content.slice(
-        Math.max(0, hit.index - 20),
-        hit.index + 20
-      );
-      if (/[0-9]/.test(around)) {
-        numericKeywords += 1;
-        numericSeen.add(hit.keyword);
+    // For value-seeking questions, count the distinct numeric tokens that sit
+    // within the window next to the question's value evidence. Years
+    // (four-digit integers like "1961" in "1961-2009") are excluded so generic
+    // passages full of dates and station counts are not rewarded merely for
+    // containing numbers; a real value ("0.05", "95%", "1, 5 and 10 years") is.
+    // Tokens are read from a slightly extended scan region so numbers at the
+    // window boundary are seen whole, and a token that is actually a truncated
+    // fragment of a longer number (e.g. "196" cut out of "1961") is rejected by
+    // checking the characters that surround it in the original content.
+    //
+    // When the question names a value concept ("significance level",
+    // "recurrence intervals", ...), a numeric token only counts when it sits
+    // next to that concept phrase itself, not next to any stray keyword hit.
+    // Anchoring the value count on the concept keeps number-dense results
+    // sections (thresholds, return values, station counts) whose keywords merely
+    // sit among incidental numbers from outranking the methodological statement
+    // that actually pairs the concept with its value. Questions without a value
+    // concept ("how many stations?", "which year?") keep counting numbers near
+    // keyword hits.
+    let valueCount = 0;
+    let conceptValue = 0;
+    if (valueSeeking) {
+      const scanStart = Math.max(0, windowStart - VALUE_WINDOW);
+      const scanEnd = Math.min(content.length, windowEnd + VALUE_WINDOW);
+      const phraseAnchors =
+        valueConcepts.length > 0
+          ? valuePhraseAnchors(content, valueConcepts, scanStart, scanEnd)
+          : null;
+      const valueSeen = new Set<string>();
+      const valuePattern = /[0-9]+(?:\.[0-9]+)?/g;
+      const scan = content.slice(scanStart, scanEnd);
+      valuePattern.lastIndex = 0;
+      let valueMatch: RegExpExecArray | null;
+      while ((valueMatch = valuePattern.exec(scan)) !== null) {
+        const token = valueMatch[0];
+        if (/^\d{4}$/.test(token)) continue;
+        const tokenIndex = scanStart + valueMatch.index;
+        const prevChar = content.charAt(tokenIndex - 1);
+        const nextChar = content.charAt(tokenIndex + token.length);
+        if (/\d/.test(prevChar) || /\d/.test(nextChar)) continue;
+        const nearValue =
+          phraseAnchors !== null
+            ? phraseAnchors.some(
+                (anchor) =>
+                  tokenIndex >= anchor.start - VALUE_WINDOW &&
+                  tokenIndex <= anchor.end + VALUE_WINDOW
+              )
+            : windowHits.some(
+                (hit) => Math.abs(hit.index - tokenIndex) <= VALUE_WINDOW
+              );
+        if (nearValue) valueSeen.add(token);
+      }
+      valueCount = valueSeen.size;
+
+      // Reward active value-concept phrases ("significance level", ...) that
+      // sit next to a number. This is the discriminator that lets the
+      // methodological "significance level (a = 0.05)" outrank a passage that
+      // only mentions "statistically significant ... 0.05" nearby.
+      if (phraseAnchors !== null) {
+        for (let concept = 0; concept < valueConcepts.length; concept += 1) {
+          const nearNumber = phraseAnchors.some(
+            (anchor) =>
+              anchor.concept === concept &&
+              hasNumberNear(
+                content,
+                anchor.start - VALUE_WINDOW,
+                anchor.end + VALUE_WINDOW
+              )
+          );
+          if (nearNumber) conceptValue += 1;
+        }
       }
     }
 
-    const score = distinct * 10 + phraseCount * 15 + numericKeywords * 5;
+    const score =
+      distinctBase * 10 +
+      distinctStudy * 8 +
+      distinctExpansion * 2 +
+      phraseCount * 20 +
+      valueCount * 10 +
+      conceptValue * 30;
     if (score > bestScore) {
       bestScore = score;
       bestStart = windowStart;
       bestEnd = windowEnd;
+      bestBase = distinctBase;
+      bestStudy = distinctStudy;
+      bestExpansion = distinctExpansion;
+      bestPhraseCount = phraseCount;
+      bestValueCount = valueCount;
+      bestConceptValue = conceptValue;
     }
   }
 
-  return [bestStart, bestEnd];
+  return {
+    start: bestStart,
+    end: bestEnd,
+    score: bestScore,
+    distinctBase: bestBase,
+    distinctStudy: bestStudy,
+    distinctExpansion: bestExpansion,
+    phraseCount: bestPhraseCount,
+    valueCount: bestValueCount,
+    conceptValue: bestConceptValue,
+  };
 }
 
 /**
@@ -313,20 +808,32 @@ function bestCluster(
  */
 function selectRelevantPassage(
   content: string,
-  keywords: Set<string>,
-  phrases: string[][]
+  base: Set<string>,
+  study: Set<string>,
+  expansion: Set<string>,
+  phrases: string[][],
+  valueSeeking: boolean,
+  valueConcepts: readonly (readonly string[])[]
 ): string {
   if (content.length <= MAX_CONTENT_CHARS) {
     return content;
   }
 
-  const hits = keywordHits(content, keywords);
+  const hits = keywordHits(content, base, study, expansion);
   if (hits.length === 0) {
     return truncate(content);
   }
 
   const budget = MAX_CONTENT_CHARS;
-  const [clusterStart, clusterEnd] = bestCluster(hits, phrases, content);
+  const cluster = bestCluster(
+    hits,
+    phrases,
+    content,
+    valueSeeking,
+    valueConcepts
+  );
+  const clusterStart = cluster.start;
+  const clusterEnd = cluster.end;
 
   // Anchor on the sentence containing the cluster's last hit. That hit can
   // land just before the continuation of an evidence-bearing statement (e.g. a
@@ -336,7 +843,71 @@ function selectRelevantPassage(
   const anchorEnd = sentenceEndIndex(content, clusterEnd);
   const requiredStart = Math.min(clusterStart, anchorStart);
   const requiredEnd = anchorEnd;
+  const window = buildPassageWindow(
+    content,
+    requiredStart,
+    requiredEnd,
+    anchorStart,
+    anchorEnd,
+    budget
+  );
+  let from = window.from;
+  let to = window.to;
 
+  // Invariant for value-seeking questions that name a value concept: when the
+  // winning cluster is itself a value-statement cluster (it scored a
+  // conceptValue bonus), the final returned passage must carry the concept
+  // phrase together with its number. Scoring happens on a window of keyword
+  // hits, so the best-scoring cluster can still lose the statement to
+  // sentence/word snapping; when that happens, re-anchor on the statement so
+  // the score and the returned passage agree.
+  if (
+    valueSeeking &&
+    valueConcepts.length > 0 &&
+    cluster.conceptValue > 0 &&
+    valueStatementSpan(content, valueConcepts, from, to) === null
+  ) {
+    const statement = valueStatementSpan(
+      content,
+      valueConcepts,
+      0,
+      content.length
+    );
+    if (statement !== null) {
+      const stmtStart = sentenceStartIndex(content, statement.start);
+      const stmtEnd = sentenceEndIndex(content, statement.end);
+      const anchored = buildPassageWindow(
+        content,
+        statement.start,
+        statement.end,
+        stmtStart,
+        stmtEnd,
+        budget
+      );
+      from = anchored.from;
+      to = anchored.to;
+    }
+  }
+
+  return content.slice(from, to).trim();
+}
+
+/**
+ * Builds a bounded passage window of at most `budget` characters around the
+ * required span, centred, then aligned to sentence and word boundaries.
+ * `fallbackStart`/`fallbackEnd` anchor the window when the required span
+ * itself is wider than the budget. The start never advances past
+ * `requiredStart` during sentence alignment, so the required evidence is never
+ * traded away for continuation context.
+ */
+function buildPassageWindow(
+  content: string,
+  requiredStart: number,
+  requiredEnd: number,
+  fallbackStart: number,
+  fallbackEnd: number,
+  budget: number
+): { from: number; to: number } {
   let from: number;
   let to: number;
   if (requiredEnd - requiredStart <= budget) {
@@ -348,11 +919,11 @@ function selectRelevantPassage(
   } else {
     // The cluster spans sentences wider than the budget; anchor on the
     // evidence sentence itself so its statement stays complete.
-    const span = anchorEnd - anchorStart;
+    const span = fallbackEnd - fallbackStart;
     const head = Math.floor((budget - span) / 2);
     const tail = budget - span - head;
-    from = Math.max(0, anchorStart - head);
-    to = Math.min(content.length, anchorEnd + tail);
+    from = Math.max(0, fallbackStart - head);
+    to = Math.min(content.length, fallbackEnd + tail);
   }
 
   // Redistribute the leftover budget when the window sits against either
@@ -381,20 +952,251 @@ function selectRelevantPassage(
   }
 
   // Word-boundary snap for whatever remains, keeping an already-reached
-  // sentence terminator so the statement stays complete.
-  while (from > 0 && !/\s/.test(content[from - 1])) from -= 1;
+  // sentence terminator so the statement stays complete. When the window
+  // already runs to the end of the document, nudge the start forward to the
+  // next word instead of backward, because a backward snap shrinks the tail
+  // budget and would cut a trailing value ("0.05)") off a value-bearing
+  // statement that sits at the very end of the content.
+  if (from > 0 && !/\s/.test(content[from - 1])) {
+    if (to < content.length) {
+      while (from > 0 && !/\s/.test(content[from - 1])) from -= 1;
+    } else {
+      while (from < to && !/\s/.test(content[from])) from += 1;
+    }
+  }
   if (to > from + budget) to = from + budget;
+  // Snap the end back to a word boundary, but never strip a trailing value:
+  // digits and closing punctuation that follow a number ("0.05)", "95%") are
+  // part of the evidence and stay.
   while (
     to > from &&
     !/\s/.test(content[to - 1]) &&
+    !/[0-9%)]/.test(content[to - 1]) &&
     !isSentenceTerminator(content, to - 1)
   ) {
     to -= 1;
   }
 
-  const passage = content.slice(from, to).trim();
+  return { from, to };
+}
 
-  return passage;
+/**
+ * The active concepts genuinely present in a text. Only the currently-active
+ * question concepts are considered, so an unrelated synonym ("effect" in a
+ * passage) never counts as coverage unless the question itself is about that
+ * concept. A concept only counts as covered when at least two *distinct* terms
+ * of it appear: a single stray synonym (e.g. one "observed" inside a methods
+ * section) is not the findings content itself, so it must not mark the concept
+ * as covered and block a complementary findings passage.
+ */
+function coveredBy(text: string, concepts: Set<string>): Set<string> {
+  const haystack = text.toLowerCase();
+  const covered = new Set<string>();
+  for (const concept of concepts) {
+    const seen = new Set<string>();
+    for (const term of CONCEPT_TERMS[concept]) {
+      if (new RegExp(`\\b${term}\\b`).test(haystack)) seen.add(term);
+    }
+    if (seen.size >= 2) covered.add(concept);
+  }
+  return covered;
+}
+
+/**
+ * Scores a single context item: a body score from the best keyword cluster in
+ * its content plus a metadata score from its title and identifying fields.
+ * The item's model-facing passage is selected alongside so that coverage can
+ * be measured against exactly what the model will see.
+ */
+function rankCandidate(
+  item: ResearchContextItem,
+  base: Set<string>,
+  study: Set<string>,
+  expansion: Set<string>,
+  phrases: string[][],
+  concepts: Set<string>,
+  valueSeeking: boolean,
+  valueConcepts: readonly (readonly string[])[]
+): Candidate {
+  const body = item.content;
+  let bodyScore = 0;
+  let passage = body;
+  if (body.trim().length > 0) {
+    const hits = keywordHits(body, base, study, expansion);
+    if (hits.length > 0) {
+      bodyScore = bestCluster(hits, phrases, body, valueSeeking, valueConcepts)
+        .score;
+      if (body.length > MAX_CONTENT_CHARS) {
+        passage = selectRelevantPassage(
+          body,
+          base,
+          study,
+          expansion,
+          phrases,
+          valueSeeking,
+          valueConcepts
+        );
+      }
+    } else if (body.length > MAX_CONTENT_CHARS) {
+      passage = truncate(body);
+    }
+  }
+
+  const metadata = metadataHaystackOf(item).toLowerCase();
+  let metadataScore = 0;
+  for (const keyword of base) {
+    if (metadata.includes(keyword)) metadataScore += 5;
+  }
+  for (const keyword of expansion) {
+    if (!base.has(keyword) && metadata.includes(keyword)) metadataScore += 2;
+  }
+  for (const phrase of phrases) {
+    const pattern = new RegExp(`\\b${phrase.join("\\s+")}\\b`, "i");
+    if (pattern.test(metadata)) metadataScore += 8;
+  }
+
+  const covered =
+    concepts.size > 0
+      ? coveredBy(`${item.title} ${passage}`, concepts)
+      : new Set<string>();
+
+  return {
+    item,
+    score: bodyScore + metadataScore,
+    passage,
+    covered,
+  };
+}
+
+/**
+ * Selects the context items, greedily preferring candidates that cover the
+ * most still-uncovered question concepts so the model receives complementary
+ * evidence instead of several items about the same idea. When every concept
+ * is already covered (or the question has no active concepts), picks the
+ * highest-scored candidates in order, so top relevance always wins ties.
+ */
+function greedyDiverse(
+  candidates: Candidate[],
+  concepts: Set<string>
+): Candidate[] {
+  const selected: Candidate[] = [];
+  const remaining = [...candidates];
+  const uncovered = new Set(concepts);
+
+  while (selected.length < MAX_CONTEXT_ITEMS && remaining.length > 0) {
+    let bestIndex = 0;
+    let bestGain = 0;
+    for (let i = 0; i < remaining.length; i += 1) {
+      let gain = 0;
+      for (const concept of remaining[i].covered) {
+        if (uncovered.has(concept)) gain += 1;
+      }
+      if (gain > bestGain) {
+        bestGain = gain;
+        bestIndex = i;
+      }
+    }
+    const [chosen] = remaining.splice(bestIndex, 1);
+    selected.push(chosen);
+    for (const concept of chosen.covered) uncovered.delete(concept);
+  }
+
+  return selected;
+}
+
+/**
+ * Appends secondary passages for still-uncovered concepts. A single long
+ * document can answer a multi-concept question across different sections, but
+ * its best cluster captures only one region; each still-uncovered concept is
+ * then targeted independently with its own focus terms, so a findings/results
+ * section thousands of characters away from the methodology section is still
+ * contributed as an additional context item (same document id, different
+ * region, independently citable). Concepts a secondary passage happens to
+ * cover are removed from the still-uncovered set, so only genuinely new
+ * coverage adds another item. Passages are only added when the focus
+ * genuinely appears in the body with at least two distinct concept terms, when
+ * they are not already part of the text the model was given for that document,
+ * and within the existing item budget.
+ */
+function addSecondaryPassages(
+  selected: Candidate[],
+  candidates: Candidate[],
+  concepts: Set<string>
+): Candidate[] {
+  if (concepts.size === 0 || selected.length >= MAX_CONTEXT_ITEMS) {
+    return selected;
+  }
+
+  const uncovered = new Set(concepts);
+  for (const candidate of selected) {
+    for (const concept of candidate.covered) uncovered.delete(concept);
+  }
+  if (uncovered.size === 0) return selected;
+
+  const result = [...selected];
+  const capacity = MAX_CONTEXT_ITEMS - result.length;
+  let added = 0;
+
+  for (const concept of [...uncovered]) {
+    if (!uncovered.has(concept)) continue;
+    if (added >= capacity) break;
+    const focus = new Set(CONCEPT_TERMS[concept]);
+
+    for (const candidate of candidates) {
+      if (candidate.item.kind !== "document") continue;
+      const body = candidate.item.content;
+      if (body.trim().length === 0 || body.length <= MAX_CONTENT_CHARS) {
+        continue;
+      }
+
+      if (
+        keywordHits(body, focus, new Set<string>(), new Set<string>())
+          .length === 0
+      ) {
+        continue;
+      }
+
+      const focused = selectRelevantPassage(
+        body,
+        focus,
+        new Set<string>(),
+        new Set<string>(),
+        [],
+        false,
+        []
+      );
+      if (focused.length === 0) continue;
+
+      const conceptCovered = coveredBy(
+        `${candidate.item.title} ${focused}`,
+        new Set([concept])
+      );
+      if (!conceptCovered.has(concept)) continue;
+
+      const duplicate = result.some(
+        (existing) =>
+          existing.item.id === candidate.item.id &&
+          existing.passage.includes(focused)
+      );
+      if (duplicate) continue;
+
+      const covered = coveredBy(
+        `${candidate.item.title} ${focused}`,
+        uncovered
+      );
+      result.push({
+        ...candidate,
+        item: { ...candidate.item, content: focused },
+        passage: focused,
+        covered,
+      });
+      added += 1;
+      for (const coveredConcept of covered) uncovered.delete(coveredConcept);
+      break;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -449,34 +1251,47 @@ export async function retrieveResearchContext(
     return fail(sourcesResult.error, { items: [], hasBodyContent: false });
   }
 
-  const keywords = keywordsOf(question);
-  const phrases = phrasesOf(question, keywords);
+  const base = keywordsOf(question);
+  const phrases = phrasesOf(question, base);
+  const valueSeeking = isValueSeeking(question);
+  const valueConcepts = activeValueConcepts(question, base);
+  const { expansion, study, concepts } = matchSetsOf(base);
 
   const documentItems = documentsResult.data
     .filter((document) => document.status === "ready")
     .map(toItem);
-  const sourceItems = sourcesResult.data.map(toSourceItem);
+  const sourceItems = dedupeSources(sourcesResult.data.map(toSourceItem));
 
-  const selected = [...documentItems, ...sourceItems]
-    .map((item) => ({ item, score: relevanceScore(item, keywords) }))
-    .filter((entry) => entry.score > 0)
+  const candidates = [...documentItems, ...sourceItems]
+    .map((item) =>
+      rankCandidate(
+        item,
+        base,
+        study,
+        expansion,
+        phrases,
+        concepts,
+        valueSeeking,
+        valueConcepts
+      )
+    )
+    .filter((candidate) => candidate.score > 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return a.item.title.localeCompare(b.item.title);
-    })
-    .slice(0, MAX_CONTEXT_ITEMS)
-    .map((entry) =>
-      entry.item.kind === "document"
-        ? {
-            ...entry.item,
-            content: selectRelevantPassage(entry.item.content, keywords, phrases),
-          }
-        : { ...entry.item, content: truncate(entry.item.content) }
-    );
+    });
+
+  const primary = greedyDiverse(candidates, concepts);
+  const selected = addSecondaryPassages(primary, candidates, concepts);
+
+  const items = selected.map((candidate) => ({
+    ...candidate.item,
+    content: candidate.passage,
+  }));
 
   return ok({
-    items: selected,
-    hasBodyContent: selected.some((item) => item.content.trim().length > 0),
+    items,
+    hasBodyContent: items.some((item) => item.content.trim().length > 0),
   });
 }
 

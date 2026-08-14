@@ -10,6 +10,7 @@ import {
   searchError,
   type SearchError,
 } from "./errors";
+import { normalizeUrl } from "./normalize-url";
 
 /**
  * Upper bound on the search query sent to the provider.
@@ -74,7 +75,8 @@ function toSearchError(error: unknown): SearchError {
 
 /**
  * Normalizes raw grounding results: keeps only well-formed http(s) URLs,
- * deduplicates, sanitizes titles, and bounds the result count.
+ * deduplicates by canonical URL, sanitizes titles, and bounds the result
+ * count.
  */
 function normalizeResults(raw: GroundedWebResult[]): WebSearchResult[] {
   const seen = new Set<string>();
@@ -82,8 +84,9 @@ function normalizeResults(raw: GroundedWebResult[]): WebSearchResult[] {
 
   for (const entry of raw) {
     if (!isValidUrl(entry.url)) continue;
-    if (seen.has(entry.url)) continue;
-    seen.add(entry.url);
+    const key = normalizeUrl(entry.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
 
     results.push({
       title: sanitizeTitle(entry.title) || entry.url,

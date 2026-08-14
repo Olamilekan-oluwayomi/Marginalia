@@ -1,6 +1,7 @@
 import "server-only";
 
 import { searchWeb, type WebSearchResult } from "@/lib/search";
+import { normalizeUrl } from "@/lib/search/normalize-url";
 import { fail, ok, validationError, type AppResult } from "./errors";
 import { requireUser } from "./session";
 import { createSource, getSources } from "./sources";
@@ -72,6 +73,7 @@ export async function runWebResearch(
     sourcesResult.data
       .map((source) => source.url)
       .filter((url): url is string => Boolean(url))
+      .map(normalizeUrl)
   );
 
   let results: WebSearchResult[];
@@ -86,8 +88,8 @@ export async function runWebResearch(
   let addedCount = 0;
 
   for (const result of results) {
-    if (existingUrls.has(result.url)) continue;
-    existingUrls.add(result.url);
+    if (existingUrls.has(normalizeUrl(result.url))) continue;
+    existingUrls.add(normalizeUrl(result.url));
 
     const created = await createSource(supabase, researchId, {
       title: result.title.slice(0, TITLE_MAX_LENGTH),

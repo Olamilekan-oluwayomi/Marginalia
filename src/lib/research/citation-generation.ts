@@ -138,6 +138,47 @@ export type ResolveCitationsResult = {
 };
 
 /**
+ * Repairs the most common malformed citation marker: a bare sentence-final
+ * integer the model wrote instead of a bracketed `[n]` (e.g. "...anomalies 1."
+ * instead of "...anomalies [1]."). A bare integer that corresponds to a
+ * resolved citation is rewritten to the clickable `[n]` marker the renderer
+ * expects; a bare integer that matches no resolved citation is removed, since
+ * an invalid marker must never be rendered. Inline integers that are not
+ * sentence-final — "0.05", "1, 5, 10 and 30 days", "1961-2018" — are left
+ * untouched, and multi-digit values that merely end a sentence (e.g. "...since
+ * 1990.") are never erased because they are not plausible marker numbers.
+ * Runs before marker stripping so the repaired markers are validated by the
+ * same rules as model-written ones.
+ */
+function normalizeMalformedMarkers(
+  answer: string,
+  resolved: ResolvedCitation[]
+): string {
+  const validNumbers = new Set(
+    resolved.map((citation) => citation.citation_number)
+  );
+  let changed = false;
+  let cleaned = answer.replace(
+    /(^|\s)(\d+)\s*(?=[.!?](?=\s|$)|$)/g,
+    (match, prefix: string, digits: string) => {
+      const number = Number(digits);
+      if (validNumbers.has(number)) {
+        return `${prefix}[${digits}]`;
+      }
+      if (number < 100) {
+        changed = true;
+        return prefix;
+      }
+      return match;
+    }
+  );
+  if (changed) {
+    cleaned = cleaned.replace(/[ ]{2,}/g, " ").replace(/[ ]+([.,;:!?])/g, "$1");
+  }
+  return cleaned;
+}
+
+/**
  * Removes every `[n]` marker whose number is not among the resolved citation
  * numbers. A marker is only ever valid when its citation resolved to real
  * evidence; stripping the rest keeps a dropped citation from leaving a
@@ -195,9 +236,10 @@ export function resolveCitations(
   }
 
   resolved.sort((a, b) => a.citation_number - b.citation_number);
+  const normalized = normalizeMalformedMarkers(output.answer, resolved);
   return {
     citations: resolved,
     rejectedCount,
-    answer: stripUnresolvedCitationMarkers(output.answer, resolved),
+    answer: stripUnresolvedCitationMarkers(normalized, resolved),
   };
 }
