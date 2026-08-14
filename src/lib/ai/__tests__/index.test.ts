@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_MODEL,
+  GENERATION_RETRY_ATTEMPTS,
   MAX_PROMPT_CHARS,
   MAX_SYSTEM_CHARS,
   generateJson,
   generateText,
+  isTransientProviderError,
   searchWebWithGrounding,
 } from "@/lib/ai";
 
@@ -100,6 +102,96 @@ describe("generateJson", () => {
     await expect(
       generateJson({ prompt: "x".repeat(MAX_PROMPT_CHARS + 1) })
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});
+
+describe("isTransientProviderError", () => {
+  it("treats HTTP 429 and 5xx statuses as transient", () => {
+    expect(isTransientProviderError({ status: 429 })).toBe(true);
+    expect(isTransientProviderError({ status: 500 })).toBe(true);
+    expect(isTransientProviderError({ status: 503 })).toBe(true);
+  });
+
+  it("treats provider RPC overload codes as transient", () => {
+    expect(
+      isTransientProviderError({ error: { code: "UNAVAILABLE" } })
+    ).toBe(true);
+    expect(
+      isTransientProviderError({ error: { code: "RESOURCE_EXHAUSTED" } })
+    ).toBe(true);
+  });
+
+  it("treats permanent failures and non-provider values as non-transient", () => {
+    expect(isTransientProviderError({ status: 400 })).toBe(false);
+    expect(isTransientProviderError({ status: 401 })).toBe(false);
+    expect(isTransientProviderError(new Error("boom"))).toBe(false);
+    expect(isTransientProviderError(null)).toBe(false);
+    expect(isTransientProviderError(undefined)).toBe(false);
+  });
+});
+
+describe("transient retry", () => {
+  beforeEach(() => {
+    mocks.generateContent.mockReset();
+  });
+
+  it("retries once and succeeds when generateText hits a transient 429", async () => {
+    const rateLimited = Object.assign(new Error("rate limited"), {
+      status: 429,
+    });
+    mocks.generateContent
+      .mockRejectedValueOnce(rateLimited)
+      .mockResolvedValueOnce({ text: "Hello" });
+
+    await expect(generateText({ prompt: "hi" })).resolves.toBe("Hello");
+    expect(mocks.generateContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a permanent provider failure", async () => {
+    const badRequest = Object.assign(new Error("bad request"), { status: 400 });
+    mocks.generateContent.mockRejectedValue(badRequest);
+
+    await expect(generateText({ prompt: "hi" })).rejects.toMatchObject({
+      code: "PROVIDER_ERROR",
+    });
+    expect(mocks.generateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects after retries are exhausted for a persistent transient failure", async () => {
+    const rateLimited = Object.assign(new Error("rate limited"), {
+      status: 503,
+    });
+    mocks.generateContent.mockRejectedValue(rateLimited);
+
+    await expect(generateText({ prompt: "hi" })).rejects.toMatchObject({
+      code: "PROVIDER_ERROR",
+    });
+    expect(mocks.generateContent).toHaveBeenCalledTimes(
+      GENERATION_RETRY_ATTEMPTS
+    );
+  });
+
+  it("retries once and succeeds when generateJson hits a transient 503", async () => {
+    const unavailable = Object.assign(new Error("unavailable"), {
+      status: 503,
+    });
+    mocks.generateContent
+      .mockRejectedValueOnce(unavailable)
+      .mockResolvedValueOnce({ text: '{"ok":true}' });
+
+    await expect(generateJson({ prompt: "hi" })).resolves.toEqual({
+      ok: true,
+    });
+    expect(mocks.generateContent).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a caller-side timeout", async () => {
+    mocks.generateContent.mockReturnValue(new Promise(() => {}));
+
+    await expect(
+      generateText({ prompt: "hi", timeoutMs: 5 })
+    ).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
+    expect(mocks.generateContent).toHaveBeenCalledTimes(1);
   });
 });
 
