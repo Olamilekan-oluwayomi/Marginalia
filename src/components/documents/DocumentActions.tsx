@@ -19,7 +19,7 @@ function actionButtonClass(
   pending: boolean
 ): string {
   const base =
-    "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-ui text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 py-2 font-ui text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
   if (tone === "danger") {
     return `${base} border-error/40 text-error hover:bg-error/5 ${
       pending ? "" : "active:bg-error/10"

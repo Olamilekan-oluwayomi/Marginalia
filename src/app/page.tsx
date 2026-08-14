@@ -1,4 +1,5 @@
 import { ArrowRight, FileText, Plus } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Greeting } from "@/components/profile/Greeting";
@@ -30,6 +31,11 @@ type RecentDocumentItem = {
 };
 
 const RECENT_DOCUMENT_LIMIT = 4;
+
+export const metadata: Metadata = {
+  title: "Workspace",
+  description: "Continue your research or start something new in Marginalia.",
+};
 
 function toResearchListItem(item: ResearchListWithCounts): ResearchListItem {
   return {

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -15,6 +16,11 @@ function signInMethodLabel(provider: unknown): string | null {
   }
   return null;
 }
+
+export const metadata: Metadata = {
+  title: "Settings",
+  description: "Manage your account and appearance.",
+};
 
 export default async function SettingsPage() {
   const user = await getCurrentUser();

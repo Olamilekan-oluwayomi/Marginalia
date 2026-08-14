@@ -49,7 +49,7 @@ export function SourceActions({
         type="button"
         onClick={() => setConfirmOpen(true)}
         aria-label={`Delete ${title}`}
-        className="inline-flex items-center gap-1.5 rounded-md border border-error/40 px-3 py-1.5 font-ui text-xs font-medium text-error transition-colors hover:bg-error/5 active:bg-error/10"
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-error/40 px-3 py-2 font-ui text-xs font-medium text-error transition-colors hover:bg-error/5 active:bg-error/10"
       >
         <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
         Delete

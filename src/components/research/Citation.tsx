@@ -128,7 +128,7 @@ export function Citation({
         onClick={handleClick}
         aria-label={`Citation ${index}${expanded ? ", collapse" : ", expand"}`}
         aria-expanded={expanded}
-        className="ml-1 cursor-pointer border-0 bg-transparent p-0 font-mono text-[0.7em] text-ochre"
+        className="ml-1 -my-1 -mr-1 inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-sm border-0 bg-transparent p-0 font-mono text-[0.7em] leading-none text-ochre"
       >
         {index}
       </button>

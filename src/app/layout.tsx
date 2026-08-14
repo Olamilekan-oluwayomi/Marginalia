@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Newsreader, Work_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { ProfileProvider } from "@/components/profile/ProfileProvider";
@@ -23,8 +23,35 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marginalia",
-  description: "Research, read, connect.",
+  title: {
+    default: "Marginalia",
+    template: "%s — Marginalia",
+  },
+  description:
+    "Research, read, connect. A private workspace for reading, organizing, and exploring your sources with an AI research assistant.",
+  robots: { index: false, follow: false },
+  openGraph: {
+    title: "Marginalia",
+    description: "Research, read, connect.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Marginalia",
+    description: "Research, read, connect.",
+  },
+};
+
+/**
+ * Mobile browser chrome (address bar / status bar) matches the app's paper
+ * background in both color schemes. The app is private (`robots: noindex`),
+ * so no social sharing metadata beyond the root defaults is needed.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#edeeea" },
+    { media: "(prefers-color-scheme: dark)", color: "#1d211f" },
+  ],
 };
 
 const themeScript = `(function () {

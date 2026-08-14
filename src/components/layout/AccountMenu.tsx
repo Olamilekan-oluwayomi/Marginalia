@@ -45,7 +45,7 @@ export function AccountMenu() {
     return (
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 items-center justify-center rounded-md text-muted"
+        className="flex h-10 w-10 items-center justify-center rounded-md text-muted"
       >
         <UserRound size={18} strokeWidth={1.7} />
       </span>
@@ -56,7 +56,7 @@ export function AccountMenu() {
     return (
       <Link
         href="/login"
-        className="flex h-9 items-center gap-2 rounded-md px-2 font-ui text-sm text-muted transition-colors hover:bg-paper-raised hover:text-ink"
+        className="flex h-10 items-center gap-2 rounded-md px-2 font-ui text-sm text-muted transition-colors hover:bg-paper-raised hover:text-ink"
       >
         <UserRound size={18} strokeWidth={1.7} />
         <span className="hidden md:block">Sign in</span>
@@ -73,7 +73,7 @@ export function AccountMenu() {
         aria-expanded={open}
         aria-label={`Account: ${name}`}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-9 items-center gap-1.5 rounded-md px-2 text-muted transition-colors hover:bg-paper-raised hover:text-ink"
+        className="flex h-10 items-center gap-1.5 rounded-md px-2 text-muted transition-colors hover:bg-paper-raised hover:text-ink"
       >
         <UserRound size={18} strokeWidth={1.7} />
         <span className="hidden max-w-36 truncate font-ui text-sm text-ink md:block">

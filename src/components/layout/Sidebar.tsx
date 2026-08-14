@@ -40,7 +40,7 @@ export function Sidebar() {
     <>
       {/* Desktop rail */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col border-r border-rule bg-paper md:flex">
-        <nav className="flex flex-1 flex-col items-center gap-2 py-4">
+        <nav aria-label="Primary" className="flex flex-1 flex-col items-center gap-2 py-4">
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -77,7 +77,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t border-rule bg-paper md:hidden">
+      <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 flex h-16 border-t border-rule bg-paper md:hidden">
         {navigation.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);

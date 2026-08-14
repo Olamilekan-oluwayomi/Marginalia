@@ -1,4 +1,5 @@
 import { ArrowRight, FileText, Plus } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +28,12 @@ function toResearchListItem(item: ResearchListWithCounts): ResearchListItem {
     updatedAt: item.updated_at,
   };
 }
+
+export const metadata: Metadata = {
+  title: "Research",
+  description:
+    "Organize papers into focused research spaces and ask questions across your sources.",
+};
 
 export default async function ResearchPage() {
   const supabase = await createSupabaseClient();

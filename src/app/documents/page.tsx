@@ -1,4 +1,5 @@
 import { FileText } from "lucide-react";
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { AddDocumentForm } from "@/components/documents/AddDocumentForm";
 import { DocumentActions } from "@/components/documents/DocumentActions";
@@ -37,6 +38,12 @@ function toDocumentListItem(item: DocumentSummary): DocumentListItem {
     status: item.status,
   };
 }
+
+export const metadata: Metadata = {
+  title: "Documents",
+  description:
+    "Upload PDFs to build your research library. Documents are stored securely and processed automatically.",
+};
 
 export default async function DocumentsPage() {
   const supabase = await createSupabaseClient();

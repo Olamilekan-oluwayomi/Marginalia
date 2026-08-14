@@ -31,12 +31,17 @@ export function GoogleSignIn({ source, error, redirectTo }: GoogleSignInProps) {
     setPending(true);
     setFailed(false);
 
-    document.cookie = `oauth_origin=${source}; path=/; samesite=lax; max-age=600`;
+    // Session metadata cookies for the /auth/callback route. `Secure` applies
+    // on HTTPS (production) so the origin/destination hints never travel in
+    // the clear; localhost stays readable for development.
+    const secure = window.location.protocol === "https:" ? "; secure" : "";
+
+    document.cookie = `oauth_origin=${source}; path=/; samesite=lax; max-age=600${secure}`;
 
     if (redirectTo) {
       document.cookie = `auth_destination=${encodeURIComponent(
         redirectTo
-      )}; path=/; samesite=lax; max-age=600`;
+      )}; path=/; samesite=lax; max-age=600${secure}`;
     }
 
     const supabase = createClient();

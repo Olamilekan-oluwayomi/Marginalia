@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateResearchForm } from "@/components/research/CreateResearchForm";
 import { Label } from "@/components/ui/Label";
+
+export const metadata: Metadata = {
+  title: "New research",
+  description: "Start a research workspace for a question you're trying to answer.",
+};
 
 export default function NewResearchPage() {
   return (

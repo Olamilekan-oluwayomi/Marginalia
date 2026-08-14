@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { AppShell } from "@/components/layout/AppShell";
 import { Answer } from "@/components/research/Answer";
 import { Citation } from "@/components/research/Citation";
@@ -41,6 +42,27 @@ import {
  * platform still enforces its own upper bound.
  */
 export const maxDuration = 60;
+
+/**
+ * Dynamic page title: a single lightweight lookup of the research record so
+ * the browser tab (and any crawler) reflects the actual workspace name. The
+ * root layout's `%s — Marginalia` template is applied automatically.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createSupabaseClient();
+  const { data } = await supabase
+    .from("research")
+    .select("title")
+    .eq("id", id)
+    .maybeSingle();
+
+  return { title: data?.title ?? "Research" };
+}
 
 type CitationNote = {
   /** Persisted citation row id; the unique key and scroll target. */
@@ -191,7 +213,7 @@ export default async function ResearchWorkspacePage({
         <header className="border-b border-rule pb-8">
           <Label>Research</Label>
 
-          <h1 className="mt-3 font-reading text-4xl leading-tight">
+          <h1 className="mt-3 break-words font-reading text-4xl leading-tight">
             {research.title}
           </h1>
 
@@ -274,6 +296,22 @@ export default async function ResearchWorkspacePage({
                             {formatDisplayDate(question.created_at)}
                           </span>
                         </div>
+
+                        {/*
+                          Live region so assistive tech announces the outcome
+                          of background generation. While waiting, the visible
+                          status block below (role="status") announces the
+                          in-progress state; this sr-only region announces the
+                          terminal states the waiting block disappears into.
+                        */}
+                        {question.answer_status === "complete" ||
+                        question.answer_status === "failed" ? (
+                          <p className="sr-only" role="status">
+                            {question.answer_status === "complete"
+                              ? "Answer complete."
+                              : "Answer failed."}
+                          </p>
+                        ) : null}
                       </div>
 
                       {paragraphs.length > 0 ? (

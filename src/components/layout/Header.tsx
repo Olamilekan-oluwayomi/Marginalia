@@ -48,7 +48,7 @@ export function Header({ title, showTitle = true }: HeaderProps) {
           onClick={() => setTheme(next)}
           aria-label={themeLabel}
           title={themeLabel}
-          className="flex h-9 w-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-paper-raised hover:text-ink"
+          className="flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-paper-raised hover:text-ink"
         >
           <ThemeIcon size={17} strokeWidth={1.7} />
         </button>

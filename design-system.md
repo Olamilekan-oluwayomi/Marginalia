@@ -12,12 +12,17 @@
 | `paper-raised` | `#F5F5F2` | Cards, input surface, hover surface |
 | `ink` | `#1F2421` | Primary text |
 | `ink-soft` | `#3A3F3A` | Secondary body text |
-| `muted` | `#6E7268` | Labels, timestamps, placeholder text |
+| `muted` | `#63675F` | Labels, timestamps, placeholder text |
 | `rule` | `#D8D6CE` | Hairline borders, dividers |
 | `pine` | `#3B6E63` | Accent — links, focus ring, active nav, primary button |
 | `pine-dim` | `#2C5049` | Pine hover/pressed state |
-| `ochre` | `#B8902E` | Citations, highlight marks, source underline |
+| `ochre` | `#84651A` | Citations, highlight marks, source underline |
 | `error` | `#A23B2E` | Errors only — desaturated brick, not stock red |
+
+> The light-mode `muted` (`#63675F`) and `ochre` (`#84651A`) shades are tuned
+> for WCAG 2.1 AA: ≥ 4.5:1 against the `paper` background, since both are used
+> for small text (labels/timestamps and citation numerals). The dark-mode
+> values already pass and are left unchanged.
 
 No gradients. No glassmorphism. Shadows are a single `0 1px 2px rgba(31,36,33,0.06)` at most, used only on the composer input, nowhere else.
 
@@ -29,11 +34,11 @@ No gradients. No glassmorphism. Shadows are a single `0 1px 2px rgba(31,36,33,0.
   --paper-raised: #F5F5F2;
   --ink: #1F2421;
   --ink-soft: #3A3F3A;
-  --muted: #6E7268;
+  --muted: #63675F;
   --rule: #D8D6CE;
   --pine: #3B6E63;
   --pine-dim: #2C5049;
-  --ochre: #B8902E;
+  --ochre: #84651A;
   --error: #A23B2E;
 
   --radius-sm: 3px;
@@ -121,10 +126,10 @@ export default {
       colors: {
         paper: { DEFAULT: '#EDEEEA', raised: '#F5F5F2' },
         ink: { DEFAULT: '#1F2421', soft: '#3A3F3A' },
-        muted: '#6E7268',
+        muted: '#63675F',
         rule: '#D8D6CE',
         pine: { DEFAULT: '#3B6E63', dim: '#2C5049' },
-        ochre: '#B8902E',
+        ochre: '#84651A',
         error: '#A23B2E',
       },
       fontFamily: {
