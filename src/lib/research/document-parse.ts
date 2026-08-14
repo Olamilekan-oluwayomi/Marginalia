@@ -1,5 +1,10 @@
 import "server-only";
 
+// Must stay above the pdf-parse import: pdfjs-dist (inside pdf-parse)
+// needs globalThis.DOMMatrix at module load time. ESM evaluates imports in
+// source order, so this side effect runs before pdf-parse evaluates.
+import "./dommatrix-polyfill";
+
 import { PDFParse } from "pdf-parse";
 
 /** Upper bound on extracted body text kept per document. */
