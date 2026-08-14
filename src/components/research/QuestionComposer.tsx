@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
@@ -21,10 +21,24 @@ const initialState: AskQuestionState = {
 export function QuestionComposer({ researchId }: { researchId: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState("");
   const [state, formAction, pending] = useActionState(
     askQuestionAction.bind(null, researchId),
     initialState
   );
+
+  const canSubmit = value.trim().length > 0;
+
+  // Clear the typed question when the last submission succeeded. React's
+  // documented "adjusting state during render" pattern — guarded by the
+  // previous render's value — so a failed submission keeps the user's text.
+  const [previousSuccess, setPreviousSuccess] = useState(state.success);
+  if (state.success !== previousSuccess) {
+    setPreviousSuccess(state.success);
+    if (state.success) {
+      setValue("");
+    }
+  }
 
   useEffect(() => {
     if (state.success) {
@@ -44,6 +58,8 @@ export function QuestionComposer({ researchId }: { researchId: string }) {
         className="mt-3 min-h-28"
         placeholder="Ask something about your research..."
         maxLength={1000}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
         aria-invalid={Boolean(state.fieldErrors.question)}
         aria-describedby={
           state.fieldErrors.question
@@ -77,8 +93,12 @@ export function QuestionComposer({ researchId }: { researchId: string }) {
       </label>
 
       <div className="mt-3 flex justify-end">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Asking..." : "Ask question"}
+        <Button
+          type="submit"
+          disabled={pending || !canSubmit}
+          title={pending ? undefined : "Type a question first"}
+        >
+          {pending ? "Asking…" : "Ask question"}
         </Button>
       </div>
     </form>
