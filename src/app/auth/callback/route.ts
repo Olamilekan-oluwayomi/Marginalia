@@ -79,7 +79,17 @@ export async function GET(request: NextRequest) {
 
     if (exchangeError) {
       console.error("OAuth code exchange failed:", exchangeError);
-      return buildRedirect(request, `/${source}?error=oauth_failed`);
+      // When the Supabase project disallows new signups, a brand-new Google
+      // identity fails the code exchange here ("Signup not allowed for this
+      // instance") before any application record exists. Route that to the
+      // explicit "no account / registration required" message instead of the
+      // generic failure; existing users exchange codes normally. This branch
+      // only picks the message shown — it never grants access.
+      const message = exchangeError.message ?? "";
+      const errorParam = /signup/i.test(message)
+        ? "account_not_found"
+        : "oauth_failed";
+      return buildRedirect(request, `/${source}?error=${errorParam}`);
     }
 
     const {
@@ -101,42 +111,14 @@ export async function GET(request: NextRequest) {
       return rejectUnknownLogin(request, supabase, "profile_check_failed");
     }
 
+    // The application is restricted to existing users: a Google identity is
+    // only admitted if a profile row already exists (created when the account
+    // was registered). A missing profile means this identity has never
+    // registered — reject it and never silently create an application account
+    // for it. The sign-out below also guarantees the failed attempt leaves no
+    // partially authenticated session behind.
     if (!profile) {
-      const selfHealDisplayName =
-        user.user_metadata?.display_name ??
-        user.user_metadata?.name ??
-        "New Researcher";
-
-      const { error: selfHealError } = await supabase
-        .from("profiles")
-        .upsert(
-          { id: user.id, display_name: selfHealDisplayName },
-          { onConflict: "id", ignoreDuplicates: true }
-        );
-
-      if (selfHealError) {
-        console.error("profile_self_heal_failed:", selfHealError);
-        return rejectUnknownLogin(request, supabase);
-      }
-
-      const { data: healedProfile, error: recheckError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (recheckError) {
-        console.error("profile_self_heal_failed:", recheckError);
-        return rejectUnknownLogin(request, supabase);
-      }
-
-      if (!healedProfile) {
-        console.error(
-          "profile_self_heal_failed:",
-          "profile row still missing after self-heal insert"
-        );
-        return rejectUnknownLogin(request, supabase);
-      }
+      return rejectUnknownLogin(request, supabase);
     }
 
     return buildRedirect(request, readDestination(request));

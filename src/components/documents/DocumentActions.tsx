@@ -95,7 +95,10 @@ export function DocumentActions({
             className={actionButtonClass("danger", false)}
           >
             <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
-            Delete
+            {/* Icon-only below sm so the action stays compact on narrow
+                screens; the label returns from sm up. The aria-label keeps
+                the control named either way. */}
+            <span className="hidden sm:inline">Delete</span>
           </button>
         </div>
 

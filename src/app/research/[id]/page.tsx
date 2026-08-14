@@ -431,16 +431,16 @@ export default async function ResearchWorkspacePage({
               {documents.map((document) => (
                 <div
                   key={document.id}
-                  className="flex items-start justify-between gap-4 border-b border-rule py-4"
+                  className="border-b border-rule py-4 sm:flex sm:items-start sm:justify-between sm:gap-4"
                 >
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="flex flex-col gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
                       <h3 className="break-words font-reading text-lg leading-snug text-ink">
                         {document.title}
                       </h3>
 
                       <span
-                        className={`font-mono text-xs ${documentStatusClass(
+                        className={`font-mono text-xs sm:whitespace-nowrap ${documentStatusClass(
                           document.status
                         )}`}
                       >
@@ -449,13 +449,20 @@ export default async function ResearchWorkspacePage({
                     </div>
 
                     <p className="mt-1 font-mono text-xs text-muted">
+                      {/* Each part stays intact (no lone "2026" wraps);
+                          the group wraps between parts instead. */}
                       {[
                         fileTypeFromName(document.file_name),
                         formatFileSize(document.file_size),
                         `Added ${formatDisplayDate(document.created_at)}`,
                       ]
                         .filter(Boolean)
-                        .join(" · ")}
+                        .map((part, index) => (
+                          <span key={index} className="whitespace-nowrap">
+                            {index > 0 ? " · " : ""}
+                            {part}
+                          </span>
+                        ))}
                     </p>
 
                     {document.status !== "ready" ? (
@@ -471,11 +478,13 @@ export default async function ResearchWorkspacePage({
                     )}
                   </div>
 
-                  <DocumentActions
-                    documentId={document.id}
-                    title={document.title}
-                    status={document.status}
-                  />
+                  <div className="mt-3 sm:mt-0 sm:shrink-0">
+                    <DocumentActions
+                      documentId={document.id}
+                      title={document.title}
+                      status={document.status}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

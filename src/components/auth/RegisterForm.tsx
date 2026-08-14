@@ -272,7 +272,10 @@ function mapSignupError(error: {
     return "That email address is already registered. Try signing in instead.";
   }
 
-  if (/signups are disabled/i.test(message)) {
+  // Matches both phrasings GoTrue uses when the Supabase project disallows
+  // new signups: "Signups are disabled" and "Signup not allowed for this
+  // instance".
+  if (/signups?\s+(are\s+)?disabled|signup.*not allowed/i.test(message)) {
     return "Registration is currently unavailable. Please try again later.";
   }
 

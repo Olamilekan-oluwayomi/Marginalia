@@ -144,13 +144,23 @@ export default async function DocumentsPage() {
                         </h2>
 
                         <p className="mt-1 font-mono text-xs text-muted">
+                          {/* Each part stays intact (no lone "2026" wraps);
+                              the group wraps between parts instead. */}
                           {[
                             document.fileType,
                             formatFileSize(document.fileSize),
                             `Added ${document.addedAt}`,
                           ]
                             .filter(Boolean)
-                            .join(" · ")}
+                            .map((part, index) => (
+                              <span
+                                key={index}
+                                className="whitespace-nowrap"
+                              >
+                                {index > 0 ? " · " : ""}
+                                {part}
+                              </span>
+                            ))}
                         </p>
 
                         <p className="mt-2 font-mono text-xs sm:hidden">
