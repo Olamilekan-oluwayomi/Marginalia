@@ -6,9 +6,11 @@ import {
   createQuestion,
   createSource,
   createSupabaseClient,
+  deleteSource,
   generateAnswer,
   getQuestionById,
   getRecentQuestionCount,
+  getSourceById,
   optionalDate,
   optionalText,
   requireText,
@@ -324,6 +326,13 @@ export async function addSourceAction(
         success: false,
       };
     }
+    if (result.error.code === "VALIDATION_ERROR") {
+      return {
+        fieldErrors: {},
+        formError: result.error.message,
+        success: false,
+      };
+    }
     return {
       fieldErrors: {},
       formError: "We couldn't add this source. Please try again.",
@@ -333,4 +342,43 @@ export async function addSourceAction(
 
   revalidatePath(`/research/${researchId}`);
   return { fieldErrors: {}, formError: null, success: true };
+}
+
+export type DeleteSourceState = {
+  error: string | null;
+};
+
+/**
+ * Deletes a source from a research workspace. The source is read first
+ * (RLS-scoped, so another user's source resolves to NOT_FOUND) to resolve the
+ * research workspace for revalidation; the data layer then removes the row
+ * under the existing security model. Citations referencing the source are
+ * cleaned up by the schema's referential rules.
+ */
+export async function deleteSourceAction(
+  _prevState: DeleteSourceState,
+  formData: FormData
+): Promise<DeleteSourceState> {
+  const sourceId = (formData.get("sourceId") as string | null)?.trim() ?? "";
+
+  const supabase = await createSupabaseClient();
+
+  const sourceResult = await getSourceById(supabase, sourceId);
+  if (sourceResult.error || !sourceResult.data) {
+    return {
+      error:
+        sourceResult.error?.code === "UNAUTHORIZED"
+          ? "You need to be signed in to do that."
+          : "This source no longer exists.",
+    };
+  }
+  const researchId = sourceResult.data.research_id;
+
+  const result = await deleteSource(supabase, sourceId);
+  if (result.error) {
+    return { error: "We couldn't delete this source. Please try again." };
+  }
+
+  revalidatePath(`/research/${researchId}`);
+  return { error: null };
 }

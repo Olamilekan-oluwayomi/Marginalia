@@ -7,6 +7,7 @@ import {
   validationError,
   type AppResult,
 } from "./errors";
+import { normalizeUrl } from "@/lib/search/normalize-url";
 import { requireUser } from "./session";
 import {
   optionalDate,
@@ -46,6 +47,38 @@ function validateCreateInput(input: CreateSourceInput): string | null {
     return contentError.message;
   }
   return null;
+}
+
+function isWebUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolves whether a source with an equivalent URL already exists. Two URLs
+ * are equivalent when they normalize to the same canonical key (host casing,
+ * trailing slashes, fragments and tracking parameters are ignored). Only
+ * well-formed http(s) URLs are deduplicated so a non-URL text value can never
+ * be merged with a real URL.
+ */
+function findDuplicateUrl(
+  existing: Pick<SourceRow, "url">[],
+  url: string
+): boolean {
+  if (!isWebUrl(url)) {
+    return false;
+  }
+  const canonical = normalizeUrl(url);
+  return existing.some((source) => {
+    if (!source.url) {
+      return false;
+    }
+    return isWebUrl(source.url) && normalizeUrl(source.url) === canonical;
+  });
 }
 
 export async function getSources(
@@ -95,6 +128,23 @@ export async function createSource(
     return fail(session.error, null);
   }
 
+  // Reject sources that duplicate an existing one in the same research
+  // *before* inserting. Web research already dedupes by canonical URL; this
+  // extends the same rule to manually added sources so the evidence list
+  // never holds two entries for the same page.
+  if (input.url) {
+    const existingResult = await getSources(supabase, researchId);
+    if (existingResult.error) {
+      return fail(existingResult.error, null);
+    }
+    if (findDuplicateUrl(existingResult.data, input.url.trim())) {
+      return fail(
+        validationError("A source with this URL is already in this research."),
+        null
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from("sources")
     .insert({
@@ -111,6 +161,41 @@ export async function createSource(
 
   if (error) {
     return fail(toAppError(error), null);
+  }
+
+  return ok(data);
+}
+
+/**
+ * Fetches a single source by id. Ownership is enforced by RLS, so a caller
+ * can never reach another user's source; a non-owned id resolves to
+ * NOT_FOUND.
+ */
+export async function getSourceById(
+  supabase: Supabase,
+  sourceId: string
+): Promise<AppResult<SourceRow | null>> {
+  const idError = requireUuid(sourceId, "Source id");
+  if (idError) {
+    return fail(validationError(idError.message), null);
+  }
+
+  const session = await requireUser(supabase);
+  if ("error" in session) {
+    return fail(session.error, null);
+  }
+
+  const { data, error } = await supabase
+    .from("sources")
+    .select("*")
+    .eq("id", sourceId)
+    .maybeSingle();
+
+  if (error) {
+    return fail(toAppError(error), null);
+  }
+  if (!data) {
+    return fail(notFound("Source not found."), null);
   }
 
   return ok(data);
