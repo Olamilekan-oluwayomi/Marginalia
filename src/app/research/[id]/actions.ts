@@ -9,7 +9,7 @@ import {
   deleteSource,
   generateAnswer,
   getQuestionById,
-  getRecentQuestionCount,
+  getRecentUserQuestionCount,
   getSourceById,
   optionalDate,
   optionalText,
@@ -25,9 +25,9 @@ const PUBLISHER_MAX_LENGTH = 200;
 const CONTENT_MAX_LENGTH = 200_000;
 
 /**
- * Application-level guard: at most this many questions may be asked on a
- * research within the window below. A burst of questions would otherwise each
- * make a full provider round trip.
+ * Application-level guard: at most this many questions may be asked within the
+ * window below, counted across ALL of the user's research workspaces. A burst
+ * of questions would otherwise each make a full provider round trip.
  */
 const QUESTION_WINDOW_MINUTES = 5;
 const QUESTION_WINDOW_LIMIT = 20;
@@ -37,7 +37,10 @@ const QUESTION_WINDOW_LIMIT = 20;
  * revalidates the workspace route so the next polled render shows the
  * terminal state. The action itself returns immediately; generation failures
  * surface through the question status (`failed`) rather than the action's
- * return value, so the UI can offer a retry.
+ * return value, so the UI can offer a retry. The task is guarded so an
+ * unexpected throw cannot produce an unhandled rejection; the question is
+ * still marked `failed` by `generateAnswer`, and revalidation always runs so
+ * the polled render reflects the terminal state.
  */
 function scheduleGeneration(
   supabase: Supabase,
@@ -45,8 +48,16 @@ function scheduleGeneration(
   questionId: string
 ): void {
   runAfterResponse(async () => {
-    await generateAnswer(supabase, { questionId, researchId });
-    revalidatePath(`/research/${researchId}`);
+    try {
+      await generateAnswer(supabase, { questionId, researchId });
+    } catch (error) {
+      console.error(
+        "[research] background generation threw unexpectedly:",
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      revalidatePath(`/research/${researchId}`);
+    }
   });
 }
 
@@ -79,9 +90,8 @@ export async function askQuestionAction(
 
   const supabase = await createSupabaseClient();
 
-  const recentResult = await getRecentQuestionCount(
+  const recentResult = await getRecentUserQuestionCount(
     supabase,
-    researchId,
     QUESTION_WINDOW_MINUTES
   );
   if (recentResult.error) {

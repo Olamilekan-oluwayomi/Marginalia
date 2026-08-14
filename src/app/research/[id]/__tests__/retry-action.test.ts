@@ -21,7 +21,7 @@ vi.mock("@/lib/research", () => ({
   generateAnswer: mocks.generateAnswer,
   createQuestion: vi.fn(),
   createSource: vi.fn(),
-  getRecentQuestionCount: vi.fn(),
+  getRecentUserQuestionCount: vi.fn(),
   optionalDate: () => null,
   optionalText: () => null,
   requireText: () => null,

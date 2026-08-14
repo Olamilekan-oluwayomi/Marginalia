@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createSupabaseClient: vi.fn(),
   createQuestion: vi.fn(),
-  getRecentQuestionCount: vi.fn(),
+  getRecentUserQuestionCount: vi.fn(),
   generateAnswer: vi.fn(),
   revalidatePath: vi.fn(),
   runAfterResponse: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("@/lib/research/background", () => ({
 vi.mock("@/lib/research", () => ({
   createSupabaseClient: mocks.createSupabaseClient,
   createQuestion: mocks.createQuestion,
-  getRecentQuestionCount: mocks.getRecentQuestionCount,
+  getRecentUserQuestionCount: mocks.getRecentUserQuestionCount,
   generateAnswer: mocks.generateAnswer,
   createSource: vi.fn(),
   getQuestionById: vi.fn(),
@@ -61,7 +61,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireText.mockReturnValue(null);
   mocks.createSupabaseClient.mockResolvedValue({});
-  mocks.getRecentQuestionCount.mockResolvedValue({ error: null, data: 0 });
+  mocks.getRecentUserQuestionCount.mockResolvedValue({ error: null, data: 0 });
   mocks.createQuestion.mockResolvedValue({ error: null, data: createdQuestion });
   mocks.generateAnswer.mockResolvedValue({ error: null, data: {} });
   mocks.runAfterResponse.mockImplementation(() => undefined);
@@ -92,6 +92,28 @@ describe("askQuestionAction", () => {
 
     const task = mocks.runAfterResponse.mock.calls[0][0];
     await task();
+
+    expect(mocks.generateAnswer).toHaveBeenCalledWith(expect.anything(), {
+      questionId: createdQuestion.id,
+      researchId: RESEARCH_ID,
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(
+      `/research/${RESEARCH_ID}`
+    );
+  });
+
+  it("revalidates the route even when background generation throws", async () => {
+    const state = await askQuestionAction(
+      RESEARCH_ID,
+      initialState,
+      formDataWith("What is the capital of France?")
+    );
+
+    expect(state.success).toBe(true);
+
+    const task = mocks.runAfterResponse.mock.calls[0][0];
+    mocks.generateAnswer.mockRejectedValue(new Error("boom"));
+    await expect(task()).resolves.toBeUndefined();
 
     expect(mocks.generateAnswer).toHaveBeenCalledWith(expect.anything(), {
       questionId: createdQuestion.id,
@@ -152,7 +174,7 @@ describe("askQuestionAction", () => {
   });
 
   it("rejects when the recent-question rate limit is reached", async () => {
-    mocks.getRecentQuestionCount.mockResolvedValue({ error: null, data: 20 });
+    mocks.getRecentUserQuestionCount.mockResolvedValue({ error: null, data: 20 });
 
     const state = await askQuestionAction(
       RESEARCH_ID,
@@ -167,7 +189,7 @@ describe("askQuestionAction", () => {
   });
 
   it("surfaces a sign-in error from the rate-limit lookup", async () => {
-    mocks.getRecentQuestionCount.mockResolvedValue({
+    mocks.getRecentUserQuestionCount.mockResolvedValue({
       error: { code: "UNAUTHORIZED", message: "Sign in required." },
       data: 0,
     });

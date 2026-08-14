@@ -48,20 +48,18 @@ export async function getQuestions(
 }
 
 /**
- * Counts questions created on a research within the last `windowMinutes`
- * minutes. Used by the question action as a light application-level rate
- * limit so a burst of questions cannot drain provider budget. RLS-scoped.
+ * Counts questions the current user asked across all of their research
+ * workspaces within the last `windowMinutes` minutes. Used by the question
+ * action as a light application-level rate limit so a burst of questions
+ * cannot drain provider budget. RLS-scoped (the `research_questions` rows are
+ * the user's own) and additionally filtered by the authenticated user id, so
+ * the cap is global per user rather than per research — a user cannot bypass
+ * it by spreading questions across many workspaces.
  */
-export async function getRecentQuestionCount(
+export async function getRecentUserQuestionCount(
   supabase: Supabase,
-  researchId: string,
   windowMinutes: number
 ): Promise<AppResult<number>> {
-  const idError = requireUuid(researchId, "Research id");
-  if (idError) {
-    return fail(validationError(idError.message), 0);
-  }
-
   const session = await requireUser(supabase);
   if ("error" in session) {
     return fail(session.error, 0);
@@ -72,7 +70,7 @@ export async function getRecentQuestionCount(
   const { count, error } = await supabase
     .from("research_questions")
     .select("id", { count: "exact", head: true })
-    .eq("research_id", researchId)
+    .eq("user_id", session.user.id)
     .gte("created_at", since);
 
   if (error) {
