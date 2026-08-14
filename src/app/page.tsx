@@ -243,7 +243,9 @@ export default async function Home() {
             </p>
 
             <div className="mt-5">
-              <Button variant="secondary">Add document</Button>
+              <Button variant="secondary" href="/documents">
+                Add document
+              </Button>
             </div>
           </div>
         </section>

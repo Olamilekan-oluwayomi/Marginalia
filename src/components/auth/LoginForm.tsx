@@ -138,15 +138,6 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
       </Button>
 
       <p className="font-ui text-sm text-muted">
-        <Link
-          href="/forgot-password"
-          className="font-medium text-pine transition-colors hover:text-pine-dim"
-        >
-          Forgot your password?
-        </Link>
-      </p>
-
-      <p className="font-ui text-sm text-muted">
         Don&apos;t have an account?{" "}
         <Link
           href="/register"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useActionState, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
@@ -59,6 +60,13 @@ export function AddDocumentForm({
     initialState
   );
   const [clientError, setClientError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.success) {
+      formRef.current?.reset();
+    }
+  }, [state.success]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const input = event.currentTarget.elements.namedItem(
@@ -80,7 +88,12 @@ export function AddDocumentForm({
           it.
         </p>
       ) : (
-        <form action={formAction} onSubmit={handleSubmit} noValidate>
+        <form
+          ref={formRef}
+          action={formAction}
+          onSubmit={handleSubmit}
+          noValidate
+        >
           <div className="grid max-w-2xl gap-6 sm:grid-cols-2">
             <div>
               <Label htmlFor="document-research">Research</Label>
@@ -128,7 +141,7 @@ export function AddDocumentForm({
           ) : null}
 
           {state.success ? (
-            <p className="mt-6 font-ui text-sm text-pine">
+            <p role="status" className="mt-6 font-ui text-sm text-pine">
               Document uploaded and processed.
             </p>
           ) : null}

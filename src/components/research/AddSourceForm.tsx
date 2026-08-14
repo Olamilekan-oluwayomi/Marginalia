@@ -192,7 +192,9 @@ export function AddSourceForm({ researchId }: { researchId: string }) {
       ) : null}
 
       {state.success ? (
-        <p className="mt-6 font-ui text-sm text-pine">Source added.</p>
+        <p role="status" className="mt-6 font-ui text-sm text-pine">
+          Source added.
+        </p>
       ) : null}
 
       <div className="mt-6">
