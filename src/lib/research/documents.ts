@@ -1,4 +1,9 @@
-import type { CreateDocumentInput, DocumentRow, Supabase } from "./types";
+import type {
+  CreateDocumentInput,
+  DocumentRow,
+  DocumentSummary,
+  Supabase,
+} from "./types";
 import {
   fail,
   notFound,
@@ -81,13 +86,22 @@ export async function getDocuments(
 }
 
 /**
+ * Metadata columns only: the documents library renders file metadata, never
+ * the extracted body text or the private storage path.
+ */
+const DOCUMENT_METADATA_COLUMNS =
+  "id, research_id, user_id, title, file_name, mime_type, file_size, status, created_at, updated_at";
+
+/**
  * Every document the authenticated user owns, newest first. Used by the
  * documents library. Ownership is enforced by RLS (`user_id = auth.uid()`),
- * so no caller-supplied scoping is needed.
+ * so no caller-supplied scoping is needed. Returns metadata-only summaries;
+ * the retrieval path uses `getDocuments` when full `content` is required as
+ * evidence.
  */
 export async function getAllDocuments(
   supabase: Supabase
-): Promise<AppResult<DocumentRow[]>> {
+): Promise<AppResult<DocumentSummary[]>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
     return fail(session.error, []);
@@ -95,14 +109,14 @@ export async function getAllDocuments(
 
   const { data, error } = await supabase
     .from("documents")
-    .select("*")
+    .select(DOCUMENT_METADATA_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (error) {
     return fail(toAppError(error), []);
   }
 
-  return ok(data ?? []);
+  return ok((data ?? []) as DocumentSummary[]);
 }
 
 /**

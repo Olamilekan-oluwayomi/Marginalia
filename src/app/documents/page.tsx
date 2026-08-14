@@ -15,7 +15,7 @@ import {
   createSupabaseClient,
   getAllDocuments,
   getResearchList,
-  type DocumentRow,
+  type DocumentSummary,
 } from "@/lib/research";
 
 type DocumentListItem = {
@@ -27,7 +27,7 @@ type DocumentListItem = {
   status: string;
 };
 
-function toDocumentListItem(item: DocumentRow): DocumentListItem {
+function toDocumentListItem(item: DocumentSummary): DocumentListItem {
   return {
     id: item.id,
     title: item.title,

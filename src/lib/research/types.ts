@@ -90,6 +90,24 @@ export type QuestionWithAnswers = ResearchQuestionRow & {
   answers: AnswerWithCitations[];
 };
 
+/**
+ * A document row with the heavy columns stripped out: `content` (up to
+ * 200k characters of extracted body text) and the private storage `file_path`.
+ * This is the shape used anywhere a document is rendered as metadata (the
+ * documents library and research workspace); the retrieval path keeps the full
+ * row because it needs `content` as evidence.
+ */
+export type DocumentSummary = Omit<DocumentRow, "content" | "file_path">;
+
+/**
+ * A source row without its `content` body text, plus a `has_content` flag so
+ * the UI can still say whether the source is citable without pulling the text
+ * into the workspace payload.
+ */
+export type SourceSummary = Omit<SourceRow, "content"> & {
+  has_content: boolean;
+};
+
 export type ResearchWorkspace = {
   research: ResearchRow;
   questions: QuestionWithAnswers[];

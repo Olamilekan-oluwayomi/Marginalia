@@ -10,7 +10,7 @@ import {
   createSupabaseClient,
   getAllDocuments,
   getResearchListWithCounts,
-  type DocumentRow,
+  type DocumentSummary,
   type ResearchListWithCounts,
 } from "@/lib/research";
 
@@ -41,7 +41,7 @@ function toResearchListItem(item: ResearchListWithCounts): ResearchListItem {
   };
 }
 
-function toRecentDocumentItem(item: DocumentRow): RecentDocumentItem {
+function toRecentDocumentItem(item: DocumentSummary): RecentDocumentItem {
   return {
     id: item.id,
     title: item.title,
