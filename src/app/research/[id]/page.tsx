@@ -5,11 +5,14 @@ import { Answer } from "@/components/research/Answer";
 import { Citation } from "@/components/research/Citation";
 import { MarginNote } from "@/components/research/MarginNote";
 import { QuestionComposer } from "@/components/research/QuestionComposer";
+import { QuestionStatusBadge } from "@/components/research/QuestionStatusBadge";
 import { QuestionStatusPoller } from "@/components/research/QuestionStatusPoller";
 import { RetryAnswer } from "@/components/research/RetryAnswer";
 import { StuckAnswerRecovery } from "@/components/research/StuckAnswerRecovery";
 import { AddSourceForm } from "@/components/research/AddSourceForm";
+import { SourceActions } from "@/components/research/SourceActions";
 import { DocumentActions } from "@/components/documents/DocumentActions";
+import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { formatDisplayDate } from "@/lib/dates";
 import {
@@ -18,9 +21,15 @@ import {
   fileTypeFromName,
   formatFileSize,
 } from "@/lib/document-format";
+import { hostnameFromUrl } from "@/lib/source-format";
+import {
+  splitAnswerMarkers,
+  splitAnswerParagraphs,
+} from "@/lib/research/answer-format";
 import {
   createSupabaseClient,
   getResearchWorkspace,
+  type AnswerStatus,
   type CitationRow,
   type ResearchWorkspace,
 } from "@/lib/research";
@@ -41,13 +50,6 @@ type CitationNote = {
   date: string;
   excerpt?: string;
 };
-
-function toParagraphs(content: string): string[] {
-  return content
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
-}
 
 function toCitationNote(
   citation: CitationRow,
@@ -90,29 +92,32 @@ function renderParagraph(
   paragraphIndex: number,
   notesByNumber: Map<number, CitationNote>
 ) {
-  const segments = paragraph.split(/(\[\d+\])/g);
+  const segments = splitAnswerMarkers(paragraph);
   const children: React.ReactNode[] = [];
-  let segmentIndex = 0;
 
-  for (const segment of segments) {
-    const match = /^\[(\d+)\]$/.exec(segment);
-    const note = match ? notesByNumber.get(Number(match[1])) : undefined;
-    const key = `${segmentIndex}`;
-    segmentIndex += 1;
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
 
-    if (note) {
-      children.push(
-        <Citation
-          key={`${note.id}-${key}`}
-          index={note.number}
-          sourceName={note.sourceName}
-          retrievedDate={note.date}
-          excerpt={note.excerpt}
-          targetId={note.id}
-        />
-      );
-    } else if (segment.length > 0) {
-      children.push(<Fragment key={`text-${key}`}>{segment}</Fragment>);
+    if (segment.kind === "marker") {
+      const note = notesByNumber.get(segment.number);
+      if (note) {
+        children.push(
+          <Citation
+            key={`${note.id}-${index}`}
+            index={note.number}
+            sourceName={note.sourceName}
+            retrievedDate={note.date}
+            excerpt={note.excerpt}
+            targetId={note.id}
+          />
+        );
+      } else {
+        children.push(
+          <Fragment key={`text-${index}`}>{`[${segment.number}]`}</Fragment>
+        );
+      }
+    } else {
+      children.push(<Fragment key={`text-${index}`}>{segment.text}</Fragment>);
     }
   }
 
@@ -166,7 +171,7 @@ export default async function ResearchWorkspacePage({
     if (question.answer_status !== "complete") continue;
     const latest = question.answers[question.answers.length - 1];
     if (!latest) continue;
-    if (toParagraphs(latest.content).length === 0) continue;
+    if (splitAnswerParagraphs(latest.content).length === 0) continue;
     for (const citation of latest.citations) {
       notes.push(toCitationNote(citation, workspace));
     }
@@ -228,7 +233,7 @@ export default async function ResearchWorkspacePage({
                       : null;
 
                   const paragraphs = latest
-                    ? toParagraphs(latest.content)
+                    ? splitAnswerParagraphs(latest.content)
                     : [];
 
                   const answerNotes = latest
@@ -256,6 +261,19 @@ export default async function ResearchWorkspacePage({
                         <p className="mt-2 font-reading text-[1.0625rem] leading-[1.65] text-ink-soft">
                           {question.question}
                         </p>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <QuestionStatusBadge
+                            status={
+                              question.answer_status as AnswerStatus
+                            }
+                          />
+
+                          <span className="font-mono text-xs text-muted">
+                            Asked{" "}
+                            {formatDisplayDate(question.created_at)}
+                          </span>
+                        </div>
                       </div>
 
                       {paragraphs.length > 0 ? (
@@ -351,10 +369,26 @@ export default async function ResearchWorkspacePage({
           ) : null}
         </div>
 
-        {documents.length > 0 ? (
-          <section className="mt-16 border-t border-rule pt-8">
-            <Label>Documents</Label>
+        <section className="mt-16 border-t border-rule pt-8">
+          <Label>Documents</Label>
 
+          {documents.length === 0 ? (
+            <div className="mt-4 rounded-md border border-rule px-4 py-10">
+              <h2 className="font-reading text-xl text-ink">
+                No documents yet.
+              </h2>
+
+              <p className="mt-3 font-ui text-sm text-muted">
+                Upload a PDF to add searchable evidence to this research.
+              </p>
+
+              <div className="mt-5">
+                <Button variant="secondary" href="/documents">
+                  Add a document
+                </Button>
+              </div>
+            </div>
+          ) : (
             <div className="mt-4">
               {documents.map((document) => (
                 <div
@@ -390,9 +424,13 @@ export default async function ResearchWorkspacePage({
                       <p className="mt-1 font-ui text-xs text-muted">
                         {document.status === "failed"
                           ? "Processing failed — this document can&rsquo;t be used as evidence."
-                          : "This document will be searchable once processing finishes."}
+                          : "This document isn&rsquo;t searchable yet."}
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="mt-1 font-ui text-xs text-pine">
+                        Searchable as evidence.
+                      </p>
+                    )}
                   </div>
 
                   <DocumentActions
@@ -403,22 +441,34 @@ export default async function ResearchWorkspacePage({
                 </div>
               ))}
             </div>
-          </section>
-        ) : null}
+          )}
+        </section>
 
-        {sources.length > 0 ? (
-          <section className="mt-16 border-t border-rule pt-8">
-            <Label>Sources</Label>
+        <section className="mt-16 border-t border-rule pt-8">
+          <Label>Sources</Label>
 
+          {sources.length === 0 ? (
+            <div className="mt-4 rounded-md border border-rule px-4 py-10">
+              <h2 className="font-reading text-xl text-ink">
+                No sources yet.
+              </h2>
+
+              <p className="mt-3 font-ui text-sm text-muted">
+                Sources are added automatically when you search the web, or
+                from the form below.
+              </p>
+            </div>
+          ) : (
             <div className="mt-4">
               {sources.map((source) => {
+                const hostname = hostnameFromUrl(source.url);
+
                 const meta = [
+                  "Web source",
                   source.publisher,
-                  source.url,
                   source.retrieved_at
                     ? `Retrieved ${formatDisplayDate(source.retrieved_at)}`
                     : undefined,
-                  source.content ? "Citable" : "Metadata only",
                 ].filter((part): part is string => Boolean(part));
 
                 return (
@@ -427,22 +477,57 @@ export default async function ResearchWorkspacePage({
                     className="flex items-start justify-between gap-4 border-b border-rule py-4"
                   >
                     <div className="min-w-0">
-                      <h3 className="break-words font-reading text-lg leading-snug text-ink">
-                        {source.title}
-                      </h3>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <h3 className="break-words font-reading text-lg leading-snug text-ink">
+                          {source.title}
+                        </h3>
+
+                        <span
+                          className={`font-mono text-xs ${
+                            source.has_content ? "text-pine" : "text-muted"
+                          }`}
+                        >
+                          {source.has_content
+                            ? "Citable"
+                            : "Metadata only"}
+                        </span>
+                      </div>
 
                       {meta.length > 0 ? (
                         <p className="mt-1 font-mono text-xs text-muted">
                           {meta.join(" · ")}
                         </p>
                       ) : null}
+
+                      {source.has_content ? (
+                        <p className="mt-1 font-ui text-xs text-pine">
+                          Searchable as evidence.
+                        </p>
+                      ) : (
+                        <p className="mt-1 font-ui text-xs text-muted">
+                          Not citable until body text is added.
+                        </p>
+                      )}
+
+                      {hostname ? (
+                        <a
+                          href={source.url!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-block max-w-full truncate font-mono text-xs text-pine underline decoration-pine/40 underline-offset-2 hover:text-pine-dim"
+                        >
+                          {hostname}
+                        </a>
+                      ) : null}
                     </div>
+
+                    <SourceActions sourceId={source.id} title={source.title} />
                   </div>
                 );
               })}
             </div>
-          </section>
-        ) : null}
+          )}
+        </section>
 
         <section className="mt-16 border-t border-rule pt-8">
           <Label>Add a source</Label>

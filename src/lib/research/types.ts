@@ -111,6 +111,6 @@ export type SourceSummary = Omit<SourceRow, "content"> & {
 export type ResearchWorkspace = {
   research: ResearchRow;
   questions: QuestionWithAnswers[];
-  documents: DocumentRow[];
-  sources: SourceRow[];
+  documents: DocumentSummary[];
+  sources: SourceSummary[];
 };
