@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   devIndicators: false,
-  serverExternalPackages: ["pdf-parse"],
+  serverExternalPackages: ["unpdf"],
   experimental: {
     serverActions: {
       // Default is 1 MB, which rejects realistic PDFs before the upload action

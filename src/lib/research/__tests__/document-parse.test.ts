@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  PDFParse: vi.fn(),
+  getDocumentProxy: vi.fn(),
+  extractText: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("pdf-parse", () => ({
-  PDFParse: mocks.PDFParse,
+vi.mock("unpdf", () => ({
+  getDocumentProxy: mocks.getDocumentProxy,
+  extractText: mocks.extractText,
 }));
 
 import {
@@ -16,19 +18,13 @@ import {
 
 const PDF_BUFFER = new Uint8Array([1, 2, 3]);
 
-function mockPdfParser(text: string, options?: { throws?: boolean }) {
-  const getText = vi.fn().mockImplementation(() => {
-    if (options?.throws) {
-      return Promise.reject(new Error("malformed pdf"));
-    }
-    return Promise.resolve({ text });
-  });
-  const destroy = vi.fn().mockResolvedValue(undefined);
-  const parser = { getText, destroy };
-  mocks.PDFParse.mockImplementation(function () {
-    return parser;
-  });
-  return { getText, destroy };
+function mockPdfText(text: string, options?: { throws?: boolean }) {
+  mocks.getDocumentProxy.mockResolvedValue({});
+  if (options?.throws) {
+    mocks.extractText.mockRejectedValue(new Error("malformed pdf"));
+  } else {
+    mocks.extractText.mockResolvedValue({ text });
+  }
 }
 
 beforeEach(() => {
@@ -64,7 +60,7 @@ describe("extractDocumentText", () => {
   });
 
   it("extracts text from a PDF", async () => {
-    const { destroy } = mockPdfParser("  hello world  ");
+    mockPdfText("  hello world  ");
 
     const text = await extractDocumentText(
       PDF_BUFFER,
@@ -73,15 +69,15 @@ describe("extractDocumentText", () => {
     );
 
     expect(text).toBe("hello world");
-    expect(mocks.PDFParse).toHaveBeenCalledWith({
-      data: PDF_BUFFER,
-      useSystemFonts: true,
-    });
-    expect(destroy).toHaveBeenCalled();
+    expect(mocks.getDocumentProxy).toHaveBeenCalledWith(PDF_BUFFER);
+    expect(mocks.extractText).toHaveBeenCalledWith(
+      expect.any(Object),
+      { mergePages: true }
+    );
   });
 
   it("falls back to the file name when the PDF mime is unknown", async () => {
-    const { destroy } = mockPdfParser("paper");
+    mockPdfText("paper");
 
     const text = await extractDocumentText(
       PDF_BUFFER,
@@ -90,7 +86,8 @@ describe("extractDocumentText", () => {
     );
 
     expect(text).toBe("paper");
-    expect(destroy).toHaveBeenCalled();
+    expect(mocks.getDocumentProxy).toHaveBeenCalledWith(PDF_BUFFER);
+    expect(mocks.extractText).toHaveBeenCalled();
   });
 
   it("decodes plain text and markdown with the UTF-8 decoder", async () => {
@@ -99,11 +96,11 @@ describe("extractDocumentText", () => {
     const text = await extractDocumentText(bytes, "text/plain", "notes.txt");
 
     expect(text).toBe("plain body");
-    expect(mocks.PDFParse).not.toHaveBeenCalled();
+    expect(mocks.getDocumentProxy).not.toHaveBeenCalled();
   });
 
   it("surfaces a stable message when the PDF parser fails", async () => {
-    mockPdfParser("", { throws: true });
+    mockPdfText("", { throws: true });
 
     await expect(
       extractDocumentText(PDF_BUFFER, "application/pdf", "paper.pdf")
@@ -111,7 +108,7 @@ describe("extractDocumentText", () => {
   });
 
   it("throws when no extractable text is found", async () => {
-    mockPdfParser("   ");
+    mockPdfText("   ");
 
     await expect(
       extractDocumentText(PDF_BUFFER, "application/pdf", "paper.pdf")
@@ -119,7 +116,7 @@ describe("extractDocumentText", () => {
   });
 
   it("caps extracted text at the limit", async () => {
-    mockPdfParser("x".repeat(250_000));
+    mockPdfText("x".repeat(250_000));
 
     const text = await extractDocumentText(
       PDF_BUFFER,

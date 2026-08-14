@@ -1,11 +1,6 @@
 import "server-only";
 
-// Must stay above the pdf-parse import: pdfjs-dist (inside pdf-parse)
-// needs globalThis.DOMMatrix at module load time. ESM evaluates imports in
-// source order, so this side effect runs before pdf-parse evaluates.
-import "./dommatrix-polyfill";
-
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 
 /** Upper bound on extracted body text kept per document. */
 const MAX_CONTENT_CHARS = 200_000;
@@ -62,20 +57,15 @@ function normalizeText(raw: string): string {
 }
 
 async function extractPdfText(buffer: Uint8Array): Promise<string> {
-  const parser = new PDFParse({
-    data: buffer,
-    useSystemFonts: true,
-  });
   try {
-    const result = await parser.getText({ pageJoiner: "\n" });
-    return result.text;
+    const pdf = await getDocumentProxy(buffer);
+    const { text } = await extractText(pdf, { mergePages: true });
+    return text;
   } catch (cause) {
     // The parser's own error is not user-facing content. Preserve it as the
     // cause so the processing layer can log the real detail while users only
     // ever receive a stable, safe message.
     throw new Error("This PDF couldn't be read.", { cause });
-  } finally {
-    await parser.destroy();
   }
 }
 
