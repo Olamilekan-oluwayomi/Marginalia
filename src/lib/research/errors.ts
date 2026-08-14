@@ -66,15 +66,36 @@ export function isAppError(error: unknown): error is AppError {
 }
 
 /**
+ * Extracts a single-line, sanitized log message from an unknown value. Raw
+ * Supabase/Postgrest error objects can embed row data or connection details in
+ * fields like `details` and `hint`, so only the message is logged — never the
+ * object itself.
+ */
+function toLogMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+  return "Unknown database error.";
+}
+
+/**
  * Normalizes an unknown failure (Supabase/Postgrest errors, thrown values)
- * into a safe `AppError`. Raw database details are logged for developers but
- * never surfaced to UI callers.
+ * into a safe `AppError`. Only the sanitized error message is logged; raw
+ * database details are never surfaced to UI callers.
  */
 export function toAppError(error: unknown): AppError {
   if (isAppError(error)) {
     return error;
   }
 
-  console.error("[research-data] database error:", error);
+  console.error("[research-data] database error:", toLogMessage(error));
   return databaseError();
 }
