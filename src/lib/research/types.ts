@@ -78,6 +78,11 @@ export type CreateAnswerInput = {
    * attached document was judged not relevant to the question.
    */
   fallback_reason?: string | null;
+  /**
+   * The search mode the answer was generated from. Derived from the research
+   * context actually provided at generation time; persisted on the row.
+   */
+  source_mode?: SourceMode | null;
 };
 
 export type CreateCitationInput = {
@@ -89,6 +94,41 @@ export type CreateCitationInput = {
 
 export type AnswerWithCitations = AnswerRow & {
   citations: CitationRow[];
+};
+
+/** Which search mode an answer was generated from. */
+export type SourceMode = "document" | "web" | "both";
+
+/**
+ * A citation attached to an answer, after the model's numbered evidence
+ * references have been resolved to real, persistable sources. Document
+ * citations point at an uploaded document (and, when known, the exact chunk
+ * or page that supplied the claim); web citations point at a URL.
+ */
+export type Citation =
+  | {
+      type: "document";
+      documentId: string;
+      documentTitle: string;
+      chunkId: string;
+      pageNumber?: number;
+      snippet: string;
+    }
+  | {
+      type: "web";
+      url: string;
+      title: string;
+      snippet: string;
+      publishedDate?: string;
+    };
+
+/**
+ * The client-facing shape of a generated answer: the persisted answer row
+ * plus the resolved citation list and the mode the answer was generated from.
+ */
+export type AnswerResponse = AnswerRow & {
+  sourceMode: SourceMode;
+  citations: Citation[];
 };
 
 export type QuestionWithAnswers = ResearchQuestionRow & {

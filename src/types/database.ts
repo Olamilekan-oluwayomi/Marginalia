@@ -26,6 +26,7 @@ export type Database = {
           model: string | null
           question_id: string
           research_id: string
+          source_mode: string
         }
         Insert: {
           content: string
@@ -35,6 +36,7 @@ export type Database = {
           model?: string | null
           question_id: string
           research_id: string
+          source_mode?: string
         }
         Update: {
           content?: string
@@ -44,6 +46,7 @@ export type Database = {
           model?: string | null
           question_id?: string
           research_id?: string
+          source_mode?: string
         }
         Relationships: [
           {
