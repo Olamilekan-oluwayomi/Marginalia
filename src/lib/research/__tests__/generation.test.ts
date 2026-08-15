@@ -85,6 +85,20 @@ function makeReadyDocument(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function makeWebItem(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    kind: "source",
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    title: "Web search result",
+    content: "",
+    metadata: {
+      publisher: "Web search",
+      url: "https://example.com/web-result",
+    },
+    ...overrides,
+  } as const;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 
@@ -127,6 +141,11 @@ beforeEach(() => {
 
 describe("generateAnswer", () => {
   it("persists an answer and marks the question complete on success", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+
     const result = await generateAnswer(fakeSupabase, {
       questionId: question.id,
       researchId: question.research_id,
@@ -139,7 +158,9 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "document" })
+      // No document is attached, so the question routes to the web; with a
+      // successful web search the answer is labeled "web".
+      expect.objectContaining({ source_mode: "web" })
     );
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
@@ -152,6 +173,10 @@ describe("generateAnswer", () => {
     mocks.generateJson.mockRejectedValue(
       aiError("PROVIDER_ERROR", "The AI provider returned an empty response.")
     );
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
 
     const result = await generateAnswer(fakeSupabase, {
       questionId: question.id,
@@ -172,6 +197,10 @@ describe("generateAnswer", () => {
     mocks.generateJson.mockRejectedValue(
       aiError("PROVIDER_ERROR", "Provider exploded.")
     );
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
 
     const result = await generateAnswer(fakeSupabase, {
       questionId: question.id,
@@ -189,6 +218,10 @@ describe("generateAnswer", () => {
 
   it("never persists an answer from malformed model output", async () => {
     mocks.generateJson.mockResolvedValue({ answer: "", citations: [] });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
 
     const result = await generateAnswer(fakeSupabase, {
       questionId: question.id,
@@ -208,6 +241,10 @@ describe("generateAnswer", () => {
     mocks.createAnswer.mockResolvedValue({
       error: { code: "DATABASE_ERROR", message: "insert failed" },
       data: null,
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
     });
 
     const result = await generateAnswer(fakeSupabase, {
@@ -284,15 +321,46 @@ describe("generateAnswer", () => {
     expect(mocks.generateJson).not.toHaveBeenCalled();
   });
 
-  it("skips web research for questions that did not request it", async () => {
+  it("runs web research automatically when no document is attached", async () => {
+    const webItem = {
+      kind: "source",
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      title: "Paris weather report",
+      content: "",
+      metadata: {
+        publisher: "Web search",
+        url: "https://example.com/paris-weather",
+      },
+    } as const;
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+
     const result = await generateAnswer(fakeSupabase, {
       questionId: question.id,
       researchId: question.research_id,
     });
 
     expect(result.error).toBeNull();
-    expect(mocks.runWebResearch).not.toHaveBeenCalled();
+    expect(mocks.runWebResearch).toHaveBeenCalledWith(
+      fakeSupabase,
+      question.research_id,
+      question.question
+    );
     expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: expect.arrayContaining([webItem]),
+      })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "web" })
+    );
   });
 
   it("falls back to web research and records a reason when the document is not relevant", async () => {
@@ -434,6 +502,21 @@ describe("generateAnswer", () => {
   });
 
   it("keeps the document path without web research when the document is relevant", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument()],
@@ -462,6 +545,21 @@ describe("generateAnswer", () => {
 
   it("passes full document content to the relevance check when under the ceiling", async () => {
     const content = "y".repeat(3_000);
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content,
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument({ content })],
@@ -489,6 +587,21 @@ describe("generateAnswer", () => {
   });
 
   it("caps a pathologically oversized document in the relevance summary", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "x".repeat(60_000),
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument({ content: "x".repeat(60_000) })],
@@ -516,11 +629,30 @@ describe("generateAnswer", () => {
   });
 
   it("honors an explicit web intent without running the relevance check", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument()],
     });
     mocks.detectExplicitSearchIntent.mockReturnValue("web");
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
 
     const result = await generateAnswer(fakeSupabase, {
       questionId: question.id,
@@ -533,9 +665,45 @@ describe("generateAnswer", () => {
     );
     expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
     expect(mocks.runWebResearch).toHaveBeenCalledOnce();
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: expect.not.arrayContaining([
+          expect.objectContaining({ kind: "document" }),
+        ]),
+      })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "web" })
+    );
   });
 
   it("honors an explicit document intent without running the relevance check", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+          {
+            kind: "source",
+            id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            title: "User-pasted note",
+            content: "Hand-written notes about the topic.",
+            metadata: { publisher: "example.org", url: "https://example.org" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument()],
@@ -550,9 +718,41 @@ describe("generateAnswer", () => {
     expect(result.error).toBeNull();
     expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
     expect(mocks.runWebResearch).not.toHaveBeenCalled();
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: [
+          expect.objectContaining({
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          }),
+        ],
+      })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ fallback_reason: null, source_mode: "document" })
+    );
   });
 
   it("treats a relevance-check failure as relevant and answers from the document", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument()],
@@ -576,10 +776,29 @@ describe("generateAnswer", () => {
     );
   });
 
-  it("runs web research and adds discovered items to the context when requested", async () => {
+  it("runs web research web-only when the checkbox is on, even with a document attached", async () => {
     mocks.getQuestionById.mockResolvedValue({
       error: null,
       data: { ...question, include_web: true },
+    });
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
     });
     const webItem = {
       kind: "source",
@@ -612,6 +831,57 @@ describe("generateAnswer", () => {
       question.research_id,
       question.question
     );
+    expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: expect.arrayContaining([webItem]),
+      })
+    );
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.not.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ kind: "document" }),
+        ]),
+      })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "web" })
+    );
+  });
+
+  it("runs web research web-only when the checkbox is on and no document is attached", async () => {
+    mocks.getQuestionById.mockResolvedValue({
+      error: null,
+      data: { ...question, include_web: true },
+    });
+    const webItem = {
+      kind: "source",
+      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      title: "Official Paris travel guide",
+      content: "",
+      metadata: {
+        publisher: "Web search",
+        url: "https://example.com/paris",
+      },
+    } as const;
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
+    expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
     expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
       question.question,
       expect.objectContaining({
@@ -630,6 +900,13 @@ describe("generateAnswer", () => {
     mocks.getQuestionById.mockResolvedValue({
       error: null,
       data: { ...question, include_web: true },
+    });
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [makeWebItem()],
+        hasBodyContent: false,
+      },
     });
     mocks.runWebResearch.mockResolvedValue({
       error: { code: "PROVIDER_ERROR", message: "Web search failed." },
@@ -734,11 +1011,312 @@ describe("generateAnswer", () => {
     );
   });
 
-  it("persists web citations from a document-plus-web answer as both mode", async () => {
+  it("runs web research when the question asks for the document but none is attached", async () => {
+    mocks.detectExplicitSearchIntent.mockReturnValue("document");
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    // No ready document exists, so an explicit "use the document" instruction
+    // cannot be honored: the web is searched automatically instead.
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
+    expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
+  });
+
+  it("logs a web-search failure and continues from local context when the document is not relevant", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "source",
+            id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            title: "User-pasted note",
+            content: "Local notes that survive the fallback.",
+            metadata: { publisher: "example.org", url: "https://example.org" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: false,
+      confidence: 0.9,
+      reason: "The document is about hydrology, not this topic.",
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: { code: "PROVIDER_ERROR", message: "Web search failed." },
+      data: null,
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await generateAnswer(fakeSupabase, {
+        questionId: question.id,
+        researchId: question.research_id,
+      });
+
+      expect(result.error).toBeNull();
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[research] webSearch failed:",
+        "Web search failed."
+      );
+      expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+        question.question,
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              kind: "source",
+              id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            }),
+          ],
+        })
+      );
+      expect(mocks.createAnswer).toHaveBeenCalledWith(
+        expect.anything(),
+        question.id,
+        question.research_id,
+        expect.objectContaining({
+          fallback_reason:
+            "This wasn't found in your document, so I searched the web instead.",
+        })
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("logs the actual underlying error when generation fails with a plain object", async () => {
+    mocks.generateJson.mockRejectedValue({ detail: "provider exploded" });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await generateAnswer(fakeSupabase, {
+        questionId: question.id,
+        researchId: question.research_id,
+      });
+
+      expect(result.error?.code).toBe("DATABASE_ERROR");
+      const logged = errorSpy.mock.calls
+        .map((call) => call.join(" "))
+        .find((line) => line.includes("answer generation failed"));
+      expect(logged).toBeDefined();
+      expect(logged).not.toContain("[object Object]");
+      expect(logged).toContain("provider exploded");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("logs the provider message when generation fails with an AI error", async () => {
+    mocks.generateJson.mockRejectedValue(
+      aiError("PROVIDER_ERROR", "Provider exploded.")
+    );
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await generateAnswer(fakeSupabase, {
+        questionId: question.id,
+        researchId: question.research_id,
+      });
+
+      expect(result.error?.code).toBe("DATABASE_ERROR");
+      expect(result.error?.message).toContain("try again");
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[research-data] answer generation failed:",
+        "Provider exploded."
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("fails an irrelevant-document question when the web fallback returns no results", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: false,
+      confidence: 0.9,
+      reason: "The document says nothing about rainforests.",
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [], addedCount: 0 },
+    });
+    mocks.updateQuestionStatus.mockResolvedValue({ error: null, data: null });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error?.code).toBe("DATABASE_ERROR");
+    expect(result.error?.message).toContain("web sources");
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(mocks.createAnswer).not.toHaveBeenCalled();
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "failed"
+    );
+  });
+
+  it("fails a question when no document is attached and web research returns no results", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [], addedCount: 0 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error?.code).toBe("DATABASE_ERROR");
+    expect(result.error?.message).toContain("web sources");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(mocks.createAnswer).not.toHaveBeenCalled();
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "failed"
+    );
+  });
+
+  it("fails a checkbox-on question when web research returns no results", async () => {
     mocks.getQuestionById.mockResolvedValue({
       error: null,
       data: { ...question, include_web: true },
     });
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [], addedCount: 0 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error?.code).toBe("DATABASE_ERROR");
+    expect(result.error?.message).toContain("web sources");
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(mocks.createAnswer).not.toHaveBeenCalled();
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "failed"
+    );
+  });
+
+  it("answers from the document when an explicit both intent runs but web research returns no results", async () => {
+    mocks.detectExplicitSearchIntent.mockReturnValue("both");
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [], addedCount: 0 },
+    });
+    mocks.generateJson.mockResolvedValue({
+      answer: "The study found a significant trend.",
+      citations: [],
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "document" })
+    );
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "complete"
+    );
+  });
+
+  it("persists web citations from an explicit both-intent answer as both mode", async () => {
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.detectExplicitSearchIntent.mockReturnValue("both");
     mocks.retrieveResearchContext.mockResolvedValue({
       error: null,
       data: {
@@ -865,11 +1443,12 @@ describe("system prompt selection by source mode", () => {
     expect(args.system).toContain("You are answering from web search results.");
   });
 
-  it("uses the combined prompt when the context mixes documents and sources", async () => {
-    mocks.getQuestionById.mockResolvedValue({
+  it("uses the combined prompt for an explicit both intent", async () => {
+    mocks.getDocuments.mockResolvedValue({
       error: null,
-      data: { ...question, include_web: true },
+      data: [makeReadyDocument()],
     });
+    mocks.detectExplicitSearchIntent.mockReturnValue("both");
     mocks.retrieveResearchContext.mockResolvedValue({
       error: null,
       data: { items: [documentItem], hasBodyContent: true },
@@ -888,6 +1467,41 @@ describe("system prompt selection by source mode", () => {
     const args = mocks.generateJson.mock.calls[0][0] as { system: string };
     expect(args.system).toContain(
       "You are answering from the user's uploaded documents and web search results together."
+    );
+  });
+
+  it("uses the web prompt for a checkbox-on question even when a document is attached", async () => {
+    mocks.getQuestionById.mockResolvedValue({
+      error: null,
+      data: { ...question, include_web: true },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: { items: [documentItem], hasBodyContent: true },
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
+    const args = mocks.generateJson.mock.calls[0][0] as { system: string };
+    expect(args.system).toContain("You are answering from web search results.");
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "web" })
     );
   });
 });

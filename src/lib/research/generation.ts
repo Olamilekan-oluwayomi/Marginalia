@@ -14,6 +14,7 @@ import { buildResearchPrompt, retrieveResearchContext, type ResearchContextItem 
 import { getDocuments } from "./documents";
 import {
   appError,
+  describeError,
   fail,
   isAppError,
   notFound,
@@ -46,6 +47,15 @@ const GENERATION_ERROR_MESSAGE =
  */
 const FALLBACK_REASON_MESSAGE =
   "This wasn't found in your document, so I searched the web instead.";
+
+/**
+ * Error returned when a web-only route produced no web evidence at all. The
+ * invariant "sourceMode is web only when web results are the actual evidence"
+ * cannot hold, so the question is failed instead of generating a misleading
+ * empty answer that claims a web search was performed.
+ */
+const NO_WEB_SOURCES_MESSAGE =
+  "We couldn't find any web sources to answer this question.";
 
 /** Upper bound on generated answer length. Keeps answers concise and costs bounded. */
 const ANSWER_MAX_OUTPUT_TOKENS = 2000;
@@ -152,6 +162,9 @@ const BOTH_ANSWER_SYSTEM_PROMPT = [
  * actually provided at generation time: uploaded documents, web sources, or
  * both. Web-mode sources include opt-in web research results and user-pasted
  * sources; a research whose context carries only those answers as web mode.
+ * When no evidence was provided at all the routing has already decided web
+ * (no document was attached, or the document was deliberately excluded), so
+ * an empty context is labeled "web" rather than the misleading "document".
  */
 function sourceModeOf(items: ResearchContextItem[]): SourceMode {
   let hasDocument = false;
@@ -164,8 +177,8 @@ function sourceModeOf(items: ResearchContextItem[]): SourceMode {
     }
   }
   if (hasDocument && hasWeb) return "both";
-  if (hasWeb) return "web";
-  return "document";
+  if (hasDocument) return "document";
+  return "web";
 }
 
 function systemPromptFor(mode: SourceMode): string {
@@ -175,30 +188,35 @@ function systemPromptFor(mode: SourceMode): string {
 }
 
 /**
- * Formats an unknown thrown value for developer logs: message and stack when
- * it is an Error, otherwise the serialized value. Plain objects serialize to
- * JSON so they never log as a useless "[object Object]"; a value that cannot
- * be serialized degrades to its string form.
+ * Best-effort web research for the routing branches. Failures are logged
+ * server-side (so web-search failures are distinguishable from empty results)
+ * and resolve to an empty item list, letting the caller decide whether the
+ * question can still be answered; empty results behave the same.
  */
-function describeError(error: unknown): string {
-  if (error instanceof Error) {
-    return `${error.message}\n${error.stack ?? "(no stack)"}`;
+async function runWebResearchItems(
+  supabase: Supabase,
+  researchId: string,
+  question: string
+): Promise<ResearchContextItem[]> {
+  const result = await runWebResearch(supabase, researchId, question);
+  if (result.error) {
+    console.error("[research] webSearch failed:", result.error.message);
+    return [];
   }
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
+  console.log(`[research] webSearch results=${result.data.items.length}`);
+  return result.data.items;
 }
 
 /**
  * Normalizes a generation failure into a safe `AppError`. Provider failures
- * are reduced to a generic message (the AI layer already logs the sanitized
- * detail); application errors pass through; anything else is logged for
- * developers (message only) before being reduced to the generic message.
+ * are logged server-side (message only) so the underlying cause is
+ * distinguishable in logs, then reduced to a generic message; application
+ * errors pass through; anything else is logged before being reduced to the
+ * generic message.
  */
 function toGenerationError(error: unknown): AppError {
   if (isAiError(error)) {
+    console.error("[research-data] answer generation failed:", error.message);
     return appError("DATABASE_ERROR", GENERATION_ERROR_MESSAGE);
   }
   if (isAppError(error)) {
@@ -206,7 +224,7 @@ function toGenerationError(error: unknown): AppError {
   }
   console.error(
     "[research-data] answer generation failed:",
-    error instanceof Error ? error.message : String(error)
+    describeError(error)
   );
   return appError("DATABASE_ERROR", GENERATION_ERROR_MESSAGE);
 }
@@ -253,6 +271,10 @@ export async function readyDocumentsSummary(
 ): Promise<string | null> {
   const documentsResult = await getDocuments(supabase, researchId);
   if (documentsResult.error) {
+    console.error(
+      "[research-data] ready documents could not be retrieved:",
+      documentsResult.error.message
+    );
     return null;
   }
   const ready = documentsResult.data.filter(
@@ -394,6 +416,13 @@ export async function generateAnswer(
     question.question
   );
   if (contextResult.error) {
+    // A context retrieval failure must not look like an answer-generation
+    // problem: log the actual error so document/source retrieval failures are
+    // distinguishable in logs, then fail the question.
+    console.error(
+      "[research-data] research context could not be retrieved:",
+      contextResult.error.message
+    );
     await markFailed(supabase, questionId);
     return fail(contextResult.error, null);
   }
@@ -401,93 +430,150 @@ export async function generateAnswer(
   let context = contextResult.data;
   let fallbackReason: string | null = null;
   if (question.include_web) {
-    const webResult = await runWebResearch(
+    // Checkbox on: web-only. The document is never offered to the model and
+    // the relevance check is skipped; source mode is "web" even when a
+    // document is attached. User-pasted sources (kind "source") stay, since
+    // they are web evidence, not document evidence.
+    console.log("[research] routing=web:webSearchChecked");
+    const items = await runWebResearchItems(
       supabase,
       researchId,
       question.question
     );
-    if (webResult.error) {
-      // Web research is best-effort; a failure here (e.g. session or
-      // database) must not fail the answer. Log and continue with local
-      // context only.
-      console.error(
-        "[research-data] web research could not be run:",
-        webResult.error.message
-      );
-    } else if (webResult.data.items.length > 0) {
-      context = {
-        items: [...context.items, ...webResult.data.items],
-        hasBodyContent: context.hasBodyContent,
-      };
-    }
+    context = {
+      items: [
+        ...context.items.filter((item) => item.kind !== "document"),
+        ...items,
+      ],
+      hasBodyContent: context.hasBodyContent,
+    };
   } else {
-    // Smart mode: when web research was not requested and the research has a
-    // ready document, gate document search on an explicit-intent check and a
+    // Smart mode: gate document search on an explicit-intent check and a
     // relevance check. An explicit instruction in the question is honored
     // directly; otherwise the document is used when it looks relevant, and web
-    // research runs as a fallback (with a user-facing reason) when it does not.
+    // research runs as a fallback (with a user-facing reason) when it does
+    // not. With no ready document, web research runs automatically.
     const summary = await readyDocumentsSummary(supabase, researchId);
-    if (summary !== null) {
+    if (summary === null) {
+      // No ready document: there is nothing to gate on, so the web is the
+      // source for this question. User-pasted sources stay in the context.
+      console.log("[research] routing=web:noDocument");
+      const items = await runWebResearchItems(
+        supabase,
+        researchId,
+        question.question
+      );
+      context = {
+        items: [...context.items, ...items],
+        hasBodyContent: context.hasBodyContent,
+      };
+    } else {
       const intent = detectExplicitSearchIntent(question.question);
-      if (intent === "web" || intent === "both") {
-        const webResult = await runWebResearch(
+      console.log(
+        `[research] routing=smart hasDocument=true explicitIntent=${intent ?? "none"}`
+      );
+      if (intent === "web") {
+        // Explicit "use the web" / "search the web": web-only. The document
+        // is not offered and the relevance check is skipped.
+        const items = await runWebResearchItems(
           supabase,
           researchId,
           question.question
         );
-        if (!webResult.error && webResult.data.items.length > 0) {
-          context = {
-            items: [...context.items, ...webResult.data.items],
-            hasBodyContent: context.hasBodyContent,
-          };
-        }
-      } else if (intent === null) {
+        context = {
+          items: [
+            ...context.items.filter((item) => item.kind !== "document"),
+            ...items,
+          ],
+          hasBodyContent: context.hasBodyContent,
+        };
+      } else if (intent === "document") {
+        // Explicit "use the document": answer only from the document. No web
+        // research, and user-pasted sources are excluded too.
+        context = {
+          items: context.items.filter((item) => item.kind === "document"),
+          hasBodyContent: context.hasBodyContent,
+        };
+      } else if (intent === "both") {
+        // Explicit "use both": the document and the web together.
+        const items = await runWebResearchItems(
+          supabase,
+          researchId,
+          question.question
+        );
+        context = {
+          items: [...context.items, ...items],
+          hasBodyContent: context.hasBodyContent,
+        };
+      } else {
         let relevant = true;
+        let relevanceConfidence: number | undefined;
         try {
-          relevant = (await checkDocumentRelevance(question.question, summary))
-            .relevant;
+          const decision = await checkDocumentRelevance(
+            question.question,
+            summary
+          );
+          relevant = decision.relevant;
+          relevanceConfidence = decision.confidence;
         } catch (error) {
           // Best-effort: a relevance-check failure must not fail the answer.
           // Treat the document as relevant (the conservative default) and log
-          // enough detail to diagnose it. String(error) would just produce
-          // "[object Object]" for a plain object, so serialize it instead.
+          // enough detail to diagnose it; describeError serializes plain
+          // objects so it never logs a useless "[object Object]".
           console.error(
-            "[research-data] relevance check failed:",
+            "[research] relevance check failed:",
             describeError(error)
           );
         }
+        console.log(
+          `[research] relevance={relevant:${relevant}, confidence:${
+            relevanceConfidence ?? "unknown"
+          }}`
+        );
         if (!relevant) {
           // The document was judged not relevant to this question, so it must
           // not be offered to the model as citable evidence: keeping it in the
           // context would let sourceModeOf label the answer "both" and
           // contradict the fallback reason shown to the user. User-pasted
           // sources (kind "source") are unrelated to that verdict and stay.
+          console.log("[research] selectedSource=web (document not relevant)");
           const offeredItems = context.items.filter(
             (item) => item.kind !== "document"
           );
-          const webResult = await runWebResearch(
+          const items = await runWebResearchItems(
             supabase,
             researchId,
             question.question
           );
-          if (!webResult.error && webResult.data.items.length > 0) {
-            context = {
-              items: [...offeredItems, ...webResult.data.items],
-              hasBodyContent: context.hasBodyContent,
-            };
-          } else {
-            context = {
-              items: offeredItems,
-              hasBodyContent: context.hasBodyContent,
-            };
-          }
+          context = {
+            items: [...offeredItems, ...items],
+            hasBodyContent: context.hasBodyContent,
+          };
           fallbackReason = FALLBACK_REASON_MESSAGE;
+        } else {
+          console.log("[research] selectedSource=document (relevant)");
         }
       }
     }
   }
 
   const sourceMode = sourceModeOf(context.items);
+  if (sourceMode === "web" && context.items.length === 0) {
+    // Invariant: sourceMode "web" must mean the model receives web results as
+    // its evidence. A web-only route (no document, document excluded as
+    // irrelevant, or checkbox/explicit web) that produced no web evidence
+    // cannot generate an honest web answer — fail the question instead of
+    // emitting a misleading empty answer (pre-fix this generated a
+    // document-flavored non-answer while claiming a web search was performed).
+    console.error(
+      "[research] generation aborted: sourceMode=web but no web evidence was available"
+    );
+    await markFailed(supabase, questionId);
+    return fail(appError("DATABASE_ERROR", NO_WEB_SOURCES_MESSAGE), null);
+  }
+  console.log(
+    `[research] generation sourceMode=${sourceMode} contextItems=${context.items.length}`
+  );
 
   let output: GeneratedAnswerOutput;
   try {
@@ -521,6 +607,7 @@ export async function generateAnswer(
   }
 
   const { citations, rejectedCount } = toAnswerCitations(output, context);
+  console.log(`[research] citations=${citations.length} dropped=${rejectedCount}`);
   if (rejectedCount > 0) {
     // Never persisted: citations that could not be verified against the
     // provided context (wrong index, an item with no body content, or a web
