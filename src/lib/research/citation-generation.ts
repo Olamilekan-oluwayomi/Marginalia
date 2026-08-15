@@ -1,4 +1,5 @@
-import type { ResearchContext } from "./context";
+import type { ResearchContext, ResearchContextItem } from "./context";
+import type { Citation } from "./types";
 
 /**
  * The citation protocol between the model and the server.
@@ -152,7 +153,7 @@ export type ResolveCitationsResult = {
  */
 function normalizeMalformedMarkers(
   answer: string,
-  resolved: ResolvedCitation[]
+  resolved: { citation_number: number }[]
 ): string {
   const validNumbers = new Set(
     resolved.map((citation) => citation.citation_number)
@@ -187,7 +188,7 @@ function normalizeMalformedMarkers(
  */
 function stripUnresolvedCitationMarkers(
   answer: string,
-  resolved: ResolvedCitation[]
+  resolved: { citation_number: number }[]
 ): string {
   const validNumbers = new Set(
     resolved.map((citation) => citation.citation_number)
@@ -242,4 +243,150 @@ export function resolveCitations(
     rejectedCount,
     answer: stripUnresolvedCitationMarkers(normalized, resolved),
   };
+}
+
+/**
+ * Repairs malformed citation markers in the answer and removes the markers of
+ * citations that were dropped during resolution, so the persisted answer can
+ * never display a dangling `[n]`. Runs at the AI boundary, before the answer
+ * is persisted.
+ */
+export function sanitizeAnswerMarkers(
+  answer: string,
+  resolved: { citation_number: number }[]
+): string {
+  return stripUnresolvedCitationMarkers(
+    normalizeMalformedMarkers(answer, resolved),
+    resolved
+  );
+}
+
+export type ResolvedAnswerCitation = Citation & {
+  /** The marker number embedded in the answer text (a positive integer). */
+  citation_number: number;
+  /**
+   * The persisted source row a web citation maps to, so the answer layer can
+   * attach it as `source_id` exactly once.
+   */
+  sourceId?: string;
+};
+
+export type ToAnswerCitationsResult = {
+  citations: ResolvedAnswerCitation[];
+  /** Number of generated citations dropped because they could not be verified. */
+  rejectedCount: number;
+};
+
+/** Bounds on the snippet stored with a citation (mirrors the excerpt cap). */
+const CITATION_SNIPPET_MAX_LENGTH = 2_000;
+
+/**
+ * Deterministic, content-derived identifier for the passage a document citation
+ * points at. Extracted documents are not yet chunked into a dedicated table, so
+ * the chunk id identifies the exact passage the model was given rather than a
+ * row; identical passages always produce the same id.
+ */
+function chunkIdOf(item: ResearchContextItem): string {
+  let hash = 5381;
+  for (let i = 0; i < item.content.length; i += 1) {
+    hash = ((hash << 5) + hash + item.content.charCodeAt(i)) >>> 0;
+  }
+  return `passage-${item.id}-${hash.toString(36)}`;
+}
+
+function snippetOf(content: string): string {
+  const trimmed = content.trim();
+  return trimmed.length > CITATION_SNIPPET_MAX_LENGTH
+    ? trimmed.slice(0, CITATION_SNIPPET_MAX_LENGTH)
+    : trimmed;
+}
+
+/**
+ * Extracts the sentence of the answer that carries the `[n]` marker for a
+ * citation. Used as the snippet for web citations whose source has no body
+ * text: the supporting sentence is the claim the answer itself made, taken
+ * verbatim from the model's own output (this layer never writes it).
+ */
+function answerSentenceForMarker(answer: string, number: number): string {
+  const markerPattern = new RegExp(`\\[${number}\\]`);
+  const markerIndex = answer.search(markerPattern);
+  if (markerIndex === -1) {
+    return "";
+  }
+  let start = markerIndex;
+  while (start > 0 && !/[.!?]/.test(answer[start - 1])) start -= 1;
+  let end = markerIndex;
+  while (end < answer.length && !/[.!?]/.test(answer[end])) end += 1;
+  if (end < answer.length) end += 1;
+  return answer.slice(start, end).trim();
+}
+
+/**
+ * Resolves a parsed model answer into the client-facing `Citation[]` shape.
+ *
+ * An evidence index is rejected when it points outside the provided context,
+ * at a document with no body content, or at a source with neither body content
+ * nor a URL. Documents map to `type: "document"` citations; sources (web
+ * research results and user-pasted sources) map to `type: "web"` citations.
+ * Every display field (document id/title, chunk id, snippet, url) is filled
+ * from the resolved item's real data — never written by the model — so page
+ * numbers, section names and quotes cannot be fabricated. The persisted source
+ * row id is carried alongside the web citation so the answer layer can attach
+ * it as `source_id`. For a web source without body text the snippet falls back
+ * to the answer sentence carrying the marker, taken verbatim from the model's
+ * own output. The marker number is kept alongside so the UI can link each
+ * `[n]` marker to its citation.
+ */
+export function toAnswerCitations(
+  output: GeneratedAnswerOutput,
+  context: ResearchContext
+): ToAnswerCitationsResult {
+  const citations: ResolvedAnswerCitation[] = [];
+  let rejectedCount = 0;
+
+  for (const citation of output.citations) {
+    const item = context.items[citation.evidence - 1];
+    if (!item) {
+      rejectedCount += 1;
+      continue;
+    }
+
+    if (item.kind === "document") {
+      if (item.content.trim().length === 0) {
+        rejectedCount += 1;
+        continue;
+      }
+      citations.push({
+        citation_number: citation.citation_number,
+        type: "document",
+        documentId: item.id,
+        documentTitle: item.title,
+        chunkId: chunkIdOf(item),
+        snippet: snippetOf(item.content),
+      });
+      continue;
+    }
+
+    const url = item.metadata.url ?? "";
+    const pastedContent = item.content.trim();
+    if (!url && pastedContent.length === 0) {
+      rejectedCount += 1;
+      continue;
+    }
+    citations.push({
+      citation_number: citation.citation_number,
+      type: "web",
+      sourceId: item.id,
+      url,
+      title: item.title,
+      snippet: snippetOf(
+        pastedContent.length > 0
+          ? pastedContent
+          : answerSentenceForMarker(output.answer, citation.citation_number)
+      ),
+    });
+  }
+
+  citations.sort((a, b) => a.citation_number - b.citation_number);
+  return { citations, rejectedCount };
 }

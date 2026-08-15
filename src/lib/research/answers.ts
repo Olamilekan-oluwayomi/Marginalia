@@ -13,7 +13,7 @@ import {
   type AppResult,
 } from "./errors";
 import { requireUser } from "./session";
-import { requireText, requireUuid } from "./validation";
+import { requireOneOf, requireText, requireUuid } from "./validation";
 
 const CONTENT_MAX_LENGTH = 100_000;
 const MODEL_MAX_LENGTH = 100;
@@ -102,6 +102,16 @@ export async function createAnswer(
   if (modelError) {
     return fail(validationError(modelError.message), null);
   }
+  if (input.source_mode !== undefined && input.source_mode !== null) {
+    const sourceModeError = requireOneOf(
+      input.source_mode,
+      ["document", "web", "both"] as const,
+      "Source mode"
+    );
+    if (sourceModeError) {
+      return fail(validationError(sourceModeError.message), null);
+    }
+  }
 
   const session = await requireUser(supabase);
   if ("error" in session) {
@@ -116,6 +126,7 @@ export async function createAnswer(
       content: input.content.trim(),
       model: input.model?.trim() || null,
       fallback_reason: input.fallback_reason?.trim() || null,
+      source_mode: input.source_mode ?? "document",
     })
     .select("*")
     .single();
