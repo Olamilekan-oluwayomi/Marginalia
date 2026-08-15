@@ -13,12 +13,6 @@ export type RelevanceResult = {
 };
 
 /**
- * Upper bound on the document text sent to the classifier. The check is a
- * fast, cheap gate, so the model only ever sees a summary-sized slice.
- */
-const MAX_DOCUMENT_CHARS = 2_000;
-
-/**
  * Ceiling on generated tokens: the response is a tiny JSON object, so the
  * budget is deliberately small to keep the call fast and inexpensive.
  */
@@ -34,12 +28,6 @@ Respond ONLY with JSON, no other text:
 }
 
 Be strict: if the question is about a clearly unrelated topic (e.g. weather, general knowledge, current events) and the document is about something else entirely, mark relevant: false.`;
-
-function boundedDocumentText(text: string): string {
-  return text.length > MAX_DOCUMENT_CHARS
-    ? text.slice(0, MAX_DOCUMENT_CHARS)
-    : text;
-}
 
 /**
  * How the user's question explicitly directs search scope. `null` when the
@@ -193,16 +181,16 @@ function parseRelevanceResult(text: string): RelevanceResult {
  * Checks whether a document is likely relevant to a user's question before
  * deciding whether to search the document or fall back to web search.
  *
- * Standalone: nothing in the application calls this yet. It only performs the
- * classifier call and returns the verdict; callers decide what to do with it.
+ * The full supplied document text is passed to the classifier; the caller
+ * (smart mode in `generateAnswer`) is responsible for bounding pathological
+ * inputs before calling this.
  */
 export async function checkDocumentRelevance(
   question: string,
   documentSummaryOrChunks: string
 ): Promise<RelevanceResult> {
-  const documentText = boundedDocumentText(documentSummaryOrChunks);
   const raw = await generateText({
-    prompt: buildPrompt(question, documentText),
+    prompt: buildPrompt(question, documentSummaryOrChunks),
     system: RELEVANCE_SYSTEM_PROMPT,
     maxOutputTokens: MAX_OUTPUT_TOKENS,
   });

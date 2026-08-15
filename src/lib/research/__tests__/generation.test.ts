@@ -371,6 +371,61 @@ describe("generateAnswer", () => {
     );
   });
 
+  it("passes full document content to the relevance check when under the ceiling", async () => {
+    const content = "y".repeat(10_000);
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument({ content })],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: true,
+      confidence: 0.9,
+      reason: "The document covers this.",
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const result = await generateAnswer(fakeSupabase, {
+        questionId: question.id,
+        researchId: question.research_id,
+      });
+
+      expect(result.error).toBeNull();
+      const [, summary] = mocks.checkDocumentRelevance.mock.calls[0];
+      expect(summary).toBe(`The study PDF\n${content}`);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("caps a pathologically oversized document in the relevance summary", async () => {
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument({ content: "x".repeat(60_000) })],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: true,
+      confidence: 1,
+      reason: "The document covers this.",
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    try {
+      const result = await generateAnswer(fakeSupabase, {
+        questionId: question.id,
+        researchId: question.research_id,
+      });
+
+      expect(result.error).toBeNull();
+      const [, summary] = mocks.checkDocumentRelevance.mock.calls[0];
+      expect(summary).toHaveLength(50_000);
+      expect(warnSpy).toHaveBeenCalledOnce();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it("honors an explicit web intent without running the relevance check", async () => {
     mocks.getDocuments.mockResolvedValue({
       error: null,

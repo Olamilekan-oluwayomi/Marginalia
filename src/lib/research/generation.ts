@@ -120,11 +120,20 @@ async function markFailed(
 }
 
 /**
- * Builds a summary of the research's ready documents for the smart-mode
- * relevance check: the title plus extracted text of each ready document. The
- * classifier truncates the input itself, so the leading slice dominates.
- * Returns `null` when there are no ready documents (or the lookup fails), in
- * which case smart mode must not run.
+ * Safety ceiling on a single document's contribution to the smart-mode
+ * relevance summary. Full extracted content is the normal case; only a
+ * pathologically oversized document is cut, and cutting logs a warning so we
+ * can tell whether the ceiling is ever hit in practice.
+ */
+const MAX_RELEVANCE_DOCUMENT_CHARS = 50_000;
+
+/**
+ * Builds the smart-mode relevance summary from the research's ready
+ * documents: each document's title plus its full extracted content. A
+ * per-document safety ceiling applies only to pathologically oversized
+ * documents (and logs a warning when hit), so an answer buried deep in a long
+ * document is still seen. Returns `null` when there are no ready documents
+ * (or the lookup fails), in which case smart mode must not run.
  */
 async function readyDocumentsSummary(
   supabase: Supabase,
@@ -144,7 +153,16 @@ async function readyDocumentsSummary(
     return null;
   }
   return ready
-    .map((document) => `${document.title}\n${document.content}`)
+    .map((document) => {
+      const body = `${document.title}\n${document.content}`;
+      if (body.length <= MAX_RELEVANCE_DOCUMENT_CHARS) {
+        return body;
+      }
+      console.warn(
+        `[research-data] relevance check capped document "${document.title}" (${document.id}) at ${MAX_RELEVANCE_DOCUMENT_CHARS} characters`
+      );
+      return body.slice(0, MAX_RELEVANCE_DOCUMENT_CHARS);
+    })
     .join("\n\n");
 }
 
