@@ -73,6 +73,11 @@ export type CreateSourceInput = {
 export type CreateAnswerInput = {
   content: string;
   model?: string;
+  /**
+   * User-facing note set when smart mode fell back to web research because an
+   * attached document was judged not relevant to the question.
+   */
+  fallback_reason?: string | null;
 };
 
 export type CreateCitationInput = {

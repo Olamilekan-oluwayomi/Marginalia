@@ -320,6 +320,12 @@ export default async function ResearchWorkspacePage({
                             renderParagraph(paragraph, index, notesByNumber)
                           )}
 
+                          {latest!.fallback_reason ? (
+                            <p className="mt-4 font-ui text-sm text-muted">
+                              {latest!.fallback_reason}
+                            </p>
+                          ) : null}
+
                           {latest!.model ? (
                             <p className="mt-6 font-mono text-xs text-muted">
                               Generated with {latest!.model}

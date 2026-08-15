@@ -115,6 +115,7 @@ export async function createAnswer(
       research_id: researchId,
       content: input.content.trim(),
       model: input.model?.trim() || null,
+      fallback_reason: input.fallback_reason?.trim() || null,
     })
     .select("*")
     .single();

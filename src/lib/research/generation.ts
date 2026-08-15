@@ -10,6 +10,7 @@ import {
   type GeneratedAnswerOutput,
 } from "./citation-generation";
 import { buildResearchPrompt, retrieveResearchContext } from "./context";
+import { getDocuments } from "./documents";
 import {
   appError,
   fail,
@@ -26,12 +27,24 @@ import {
   updateQuestionStatus,
 } from "./questions";
 import { runWebResearch } from "./web-research";
+import {
+  checkDocumentRelevance,
+  detectExplicitSearchIntent,
+} from "./relevance-check";
 import { requireUser } from "./session";
 import type { AnswerRow, Supabase } from "./types";
 import { requireUuid } from "./validation";
 
 const GENERATION_ERROR_MESSAGE =
   "We couldn't generate this answer. Please try again.";
+
+/**
+ * User-facing note persisted on the answer when smart mode fell back to web
+ * research because the attached document was judged not relevant to the
+ * question.
+ */
+const FALLBACK_REASON_MESSAGE =
+  "This wasn't found in your document, so I searched the web instead.";
 
 /** Upper bound on generated answer length. Keeps answers concise and costs bounded. */
 const ANSWER_MAX_OUTPUT_TOKENS = 2000;
@@ -104,6 +117,35 @@ async function markFailed(
       result.error.message
     );
   }
+}
+
+/**
+ * Builds a summary of the research's ready documents for the smart-mode
+ * relevance check: the title plus extracted text of each ready document. The
+ * classifier truncates the input itself, so the leading slice dominates.
+ * Returns `null` when there are no ready documents (or the lookup fails), in
+ * which case smart mode must not run.
+ */
+async function readyDocumentsSummary(
+  supabase: Supabase,
+  researchId: string
+): Promise<string | null> {
+  const documentsResult = await getDocuments(supabase, researchId);
+  if (documentsResult.error) {
+    return null;
+  }
+  const ready = documentsResult.data.filter(
+    (document) =>
+      document.status === "ready" &&
+      document.content !== null &&
+      document.content.trim().length > 0
+  );
+  if (ready.length === 0) {
+    return null;
+  }
+  return ready
+    .map((document) => `${document.title}\n${document.content}`)
+    .join("\n\n");
 }
 
 export type GenerateAnswerInput = {
@@ -209,6 +251,7 @@ export async function generateAnswer(
   }
 
   let context = contextResult.data;
+  let fallbackReason: string | null = null;
   if (question.include_web) {
     const webResult = await runWebResearch(
       supabase,
@@ -228,6 +271,56 @@ export async function generateAnswer(
         items: [...context.items, ...webResult.data.items],
         hasBodyContent: context.hasBodyContent,
       };
+    }
+  } else {
+    // Smart mode: when web research was not requested and the research has a
+    // ready document, gate document search on an explicit-intent check and a
+    // relevance check. An explicit instruction in the question is honored
+    // directly; otherwise the document is used when it looks relevant, and web
+    // research runs as a fallback (with a user-facing reason) when it does not.
+    const summary = await readyDocumentsSummary(supabase, researchId);
+    if (summary !== null) {
+      const intent = detectExplicitSearchIntent(question.question);
+      if (intent === "web" || intent === "both") {
+        const webResult = await runWebResearch(
+          supabase,
+          researchId,
+          question.question
+        );
+        if (!webResult.error && webResult.data.items.length > 0) {
+          context = {
+            items: [...context.items, ...webResult.data.items],
+            hasBodyContent: context.hasBodyContent,
+          };
+        }
+      } else if (intent === null) {
+        let relevant = true;
+        try {
+          relevant = (await checkDocumentRelevance(question.question, summary))
+            .relevant;
+        } catch (error) {
+          // Best-effort: a relevance-check failure must not fail the answer.
+          // Treat the document as relevant (the conservative default) and log.
+          console.error(
+            "[research-data] relevance check failed:",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+        if (!relevant) {
+          const webResult = await runWebResearch(
+            supabase,
+            researchId,
+            question.question
+          );
+          if (!webResult.error && webResult.data.items.length > 0) {
+            context = {
+              items: [...context.items, ...webResult.data.items],
+              hasBodyContent: context.hasBodyContent,
+            };
+          }
+          fallbackReason = FALLBACK_REASON_MESSAGE;
+        }
+      }
     }
   }
 
@@ -278,6 +371,7 @@ export async function generateAnswer(
   const answerResult = await createAnswer(supabase, questionId, researchId, {
     content: sanitizedAnswer,
     model: DEFAULT_MODEL,
+    fallback_reason: fallbackReason,
   });
   if (answerResult.error) {
     await markFailed(supabase, questionId);

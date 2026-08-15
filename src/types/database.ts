@@ -21,6 +21,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          fallback_reason: string | null
           id: string
           model: string | null
           question_id: string
@@ -29,6 +30,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
+          fallback_reason?: string | null
           id?: string
           model?: string | null
           question_id: string
@@ -37,6 +39,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
+          fallback_reason?: string | null
           id?: string
           model?: string | null
           question_id?: string

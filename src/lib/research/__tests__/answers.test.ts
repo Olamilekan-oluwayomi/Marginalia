@@ -202,6 +202,29 @@ describe("createAnswer", () => {
       research_id: RESEARCH_ID,
       content: "body text",
       model: null,
+      fallback_reason: null,
+    });
+    expect(result.data?.id).toBe(ANSWER_ID);
+  });
+
+  it("inserts a trimmed fallback reason when provided", async () => {
+    const { supabase, from } = makeSupabase({
+      insertResult: { data: makeAnswer(), error: null },
+    });
+
+    const result = await createAnswer(supabase, QUESTION_ID, RESEARCH_ID, {
+      content: "body text",
+      fallback_reason: "  This wasn't found in your document.  ",
+    });
+
+    expect(result.error).toBeNull();
+    const insertChain = from.mock.results[0].value.insert;
+    expect(insertChain).toHaveBeenCalledWith({
+      question_id: QUESTION_ID,
+      research_id: RESEARCH_ID,
+      content: "body text",
+      model: null,
+      fallback_reason: "This wasn't found in your document.",
     });
     expect(result.data?.id).toBe(ANSWER_ID);
   });
