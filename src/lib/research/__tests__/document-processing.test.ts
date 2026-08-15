@@ -243,7 +243,7 @@ describe("processDocument", () => {
     expect(mocks.setDocumentFailed).toHaveBeenCalledTimes(1);
   });
 
-  it("never surfaces raw pdf-parse internals to the user", async () => {
+  it("never surfaces raw parser internals to the user", async () => {
     mocks.getDocumentById.mockResolvedValue({
       data: makeDocument(),
       error: null,

@@ -654,7 +654,7 @@ describe("conceptual retrieval", () => {
   });
 
   it("retrieves the significance-level statement from a realistic full-paper extraction shape", async () => {
-    // Mirrors how pdf-parse joins a real document: page lines joined with
+    // Mirrors how unpdf joins a real document: page lines joined with
     // newlines, dense keyword-rich intro/results sections on either side of
     // the methodology statement, numbers throughout, and a competing document
     // full of "significant at the 0.05 level" phrasing that never forms the

@@ -42,7 +42,7 @@ the text rather than as stacked chat bubbles.
 | Styling | Tailwind CSS v4, custom design tokens (`design-system.md`) |
 | Database / Auth / Storage | Supabase (Postgres + RLS, Google OAuth + email, private storage bucket) |
 | AI | Google Gemini (`@google/genai`): text/JSON generation + Google Search grounding |
-| PDF extraction | `pdf-parse` |
+| PDF extraction | `unpdf` |
 | Tests | Vitest (unit tests, node environment, providers mocked at app boundaries) |
 
 ## Architecture overview
@@ -155,7 +155,7 @@ npm run start
    `{user_id}/{research_id}/{document_id}.pdf`.
 2. A `documents` row is created with status `pending`.
 3. The document is claimed atomically (`pending → processing`), downloaded
-   from storage, and its body text is extracted with `pdf-parse`.
+   from storage, and its body text is extracted with `unpdf`.
 4. Extracted text is persisted to `documents.content` and the row becomes
    `ready`. Failures mark the row `failed` (with a Retry control), and a
    failed row insert removes the just-uploaded file so no orphan remains.

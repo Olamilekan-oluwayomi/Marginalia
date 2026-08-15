@@ -28,6 +28,7 @@ function makeAnswer(overrides: Partial<Record<string, unknown>> = {}) {
     research_id: RESEARCH_ID,
     content: "The answer body.",
     model: "test-model",
+    source_mode: "document",
     created_at: "2026-08-13T00:00:00.000Z",
     ...overrides,
   };
@@ -203,6 +204,7 @@ describe("createAnswer", () => {
       content: "body text",
       model: null,
       fallback_reason: null,
+      source_mode: "document",
     });
     expect(result.data?.id).toBe(ANSWER_ID);
   });
@@ -225,8 +227,34 @@ describe("createAnswer", () => {
       content: "body text",
       model: null,
       fallback_reason: "This wasn't found in your document.",
+      source_mode: "document",
     });
     expect(result.data?.id).toBe(ANSWER_ID);
+  });
+
+  it("inserts the requested source mode", async () => {
+    const { supabase, from } = makeSupabase({
+      insertResult: { data: makeAnswer({ source_mode: "web" }), error: null },
+    });
+
+    const result = await createAnswer(supabase, QUESTION_ID, RESEARCH_ID, {
+      content: "body text",
+      source_mode: "web",
+    });
+
+    expect(result.error).toBeNull();
+    const insertChain = from.mock.results[0].value.insert;
+    expect(insertChain).toHaveBeenCalledWith(
+      expect.objectContaining({ source_mode: "web" })
+    );
+  });
+
+  it("rejects an invalid source mode", async () => {
+    const result = await createAnswer({} as Supabase, QUESTION_ID, RESEARCH_ID, {
+      content: "body text",
+      source_mode: "vhs" as never,
+    });
+    expect(result.error?.code).toBe("VALIDATION_ERROR");
   });
 
   it("maps a query failure to DATABASE_ERROR", async () => {

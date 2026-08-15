@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   splitAnswerMarkers,
   splitAnswerParagraphs,
+  stripCitationMarkers,
 } from "@/lib/research/answer-format";
 
 describe("splitAnswerParagraphs", () => {
@@ -66,5 +67,27 @@ describe("splitAnswerMarkers", () => {
     expect(splitAnswerMarkers("Just prose.")).toEqual([
       { kind: "text", text: "Just prose." },
     ]);
+  });
+});
+
+describe("stripCitationMarkers", () => {
+  it("removes inline [n] markers and collapses the leftover whitespace", () => {
+    expect(
+      stripCitationMarkers(
+        "Annual maxima are increasing across the region [1]."
+      )
+    ).toBe("Annual maxima are increasing across the region.");
+  });
+
+  it("leaves text without markers untouched", () => {
+    expect(
+      stripCitationMarkers("The body text of a source citation.")
+    ).toBe("The body text of a source citation.");
+  });
+
+  it("keeps non-marker bracketed text", () => {
+    expect(stripCitationMarkers("The file [draft].pdf is attached.")).toBe(
+      "The file [draft].pdf is attached."
+    );
   });
 });

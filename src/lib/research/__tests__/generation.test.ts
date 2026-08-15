@@ -118,6 +118,7 @@ beforeEach(() => {
       research_id: question.research_id,
       content: "Paris is the capital of France.",
       model: "test-model",
+      source_mode: "document",
       created_at: "2026-08-13T00:00:01.000Z",
     },
   });
@@ -134,6 +135,12 @@ describe("generateAnswer", () => {
     expect(result.error).toBeNull();
     expect(result.data?.id).toBe("44444444-4444-4444-4444-444444444444");
     expect(mocks.createAnswer).toHaveBeenCalledOnce();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "document" })
+    );
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
@@ -340,6 +347,7 @@ describe("generateAnswer", () => {
       question.research_id,
       expect.objectContaining({
         fallback_reason: "This wasn't found in your document, so I searched the web instead.",
+        source_mode: "web",
       })
     );
   });
@@ -367,7 +375,7 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ fallback_reason: null })
+      expect.objectContaining({ fallback_reason: null, source_mode: "document" })
     );
   });
 
@@ -483,7 +491,7 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ fallback_reason: null })
+      expect.objectContaining({ fallback_reason: null, source_mode: "document" })
     );
   });
 
@@ -528,6 +536,12 @@ describe("generateAnswer", () => {
       expect.objectContaining({
         items: expect.arrayContaining([webItem]),
       })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "web" })
     );
   });
 
@@ -586,6 +600,7 @@ describe("generateAnswer", () => {
       question.research_id,
       expect.objectContaining({
         content: "A significance level of 0.05 was used [1].",
+        source_mode: "document",
       })
     );
     expect(mocks.createCitation).toHaveBeenCalledWith(
@@ -595,6 +610,7 @@ describe("generateAnswer", () => {
         citation_number: 1,
         document_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         source_id: undefined,
+        excerpt: "alpha of 0.05 was used for every trend analysis.",
       })
     );
   });
@@ -634,6 +650,163 @@ describe("generateAnswer", () => {
       expect.objectContaining({
         content: "A significance level of 0.05 was used.",
       })
+    );
+  });
+
+  it("persists web citations from a document-plus-web answer as both mode", async () => {
+    mocks.getQuestionById.mockResolvedValue({
+      error: null,
+      data: { ...question, include_web: true },
+    });
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "alpha of 0.05 was used for every trend analysis.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    const webItem = {
+      kind: "source",
+      id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      title: "Official climate guidance",
+      content: "",
+      metadata: {
+        publisher: "Web search",
+        url: "https://example.com/climate-guidance",
+      },
+    } as const;
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+    mocks.generateJson.mockResolvedValue({
+      answer:
+        "The trend analysis used a 0.05 significance level [1]. Related guidance is available online [2].",
+      citations: [
+        { citation_number: 1, evidence: 1 },
+        { citation_number: 2, evidence: 2 },
+      ],
+    });
+    mocks.createCitation.mockResolvedValue({ error: null, data: {} });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "both", fallback_reason: null })
+    );
+    expect(mocks.createCitation).toHaveBeenCalledWith(
+      expect.anything(),
+      "44444444-4444-4444-4444-444444444444",
+      expect.objectContaining({
+        citation_number: 2,
+        document_id: undefined,
+        source_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        excerpt: "Related guidance is available online [2].",
+      })
+    );
+  });
+});
+
+describe("system prompt selection by source mode", () => {
+  const documentItem = {
+    kind: "document",
+    id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    title: "The study PDF",
+    content: "alpha of 0.05 was used for every trend analysis.",
+    metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+  } as const;
+  const webItem = {
+    kind: "source",
+    id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    title: "Official climate guidance",
+    content: "",
+    metadata: {
+      publisher: "Web search",
+      url: "https://example.com/climate-guidance",
+    },
+  } as const;
+
+  it("uses the document-mode prompt when the context is documents only", async () => {
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: { items: [documentItem], hasBodyContent: true },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    const args = mocks.generateJson.mock.calls[0][0] as { system: string };
+    expect(args.system).toContain(
+      "You are answering from the user's uploaded documents only."
+    );
+  });
+
+  it("uses the web-mode prompt when the context is sources only", async () => {
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: false,
+      confidence: 0.9,
+      reason: "The document is about hydrology, not this topic.",
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    const args = mocks.generateJson.mock.calls[0][0] as { system: string };
+    expect(args.system).toContain("You are answering from web search results.");
+  });
+
+  it("uses the combined prompt when the context mixes documents and sources", async () => {
+    mocks.getQuestionById.mockResolvedValue({
+      error: null,
+      data: { ...question, include_web: true },
+    });
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: { items: [documentItem], hasBodyContent: true },
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    const args = mocks.generateJson.mock.calls[0][0] as { system: string };
+    expect(args.system).toContain(
+      "You are answering from the user's uploaded documents and web search results together."
     );
   });
 });
