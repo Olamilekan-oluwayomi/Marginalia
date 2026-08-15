@@ -7,6 +7,8 @@ type CitationProps = {
   sourceName?: string;
   retrievedDate?: string;
   excerpt?: string;
+  /** External URL for a web citation; renders the source name as a link. */
+  url?: string;
   /** The persisted citation row id; the margin note is keyed by it. */
   targetId?: string;
   onClick?: () => void;
@@ -110,6 +112,7 @@ export function Citation({
   sourceName,
   retrievedDate,
   excerpt,
+  url,
   targetId,
   onClick,
 }: CitationProps) {
@@ -136,7 +139,19 @@ export function Citation({
       {expanded && sourceName ? (
         <span className="mt-4 block border-t border-rule pt-2 lg:hidden">
           <span className="block font-mono text-xs text-muted">
-            {sourceName} · {retrievedDate}
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-words text-pine underline decoration-pine/40 underline-offset-2 hover:text-pine-dim"
+              >
+                {sourceName}
+              </a>
+            ) : (
+              sourceName
+            )}
+            {retrievedDate ? ` · ${retrievedDate}` : ""}
           </span>
 
           <span className="mt-1 block font-ui text-sm leading-snug text-ink-soft">

@@ -26,6 +26,7 @@ import { hostnameFromUrl } from "@/lib/source-format";
 import {
   splitAnswerMarkers,
   splitAnswerParagraphs,
+  stripCitationMarkers,
 } from "@/lib/research/answer-format";
 import {
   createSupabaseClient,
@@ -68,38 +69,55 @@ type CitationNote = {
   /** Persisted citation row id; the unique key and scroll target. */
   id: string;
   number: number;
+  /** "document" for an uploaded-document citation, "web" for a source URL. */
+  kind: "document" | "web";
   sourceName: string;
   date: string;
+  /** The external URL for a web citation, when the source has one. */
+  url?: string;
   excerpt?: string;
+};
+
+/** Display label for the persisted source mode of a completed answer. */
+const SOURCE_MODE_LABELS: Record<string, string> = {
+  document: "Document",
+  web: "Web",
+  both: "Document + web",
 };
 
 function toCitationNote(
   citation: CitationRow,
   workspace: Pick<ResearchWorkspace, "documents" | "sources">
 ): CitationNote {
-  let sourceName = "";
-  let date = "";
-
   if (citation.document_id) {
     const document = workspace.documents.find(
       (item) => item.id === citation.document_id
     );
-    sourceName = document?.title ?? "Document";
-    date = document ? formatDisplayDate(document.created_at) : "";
-  } else if (citation.source_id) {
-    const source = workspace.sources.find(
-      (item) => item.id === citation.source_id
-    );
-    sourceName = source?.title ?? "Source";
-    date = source?.retrieved_at ? formatDisplayDate(source.retrieved_at) : "";
+    return {
+      id: citation.id,
+      number: citation.citation_number,
+      kind: "document",
+      sourceName: document?.title ?? "Document",
+      date: document ? formatDisplayDate(document.created_at) : "",
+      excerpt: citation.excerpt
+        ? stripCitationMarkers(citation.excerpt)
+        : undefined,
+    };
   }
 
+  const source = workspace.sources.find(
+    (item) => item.id === citation.source_id
+  );
   return {
     id: citation.id,
     number: citation.citation_number,
-    sourceName,
-    date,
-    excerpt: citation.excerpt ?? undefined,
+    kind: "web",
+    sourceName: source?.title ?? "Source",
+    date: source?.retrieved_at ? formatDisplayDate(source.retrieved_at) : "",
+    url: source?.url ?? undefined,
+    excerpt: citation.excerpt
+      ? stripCitationMarkers(citation.excerpt)
+      : undefined,
   };
 }
 
@@ -130,6 +148,7 @@ function renderParagraph(
             sourceName={note.sourceName}
             retrievedDate={note.date}
             excerpt={note.excerpt}
+            url={note.url}
             targetId={note.id}
           />
         );
@@ -295,6 +314,13 @@ export default async function ResearchWorkspacePage({
                             Asked{" "}
                             {formatDisplayDate(question.created_at)}
                           </span>
+
+                          {latest?.source_mode ? (
+                            <span className="font-mono text-xs text-muted">
+                              {SOURCE_MODE_LABELS[latest.source_mode] ??
+                                latest.source_mode}
+                            </span>
+                          ) : null}
                         </div>
 
                         {/*
@@ -405,6 +431,7 @@ export default async function ResearchWorkspacePage({
                       sourceName={note.sourceName}
                       retrievedDate={note.date}
                       excerpt={note.excerpt}
+                      url={note.url}
                     />
                   </div>
                 ))}

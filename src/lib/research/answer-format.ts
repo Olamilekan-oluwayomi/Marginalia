@@ -56,3 +56,18 @@ export function splitAnswerMarkers(paragraph: string): AnswerSegment[] {
 
   return segments;
 }
+
+/**
+ * Removes inline `[n]` citation markers from display text, collapsing the
+ * whitespace they leave behind. Used for footnote excerpts that are themselves
+ * a claim sentence taken verbatim from the answer (web citations whose source
+ * has no body text), so the note shows clean prose rather than a duplicate
+ * marker.
+ */
+export function stripCitationMarkers(text: string): string {
+  return text
+    .replace(/\[\d+\]/g, "")
+    .replace(/[ ]{2,}/g, " ")
+    .replace(/[ ]+([.,;:!?])/g, "$1")
+    .trim();
+}
