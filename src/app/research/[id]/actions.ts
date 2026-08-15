@@ -17,6 +17,7 @@ import {
   tryTransitionQuestionStatus,
   type Supabase,
 } from "@/lib/research";
+import { describeError } from "@/lib/research/errors";
 
 const QUESTION_MAX_LENGTH = 1000;
 const TITLE_MAX_LENGTH = 300;
@@ -52,8 +53,8 @@ function scheduleGeneration(
       await generateAnswer(supabase, { questionId, researchId });
     } catch (error) {
       console.error(
-        "[research] background generation threw unexpectedly:",
-        error instanceof Error ? error.message : String(error)
+        "[research-data] background generation threw unexpectedly:",
+        describeError(error)
       );
     } finally {
       revalidatePath(`/research/${researchId}`);

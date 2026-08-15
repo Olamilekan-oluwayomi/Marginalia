@@ -95,6 +95,23 @@ function toLogMessage(error: unknown): string {
 }
 
 /**
+ * Formats an unknown thrown value for developer logs: message and stack when
+ * it is an Error, otherwise the serialized value. Plain objects serialize to
+ * JSON so they never log as a useless "[object Object]"; a value that cannot
+ * be serialized degrades to its string form.
+ */
+export function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.message}\n${error.stack ?? "(no stack)"}`;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+/**
  * Normalizes an unknown failure (Supabase/Postgrest errors, thrown values)
  * into a safe `AppError`. Only the sanitized error message is logged; raw
  * database details are never surfaced to UI callers.

@@ -2,7 +2,7 @@ import "server-only";
 
 import { searchWeb, type WebSearchResult } from "@/lib/search";
 import { normalizeUrl } from "@/lib/search/normalize-url";
-import { fail, ok, validationError, type AppResult } from "./errors";
+import { describeError, fail, ok, validationError, type AppResult } from "./errors";
 import { requireUser } from "./session";
 import { createSource, getSources } from "./sources";
 import type { ResearchContextItem } from "./context";
@@ -79,8 +79,11 @@ export async function runWebResearch(
   let results: WebSearchResult[];
   try {
     results = await searchWeb(question);
-  } catch {
-    // Best-effort: a search failure must never block the answer.
+  } catch (error) {
+    // Best-effort: a search failure must never block the answer, but it must
+    // be logged server-side so web-search failures are distinguishable from
+    // empty results.
+    console.error("[research-data] web search failed:", describeError(error));
     return ok({ items: [], addedCount: 0 });
   }
 
@@ -99,7 +102,13 @@ export async function runWebResearch(
     });
 
     if (created.error || !created.data) {
-      // Skip a single failed insert; keep the remaining results.
+      // Skip a single failed insert; keep the remaining results. Log it so a
+      // source persistence failure (e.g. RLS or a schema gap) is not silently
+      // mistaken for "web search returned nothing".
+      console.error(
+        "[research] web search result could not be persisted:",
+        created.error?.message ?? "missing source row"
+      );
       continue;
     }
 
