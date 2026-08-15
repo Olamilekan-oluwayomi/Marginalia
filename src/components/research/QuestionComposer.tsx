@@ -18,7 +18,13 @@ const initialState: AskQuestionState = {
   success: false,
 };
 
-export function QuestionComposer({ researchId }: { researchId: string }) {
+export function QuestionComposer({
+  researchId,
+  hasDocument,
+}: {
+  researchId: string;
+  hasDocument: boolean;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState("");
@@ -91,6 +97,21 @@ export function QuestionComposer({ researchId }: { researchId: string }) {
         />
         Search the web for sources before answering
       </label>
+
+      {hasDocument ? (
+        <p className="mt-2 font-ui text-xs text-muted">
+          Leave this unchecked and Marginalia checks your document first,
+          searching the web only when the document doesn&rsquo;t cover the
+          question. You can also say &ldquo;use the document&rdquo;,
+          &ldquo;use the web&rdquo;, or &ldquo;use both&rdquo; in your
+          question.
+        </p>
+      ) : (
+        <p className="mt-2 font-ui text-xs text-muted">
+          No searchable document is attached yet, so answers will draw on web
+          search results.
+        </p>
+      )}
 
       <div className="mt-3 flex justify-end">
         <Button

@@ -412,7 +412,12 @@ export default async function ResearchWorkspacePage({
             )}
 
             <div className="mt-12 border-t border-rule pt-6">
-              <QuestionComposer researchId={research.id} />
+              <QuestionComposer
+                researchId={research.id}
+                hasDocument={documents.some(
+                  (document) => document.status === "ready"
+                )}
+              />
             </div>
           </section>
 
