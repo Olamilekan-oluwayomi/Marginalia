@@ -422,6 +422,14 @@ export async function generateAnswer(
           );
         }
         if (!relevant) {
+          // The document was judged not relevant to this question, so it must
+          // not be offered to the model as citable evidence: keeping it in the
+          // context would let sourceModeOf label the answer "both" and
+          // contradict the fallback reason shown to the user. User-pasted
+          // sources (kind "source") are unrelated to that verdict and stay.
+          const offeredItems = context.items.filter(
+            (item) => item.kind !== "document"
+          );
           const webResult = await runWebResearch(
             supabase,
             researchId,
@@ -429,7 +437,12 @@ export async function generateAnswer(
           );
           if (!webResult.error && webResult.data.items.length > 0) {
             context = {
-              items: [...context.items, ...webResult.data.items],
+              items: [...offeredItems, ...webResult.data.items],
+              hasBodyContent: context.hasBodyContent,
+            };
+          } else {
+            context = {
+              items: offeredItems,
               hasBodyContent: context.hasBodyContent,
             };
           }

@@ -352,6 +352,87 @@ describe("generateAnswer", () => {
     );
   });
 
+  it("excludes the rejected document from the context when falling back, so source_mode is web, not both", async () => {
+    // Production shape: the workspace context carries the ready document, and
+    // the relevance check rejects it. The document must not remain "offered
+    // evidence" for sourceModeOf, or the answer would be labeled "both" next
+    // to a fallback reason that says the document was not used.
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [
+          {
+            kind: "document",
+            id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            title: "The study PDF",
+            content: "A trend analysis of extreme precipitation.",
+            metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+          },
+        ],
+        hasBodyContent: true,
+      },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: false,
+      confidence: 0.9,
+      reason: "The document is about hydrology, not the weather in Tokyo.",
+    });
+    const webItem = {
+      kind: "source",
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      title: "Tokyo weather report",
+      content: "",
+      metadata: {
+        publisher: "Web search",
+        url: "https://example.com/tokyo-weather",
+      },
+    } as const;
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [webItem], addedCount: 1 },
+    });
+    mocks.generateJson.mockResolvedValue({
+      answer: "Tokyo is forecast to see heavy rain [1].",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    });
+    mocks.createCitation.mockResolvedValue({ error: null, data: {} });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: [webItem],
+      })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({
+        fallback_reason: "This wasn't found in your document, so I searched the web instead.",
+        source_mode: "web",
+      })
+    );
+    expect(mocks.createCitation).toHaveBeenCalledWith(
+      expect.anything(),
+      "44444444-4444-4444-4444-444444444444",
+      expect.objectContaining({
+        citation_number: 1,
+        document_id: undefined,
+        source_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      })
+    );
+  });
+
   it("keeps the document path without web research when the document is relevant", async () => {
     mocks.getDocuments.mockResolvedValue({
       error: null,
