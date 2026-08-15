@@ -461,7 +461,7 @@ describe("generateAnswer", () => {
   });
 
   it("passes full document content to the relevance check when under the ceiling", async () => {
-    const content = "y".repeat(10_000);
+    const content = "y".repeat(3_000);
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [makeReadyDocument({ content })],
@@ -508,7 +508,7 @@ describe("generateAnswer", () => {
 
       expect(result.error).toBeNull();
       const [, summary] = mocks.checkDocumentRelevance.mock.calls[0];
-      expect(summary).toHaveLength(50_000);
+      expect(summary).toHaveLength(4_000);
       expect(warnSpy).toHaveBeenCalledOnce();
     } finally {
       warnSpy.mockRestore();

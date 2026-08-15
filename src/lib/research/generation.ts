@@ -175,6 +175,23 @@ function systemPromptFor(mode: SourceMode): string {
 }
 
 /**
+ * Formats an unknown thrown value for developer logs: message and stack when
+ * it is an Error, otherwise the serialized value. Plain objects serialize to
+ * JSON so they never log as a useless "[object Object]"; a value that cannot
+ * be serialized degrades to its string form.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.message}\n${error.stack ?? "(no stack)"}`;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+/**
  * Normalizes a generation failure into a safe `AppError`. Provider failures
  * are reduced to a generic message (the AI layer already logs the sanitized
  * detail); application errors pass through; anything else is logged for
@@ -213,22 +230,24 @@ async function markFailed(
 }
 
 /**
- * Safety ceiling on a single document's contribution to the smart-mode
- * relevance summary. Full extracted content is the normal case; only a
- * pathologically oversized document is cut, and cutting logs a warning so we
- * can tell whether the ceiling is ever hit in practice.
+ * Ceilings on the smart-mode relevance summary. A relevance check is a
+ * topical classifier: it only needs each ready document's title plus a
+ * leading excerpt, not the full extracted content. Both bounds sit far below
+ * the AI layer's prompt guard (`MAX_PROMPT_CHARS`) so the check can never
+ * fail with a prompt-too-long error, and the totals keep the call cheap and
+ * fast. Hitting either ceiling logs a warning so we can tell whether the
+ * bounds are ever hit in practice.
  */
-const MAX_RELEVANCE_DOCUMENT_CHARS = 50_000;
+const MAX_RELEVANCE_DOCUMENT_CHARS = 4_000;
+const MAX_RELEVANCE_SUMMARY_CHARS = 12_000;
 
 /**
  * Builds the smart-mode relevance summary from the research's ready
- * documents: each document's title plus its full extracted content. A
- * per-document safety ceiling applies only to pathologically oversized
- * documents (and logs a warning when hit), so an answer buried deep in a long
- * document is still seen. Returns `null` when there are no ready documents
- * (or the lookup fails), in which case smart mode must not run.
+ * documents: each document's title plus a leading excerpt of its content,
+ * bounded per document and in total. Returns `null` when there are no ready
+ * documents (or the lookup fails), in which case smart mode must not run.
  */
-async function readyDocumentsSummary(
+export async function readyDocumentsSummary(
   supabase: Supabase,
   researchId: string
 ): Promise<string | null> {
@@ -245,18 +264,32 @@ async function readyDocumentsSummary(
   if (ready.length === 0) {
     return null;
   }
-  return ready
-    .map((document) => {
-      const body = `${document.title}\n${document.content}`;
-      if (body.length <= MAX_RELEVANCE_DOCUMENT_CHARS) {
-        return body;
-      }
+  const parts: string[] = [];
+  let remaining = MAX_RELEVANCE_SUMMARY_CHARS;
+  for (const document of ready) {
+    if (remaining <= 0) {
+      break;
+    }
+    const body = `${document.title}\n${document.content}`;
+    const truncated = body.length > MAX_RELEVANCE_DOCUMENT_CHARS;
+    const excerpt = truncated
+      ? body.slice(0, MAX_RELEVANCE_DOCUMENT_CHARS)
+      : body;
+    const part = excerpt.length > remaining ? excerpt.slice(0, remaining) : excerpt;
+    parts.push(part);
+    remaining -= part.length;
+    if (truncated) {
       console.warn(
         `[research-data] relevance check capped document "${document.title}" (${document.id}) at ${MAX_RELEVANCE_DOCUMENT_CHARS} characters`
       );
-      return body.slice(0, MAX_RELEVANCE_DOCUMENT_CHARS);
-    })
-    .join("\n\n");
+    }
+    if (part.length < excerpt.length) {
+      console.warn(
+        `[research-data] relevance check capped the combined summary at ${MAX_RELEVANCE_SUMMARY_CHARS} characters`
+      );
+    }
+  }
+  return parts.join("\n\n");
 }
 
 export type GenerateAnswerInput = {
@@ -415,10 +448,12 @@ export async function generateAnswer(
             .relevant;
         } catch (error) {
           // Best-effort: a relevance-check failure must not fail the answer.
-          // Treat the document as relevant (the conservative default) and log.
+          // Treat the document as relevant (the conservative default) and log
+          // enough detail to diagnose it. String(error) would just produce
+          // "[object Object]" for a plain object, so serialize it instead.
           console.error(
             "[research-data] relevance check failed:",
-            error instanceof Error ? error.message : String(error)
+            describeError(error)
           );
         }
         if (!relevant) {
