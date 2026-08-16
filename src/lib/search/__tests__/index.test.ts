@@ -1,18 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  searchWebWithGrounding: vi.fn(),
-  isAiError: vi.fn(),
-  isAiClientConfigured: vi.fn(),
+  tavilySearch: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/ai", () => ({
-  searchWebWithGrounding: mocks.searchWebWithGrounding,
-  isAiError: mocks.isAiError,
-  isAiClientConfigured: mocks.isAiClientConfigured,
+vi.mock("@/lib/search/providers/tavily", () => ({
+  TavilyWebSearchProvider: class {
+    search = mocks.tavilySearch;
+  },
 }));
 
+import { searchError } from "@/lib/search/errors";
 import { searchWeb } from "@/lib/search";
 
 function groundResult(overrides: Partial<{ title: string; url: string }> = {}) {
@@ -21,9 +20,7 @@ function groundResult(overrides: Partial<{ title: string; url: string }> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.searchWebWithGrounding.mockResolvedValue([]);
-  mocks.isAiError.mockImplementation(() => false);
-  mocks.isAiClientConfigured.mockReturnValue(true);
+  mocks.tavilySearch.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -45,9 +42,7 @@ describe("searchWeb", () => {
 
   it("throws a PROVIDER_ERROR when the search times out", async () => {
     vi.useFakeTimers();
-    mocks.searchWebWithGrounding.mockImplementation(
-      () => new Promise(() => {})
-    );
+    mocks.tavilySearch.mockImplementation(() => new Promise(() => {}));
 
     let captured: unknown;
     const pending = searchWeb("a question").catch((error) => {
@@ -62,15 +57,9 @@ describe("searchWeb", () => {
     });
   });
 
-  it("preserves a NOT_CONFIGURED ai error", async () => {
-    mocks.searchWebWithGrounding.mockRejectedValue(
-      Object.assign(new Error("missing key"), { code: "NOT_CONFIGURED" })
-    );
-    mocks.isAiError.mockImplementation(
-      (err: unknown) =>
-        typeof err === "object" &&
-        err !== null &&
-        (err as { code?: string }).code === "NOT_CONFIGURED"
+  it("preserves a NOT_CONFIGURED provider error", async () => {
+    mocks.tavilySearch.mockRejectedValue(
+      searchError("NOT_CONFIGURED", "TAVILY_API_KEY is not set.")
     );
 
     await expect(searchWeb("a question")).rejects.toMatchObject({
@@ -78,23 +67,19 @@ describe("searchWeb", () => {
     });
   });
 
-  it("reduces other ai errors to PROVIDER_ERROR while preserving the underlying cause", async () => {
-    mocks.searchWebWithGrounding.mockRejectedValue(
-      Object.assign(new Error("rate limited"), { code: "RATE_LIMITED" })
-    );
-    mocks.isAiError.mockImplementation(
-      (err: unknown) =>
-        typeof err === "object" && err !== null && "code" in (err as object)
+  it("passes a provider PROVIDER_ERROR through with its cause", async () => {
+    mocks.tavilySearch.mockRejectedValue(
+      searchError("PROVIDER_ERROR", "Insufficient credits.")
     );
 
     await expect(searchWeb("a question")).rejects.toMatchObject({
       code: "PROVIDER_ERROR",
-      message: "rate limited",
+      message: "Insufficient credits.",
     });
   });
 
   it("reduces unknown errors to a generic PROVIDER_ERROR", async () => {
-    mocks.searchWebWithGrounding.mockRejectedValue(new Error("crash"));
+    mocks.tavilySearch.mockRejectedValue(new Error("crash"));
 
     await expect(searchWeb("a question")).rejects.toMatchObject({
       code: "PROVIDER_ERROR",
@@ -102,37 +87,16 @@ describe("searchWeb", () => {
     });
   });
 
-  it("logs whether the AI API key is configured", async () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    try {
-      await searchWeb("a question");
-      expect(
-        logSpy.mock.calls.some((call) =>
-          call.join(" ").includes("webSearch:config apiKeyConfigured=true")
-        )
-      ).toBe(true);
-
-      mocks.isAiClientConfigured.mockReturnValue(false);
-      await searchWeb("a question");
-      expect(
-        logSpy.mock.calls.some((call) =>
-          call.join(" ").includes("webSearch:config apiKeyConfigured=false")
-        )
-      ).toBe(true);
-    } finally {
-      logSpy.mockRestore();
-    }
-  });
-
   it("returns an empty array when the provider returns no results", async () => {
     const results = await searchWeb("a question");
 
     expect(results).toEqual([]);
-    expect(mocks.searchWebWithGrounding).toHaveBeenCalledWith("a question");
+    expect(mocks.tavilySearch).toHaveBeenCalledOnce();
+    expect(mocks.tavilySearch).toHaveBeenCalledWith("a question");
   });
 
   it("keeps only well-formed http(s) URLs", async () => {
-    mocks.searchWebWithGrounding.mockResolvedValue([
+    mocks.tavilySearch.mockResolvedValue([
       groundResult(),
       groundResult({ url: "ftp://example.com/bad" }),
       groundResult({ url: "javascript:alert(1)" }),
@@ -145,7 +109,7 @@ describe("searchWeb", () => {
   });
 
   it("deduplicates by canonical URL", async () => {
-    mocks.searchWebWithGrounding.mockResolvedValue([
+    mocks.tavilySearch.mockResolvedValue([
       groundResult({ url: "https://example.com/page" }),
       groundResult({ title: "Second", url: "https://example.com/page?utm_source=news" }),
       groundResult({ title: "Third", url: "https://EXAMPLE.com/page/" }),
@@ -161,7 +125,7 @@ describe("searchWeb", () => {
     const raw = Array.from({ length: 10 }, (_, i) =>
       groundResult({ title: `Title\u0000${i}`, url: `https://example.com/${i}` })
     );
-    mocks.searchWebWithGrounding.mockResolvedValue(raw);
+    mocks.tavilySearch.mockResolvedValue(raw);
 
     const results = await searchWeb("a question");
 

@@ -301,11 +301,13 @@ export type GroundedWebResult = {
  * Runs a web search through the Gemini provider's Google Search grounding
  * tool and returns the grounded result references (title + URL only).
  *
- * This is the only place the search capability touches the provider. It is
- * server-only (same client and key as generation), and the URLs come from the
- * provider's grounding metadata — never from the model inventing links.
- * Empty results are a valid outcome and return an empty array. A transient
- * provider failure is retried once before the error surfaces.
+ * NOTE: the live search path no longer calls this. `searchWeb`
+ * (`src/lib/search`) delegates to the Tavily provider, so this function is
+ * kept only as a tested utility for Gemini-grounding experiments. The URLs
+ * come from the provider's grounding metadata — never from the model
+ * inventing links. Empty results are a valid outcome and return an empty
+ * array. A transient provider failure is retried once before the error
+ * surfaces.
  */
 export async function searchWebWithGrounding(
   query: string
