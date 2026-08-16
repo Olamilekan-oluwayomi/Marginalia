@@ -10,6 +10,7 @@ export {
   type AiError,
   type AiErrorCode,
 } from "./errors";
+export { isAiClientConfigured } from "./client";
 
 /**
  * Default model used when callers do not ask for a specific one. A cheap,

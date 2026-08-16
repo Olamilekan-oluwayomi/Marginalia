@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  isAiClientConfigured,
   isAiError,
   searchWebWithGrounding,
   type GroundedWebResult,
@@ -53,18 +54,21 @@ function isValidUrl(value: string): boolean {
 
 /**
  * Reduces a provider/unknown failure to a safe `SearchError`. The provider's
- * own `NOT_CONFIGURED` is preserved (the API key is missing); everything else
- * becomes a generic provider error. Raw details are logged for developers,
- * never surfaced to UI callers.
+ * own `NOT_CONFIGURED` is preserved (the API key is missing); every other
+ * cause carries the underlying AI error's message forward so a quota, auth,
+ * timeout, or grounding failure stays distinguishable in the caller's logs.
+ * Raw details are logged for developers, never surfaced to UI callers.
  */
 function toSearchError(error: unknown): SearchError {
   if (isSearchError(error)) {
     return error;
   }
   if (isAiError(error)) {
-    return error.code === "NOT_CONFIGURED"
-      ? searchError("NOT_CONFIGURED", error.message)
-      : searchError("PROVIDER_ERROR", "Web search could not be completed.");
+    if (error.code === "NOT_CONFIGURED") {
+      return searchError("NOT_CONFIGURED", error.message);
+    }
+    console.error("[search] web search failed:", error.message);
+    return searchError("PROVIDER_ERROR", error.message);
   }
   console.error(
     "[search] web search failed:",
@@ -110,6 +114,9 @@ function normalizeResults(raw: GroundedWebResult[]): WebSearchResult[] {
  */
 export async function searchWeb(query: string): Promise<WebSearchResult[]> {
   const trimmed = (query ?? "").trim();
+  console.log(
+    `[research] webSearch:config apiKeyConfigured=${isAiClientConfigured()}`
+  );
   if (trimmed.length === 0 || trimmed.length > SEARCH_QUERY_MAX_LENGTH) {
     throw searchError(
       "PROVIDER_ERROR",

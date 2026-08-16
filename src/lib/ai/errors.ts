@@ -33,16 +33,20 @@ function toLogMessage(error: unknown): string {
 /**
  * Normalizes an unknown provider failure into a safe `AiError`. Raw SDK
  * details are logged for developers (message only, never request objects or
- * headers) but never surfaced to UI callers.
+ * headers) and preserved on the returned error's message so downstream layers
+ * (search error mapping, answer-generation logging) can distinguish a quota,
+ * auth, timeout, or grounding failure instead of reducing every cause to the
+ * same generic line. The message is never surfaced to UI callers.
  */
 export function toAiError(error: unknown): AiError {
   if (isAiError(error)) {
     return error;
   }
 
-  console.error("[ai] provider error:", toLogMessage(error));
+  const detail = toLogMessage(error);
+  console.error("[ai] provider error:", detail);
   return aiError(
     "PROVIDER_ERROR",
-    "The AI provider could not complete the request."
+    `The AI provider could not complete the request: ${detail}`
   );
 }

@@ -9,6 +9,15 @@ const API_KEY_ENV = "GEMINI_API_KEY";
 let client: GoogleGenAI | null = null;
 
 /**
+ * Whether the AI API key is present in the environment. Used to log
+ * configuration presence at the web-search boundary without ever logging the
+ * key itself.
+ */
+export function isAiClientConfigured(): boolean {
+  return Boolean(process.env[API_KEY_ENV]);
+}
+
+/**
  * Returns the shared server-side Gemini client, creating it on first use.
  *
  * The API key is read only from `process.env` at call time and is never

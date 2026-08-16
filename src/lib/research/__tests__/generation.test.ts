@@ -1220,6 +1220,76 @@ describe("generateAnswer", () => {
     );
   });
 
+  it("fails a question when no document is attached and web research fails at the provider", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: { code: "PROVIDER_ERROR", message: "Web search failed." },
+      data: null,
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await generateAnswer(fakeSupabase, {
+        questionId: question.id,
+        researchId: question.research_id,
+      });
+
+      expect(result.error?.code).toBe("DATABASE_ERROR");
+      expect(result.error?.message).toContain("web sources");
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[research] webSearch failed:",
+        "Web search failed."
+      );
+      expect(mocks.generateJson).not.toHaveBeenCalled();
+      expect(mocks.createAnswer).not.toHaveBeenCalled();
+      expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+        expect.anything(),
+        question.id,
+        "failed"
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("generates a web-only answer with a persisted web citation when no document is attached", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    mocks.generateJson.mockResolvedValue({
+      answer: "The capital of France is Paris [1].",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    });
+    mocks.createCitation.mockResolvedValue({ error: null, data: {} });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({
+        content: "The capital of France is Paris [1].",
+        source_mode: "web",
+        fallback_reason: null,
+      })
+    );
+    expect(mocks.createCitation).toHaveBeenCalledWith(
+      expect.anything(),
+      "44444444-4444-4444-4444-444444444444",
+      expect.objectContaining({
+        citation_number: 1,
+        document_id: undefined,
+        source_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        excerpt: "The capital of France is Paris [1].",
+      })
+    );
+  });
+
   it("fails a checkbox-on question when web research returns no results", async () => {
     mocks.getQuestionById.mockResolvedValue({
       error: null,

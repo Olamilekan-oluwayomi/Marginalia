@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   searchWebWithGrounding: vi.fn(),
   isAiError: vi.fn(),
+  isAiClientConfigured: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/ai", () => ({
   searchWebWithGrounding: mocks.searchWebWithGrounding,
   isAiError: mocks.isAiError,
+  isAiClientConfigured: mocks.isAiClientConfigured,
 }));
 
 import { searchWeb } from "@/lib/search";
@@ -21,6 +23,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.searchWebWithGrounding.mockResolvedValue([]);
   mocks.isAiError.mockImplementation(() => false);
+  mocks.isAiClientConfigured.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -75,7 +78,7 @@ describe("searchWeb", () => {
     });
   });
 
-  it("reduces other ai errors to a generic PROVIDER_ERROR", async () => {
+  it("reduces other ai errors to PROVIDER_ERROR while preserving the underlying cause", async () => {
     mocks.searchWebWithGrounding.mockRejectedValue(
       Object.assign(new Error("rate limited"), { code: "RATE_LIMITED" })
     );
@@ -86,7 +89,7 @@ describe("searchWeb", () => {
 
     await expect(searchWeb("a question")).rejects.toMatchObject({
       code: "PROVIDER_ERROR",
-      message: "Web search could not be completed.",
+      message: "rate limited",
     });
   });
 
@@ -97,6 +100,28 @@ describe("searchWeb", () => {
       code: "PROVIDER_ERROR",
       message: "Web search could not be completed.",
     });
+  });
+
+  it("logs whether the AI API key is configured", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await searchWeb("a question");
+      expect(
+        logSpy.mock.calls.some((call) =>
+          call.join(" ").includes("webSearch:config apiKeyConfigured=true")
+        )
+      ).toBe(true);
+
+      mocks.isAiClientConfigured.mockReturnValue(false);
+      await searchWeb("a question");
+      expect(
+        logSpy.mock.calls.some((call) =>
+          call.join(" ").includes("webSearch:config apiKeyConfigured=false")
+        )
+      ).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
   it("returns an empty array when the provider returns no results", async () => {

@@ -106,22 +106,64 @@ describe("runWebResearch", () => {
 
   it("returns an empty payload when the search returns no results", async () => {
     const { supabase } = makeSupabase();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const result = await runWebResearch(supabase, RESEARCH_ID, "q");
+    try {
+      const result = await runWebResearch(supabase, RESEARCH_ID, "q");
 
-    expect(result.error).toBeNull();
-    expect(result.data).toEqual({ items: [], addedCount: 0 });
-    expect(mocks.searchWeb).toHaveBeenCalledWith("q");
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({ items: [], addedCount: 0 });
+      expect(mocks.searchWeb).toHaveBeenCalledWith("q");
+      expect(
+        logSpy.mock.calls.some((call) =>
+          call.join(" ").includes("[research] webSearch:provider_empty")
+        )
+      ).toBe(true);
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
-  it("returns an empty payload when the search throws", async () => {
+  it("surfaces a real search failure instead of silently converting it to an empty success", async () => {
     mocks.searchWeb.mockRejectedValue(new Error("provider down"));
     const { supabase } = makeSupabase();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const result = await runWebResearch(supabase, RESEARCH_ID, "q");
+    try {
+      const result = await runWebResearch(supabase, RESEARCH_ID, "q");
 
-    expect(result.error).toBeNull();
-    expect(result.data).toEqual({ items: [], addedCount: 0 });
+      expect(result.error?.code).toBe("DATABASE_ERROR");
+      expect(result.data).toEqual({ items: [], addedCount: 0 });
+      const logged = errorSpy.mock.calls
+        .map((call) => call.join(" "))
+        .find((line) => line.includes("webSearch:provider_failure"));
+      expect(logged).toBeDefined();
+      expect(logged).toContain("provider down");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("logs the provider-failure cause for a configuration gap", async () => {
+    mocks.searchWeb.mockRejectedValue({
+      code: "NOT_CONFIGURED",
+      message: "GEMINI_API_KEY is not set.",
+    });
+    const { supabase } = makeSupabase();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await runWebResearch(supabase, RESEARCH_ID, "q");
+
+      expect(result.error?.code).toBe("DATABASE_ERROR");
+      const logged = errorSpy.mock.calls
+        .map((call) => call.join(" "))
+        .find((line) => line.includes("webSearch:provider_failure"));
+      expect(logged).toBeDefined();
+      expect(logged).toContain("NOT_CONFIGURED");
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("skips results whose URL already exists in the research", async () => {
@@ -155,18 +197,26 @@ describe("runWebResearch", () => {
         { data: makeSource({ title: "Second result", url: "https://example.com/two" }), error: null },
       ],
     });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const result = await runWebResearch(supabase, RESEARCH_ID, "q");
+    try {
+      const result = await runWebResearch(supabase, RESEARCH_ID, "q");
 
-    expect(result.error).toBeNull();
-    expect(result.data.addedCount).toBe(2);
-    expect(result.data.items).toHaveLength(2);
-    expect(result.data.items[0]).toMatchObject({
-      kind: "source",
-      content: "",
-      metadata: { publisher: "Web search", url: "https://example.com/one" },
-    });
-    expect(insertCalls).toHaveBeenCalledTimes(2);
+      expect(result.error).toBeNull();
+      expect(result.data.addedCount).toBe(2);
+      expect(result.data.items).toHaveLength(2);
+      expect(result.data.items[0]).toMatchObject({
+        kind: "source",
+        content: "",
+        metadata: { publisher: "Web search", url: "https://example.com/one" },
+      });
+      expect(insertCalls).toHaveBeenCalledTimes(2);
+      const joined = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+      expect(joined).toContain("[research] webSearch:provider_success results=2");
+      expect(joined).toContain("[research] webSearch:source_insert_success count=2");
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
   it("truncates titles to the cap", async () => {
@@ -198,12 +248,22 @@ describe("runWebResearch", () => {
         { data: makeSource({ title: "Ok", url: "https://example.com/ok" }), error: null },
       ],
     });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const result = await runWebResearch(supabase, RESEARCH_ID, "q");
+    try {
+      const result = await runWebResearch(supabase, RESEARCH_ID, "q");
 
-    expect(result.error).toBeNull();
-    expect(result.data.addedCount).toBe(1);
-    expect(result.data.items).toHaveLength(1);
+      expect(result.error).toBeNull();
+      expect(result.data.addedCount).toBe(1);
+      expect(result.data.items).toHaveLength(1);
+      expect(
+        errorSpy.mock.calls.some((call) =>
+          call.join(" ").includes("webSearch:source_insert_failure")
+        )
+      ).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("stops persisting once the new-source cap is reached", async () => {

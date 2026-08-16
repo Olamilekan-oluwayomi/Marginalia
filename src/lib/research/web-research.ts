@@ -2,7 +2,7 @@ import "server-only";
 
 import { searchWeb, type WebSearchResult } from "@/lib/search";
 import { normalizeUrl } from "@/lib/search/normalize-url";
-import { describeError, fail, ok, validationError, type AppResult } from "./errors";
+import { appError, describeError, fail, ok, validationError, type AppResult } from "./errors";
 import { requireUser } from "./session";
 import { createSource, getSources } from "./sources";
 import type { ResearchContextItem } from "./context";
@@ -41,10 +41,13 @@ export type RunWebResearchResult = {
  * visible in the workspace and reusable on later questions; the user can paste
  * body text into them later to make them citable.
  *
- * Web research is best-effort and never fails the surrounding answer:
- * provider failures, timeouts, and empty results all resolve to an empty
- * payload. Ownership is enforced by the RLS-scoped data layer and the session
- * check here.
+ * Web research is best-effort and never fails the surrounding answer's
+ * routing, but a real search failure is never converted into a silent empty
+ * success: provider/configuration failures surface as a `fail` result whose
+ * cause is logged via `describeError`, so "search failed" is distinguishable
+ * from "search returned nothing" (which resolves to an empty payload).
+ * Ownership is enforced by the RLS-scoped data layer and the session check
+ * here.
  */
 export async function runWebResearch(
   supabase: Supabase,
@@ -64,6 +67,8 @@ export async function runWebResearch(
     return fail(session.error, { items: [], addedCount: 0 });
   }
 
+  console.log("[research] webSearch:start");
+
   const sourcesResult = await getSources(supabase, researchId);
   if (sourcesResult.error) {
     return fail(sourcesResult.error, { items: [], addedCount: 0 });
@@ -80,12 +85,22 @@ export async function runWebResearch(
   try {
     results = await searchWeb(question);
   } catch (error) {
-    // Best-effort: a search failure must never block the answer, but it must
-    // be logged server-side so web-search failures are distinguishable from
-    // empty results.
-    console.error("[research-data] web search failed:", describeError(error));
+    // A search failure must not be converted into a silent empty result: it is
+    // logged with its full underlying cause so a quota, auth, timeout, or
+    // grounding failure is distinguishable from "the provider returned
+    // nothing", and it surfaces as an error the caller can react to.
+    console.error("[research] webSearch:provider_failure", describeError(error));
+    return fail(
+      appError("DATABASE_ERROR", "Web search could not be completed."),
+      { items: [], addedCount: 0 }
+    );
+  }
+
+  if (results.length === 0) {
+    console.log("[research] webSearch:provider_empty");
     return ok({ items: [], addedCount: 0 });
   }
+  console.log(`[research] webSearch:provider_success results=${results.length}`);
 
   const items: ResearchContextItem[] = [];
   let addedCount = 0;
@@ -106,7 +121,7 @@ export async function runWebResearch(
       // source persistence failure (e.g. RLS or a schema gap) is not silently
       // mistaken for "web search returned nothing".
       console.error(
-        "[research] web search result could not be persisted:",
+        "[research] webSearch:source_insert_failure",
         created.error?.message ?? "missing source row"
       );
       continue;
@@ -127,5 +142,6 @@ export async function runWebResearch(
     if (addedCount >= MAX_NEW_SOURCES) break;
   }
 
+  console.log(`[research] webSearch:source_insert_success count=${addedCount}`);
   return ok({ items, addedCount });
 }
