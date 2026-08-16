@@ -597,6 +597,45 @@ describe("conceptual retrieval", () => {
     expect(passage).toContain("0.05");
   });
 
+  it("selects the real PDF significance statement that splits the concept phrase from the value", async () => {
+    // Real text from the rainfall paper (Section 3.2): the concept phrase is
+    // split ("significant ... at α = 0.05 level") and Greek α is used, so a
+    // literal "significance level (a = 0.05)" phrase match is impossible and a
+    // strict adjacent-phrase rule scored it zero. It must still outrank the
+    // generic significance text that carries no value.
+    const realPassage =
+      "Southeast Coast and Northwest China have the largest trend magnitude and " +
+      "statistics, which are statistically significant at α = 0.05 level based on " +
+      "Kendall nonparameter testing.";
+    const filler =
+      "Background introduction text without any question terms. ".repeat(50);
+    const genericEarly = (
+      "Statistically significant trends were observed during 1961-2009 across the study region. " +
+      "The significance of annual changes was evaluated at every station during the period 1961-2009. "
+    ).repeat(10);
+    const midFiller = "Unrelated filler text without keywords. ".repeat(60);
+
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [
+        makeDocument({
+          id: "77777777-7777-4777-8777-777777777743",
+          title: "Temporal variation of extreme rainfall in China",
+          content: filler + genericEarly + midFiller + realPassage,
+        }),
+      ],
+    });
+
+    const context = await retrieve(
+      "At what statistical significance level were trends evaluated?"
+    );
+
+    expect(context.items.length).toBeGreaterThanOrEqual(1);
+    const passage = context.items[0].content;
+    expect(passage).toContain("α = 0.05");
+    expect(passage).toContain("0.05");
+  });
+
   it("selects the value-bearing methodology statement over a number-saturated thresholds region (live shape)", async () => {
     // Mirrors the live paper extraction that failed before the fix: a long
     // document whose results/thresholds region saturates every question

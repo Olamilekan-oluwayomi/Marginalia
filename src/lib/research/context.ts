@@ -256,6 +256,85 @@ const CONCEPT_TERMS: Record<string, readonly string[]> = {
   ],
 };
 
+/**
+ * Word-form families used to widen keyword matching to grammatical variants.
+ * A question's keyword "statistical" must satisfy a document that says
+ * "statistically", and "significance" must satisfy "significant", because a
+ * strict exact-token match leaves real methodology sentences scoring zero.
+ * Matching stays narrow and curated: only the words listed here share a
+ * family, so a document word is never matched to an unrelated word that merely
+ * shares a prefix. Words outside these families keep exact-match semantics.
+ */
+const WORD_FORMS: Record<string, readonly string[]> = {
+  statistic: ["statistic", "statistics", "statistical", "statistically"],
+  significant: ["significance", "significant", "significantly"],
+  trend: ["trend", "trends"],
+  level: ["level", "levels"],
+  vary: ["variation", "variations", "vary", "varies", "varied"],
+  change: ["change", "changes", "changed", "changing"],
+  increase: ["increase", "increases", "increased", "increasing"],
+  decrease: ["decrease", "decreases", "decreased", "decreasing"],
+  analyse: [
+    "analysis",
+    "analyses",
+    "analyse",
+    "analysed",
+    "analysing",
+    "analyze",
+    "analyzes",
+    "analyzed",
+    "analyzing",
+  ],
+  assess: ["assess", "assesses", "assessed", "assessing", "assessment"],
+  evaluate: [
+    "evaluate",
+    "evaluates",
+    "evaluated",
+    "evaluating",
+    "evaluation",
+  ],
+  method: [
+    "method",
+    "methods",
+    "methodology",
+    "methodologies",
+    "methodological",
+  ],
+  correlate: [
+    "correlate",
+    "correlates",
+    "correlated",
+    "correlating",
+    "correlation",
+    "correlations",
+  ],
+  regress: ["regression", "regressions"],
+  hypothes: ["hypothesis", "hypotheses"],
+  threshold: ["threshold", "thresholds"],
+  observe: [
+    "observe",
+    "observes",
+    "observed",
+    "observing",
+    "observation",
+    "observations",
+  ],
+};
+
+/**
+ * The word-boundary regex source that matches a keyword together with every
+ * grammatical variant in its word-form family. Exact-match semantics when the
+ * keyword has no family.
+ */
+export function wordFormSource(word: string): string {
+  for (const forms of Object.values(WORD_FORMS)) {
+    if (forms.includes(word)) {
+      return `\\b(?:${forms.join("|")})\\b`;
+    }
+  }
+  return `\\b${word}\\b`;
+}
+
 export type ResearchContextItem = {
   kind: "document" | "source";
   id: string;
@@ -487,7 +566,7 @@ function keywordHits(
   const haystack = content.toLowerCase();
   const hits: KeywordHit[] = [];
   for (const keyword of base) {
-    const pattern = new RegExp(`\\b${keyword}\\b`, "g");
+    const pattern = new RegExp(wordFormSource(keyword), "g");
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(haystack)) !== null) {
       hits.push({ index: match.index, keyword, kind: "base" });
@@ -495,7 +574,7 @@ function keywordHits(
   }
   for (const keyword of study) {
     if (base.has(keyword)) continue;
-    const pattern = new RegExp(`\\b${keyword}\\b`, "g");
+    const pattern = new RegExp(wordFormSource(keyword), "g");
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(haystack)) !== null) {
       hits.push({ index: match.index, keyword, kind: "study" });
@@ -503,7 +582,7 @@ function keywordHits(
   }
   for (const keyword of expansion) {
     if (base.has(keyword) || study.has(keyword)) continue;
-    const pattern = new RegExp(`\\b${keyword}\\b`, "g");
+    const pattern = new RegExp(wordFormSource(keyword), "g");
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(haystack)) !== null) {
       hits.push({ index: match.index, keyword, kind: "expansion" });
@@ -540,66 +619,60 @@ function phrasesOf(question: string, keywords: Set<string>): string[][] {
 }
 
 /**
- * True when `content` contains a real numeric token within `[from, to)`.
- * Four-digit years and fragments cut from longer numbers are not values.
+ * A value notation that marks a sentence as carrying an actual value: a
+ * decimal number ("0.05"), a percentage ("95%"), or a statistical comparison
+ * such as "α = 0.05" or "p < 0.01". Four-digit integers (years, station
+ * counts) are excluded because a decimal point, a percent sign or a
+ * comparison marker is required. The lookbehind keeps a trailing "p" inside a
+ * word ("step < 5") from passing as a p-value.
  */
-function hasNumberNear(content: string, from: number, to: number): boolean {
-  const start = Math.max(0, from);
-  const end = Math.min(content.length, to);
-  if (end <= start) return false;
-  const chunk = content.slice(start, end);
-  const numberPattern = /[0-9]+(?:\.[0-9]+)?/g;
-  let match: RegExpExecArray | null;
-  while ((match = numberPattern.exec(chunk)) !== null) {
-    if (/^\d{4}$/.test(match[0])) continue;
-    const tokenIndex = start + match.index;
-    const prev = content.charAt(tokenIndex - 1);
-    const next = content.charAt(tokenIndex + match[0].length);
-    if (/\d/.test(prev) || /\d/.test(next)) continue;
-    return true;
-  }
-  return false;
+const VALUE_NOTATION_PATTERN =
+  /(?:\d+\.\d+|\d+\s*%|(?<![a-z])(?:p|alpha|α)\s*(?:=|≠|<|≤|>|≥)\s*\.?\d+)/i;
+
+/**
+ * True when the sentence containing `position` carries a value notation
+ * anywhere within it.
+ */
+function sentenceHasValueNotation(content: string, position: number): boolean {
+  const sentence = content.slice(
+    sentenceStartIndex(content, position),
+    sentenceEndIndex(content, position)
+  );
+  return VALUE_NOTATION_PATTERN.test(sentence);
 }
 
 /**
- * Every occurrence of the active value concept phrases within `[from, to)`,
- * as absolute content offsets. Used to anchor value-count scoring on the
- * concept phrase rather than on scattered keyword hits, and to locate a
- * value-bearing statement for passage selection.
+ * Word-boundary indexes of every occurrence of a value concept's terms within
+ * `[from, to)`. Word-form aware, so "significant" counts for "significance"
+ * and "levels" counts for "level".
  */
-function valuePhraseAnchors(
+function conceptTermIndexes(
   content: string,
-  valueConcepts: readonly (readonly string[])[],
+  conceptWords: readonly string[],
   from: number,
   to: number
-): { start: number; end: number; concept: number }[] {
+): number[] {
   const start = Math.max(0, from);
   const end = Math.min(content.length, to);
   if (end <= start) return [];
-  const scan = content.slice(start, end);
-  const anchors: { start: number; end: number; concept: number }[] = [];
-  for (let concept = 0; concept < valueConcepts.length; concept += 1) {
-    const pattern = new RegExp(
-      `\\b${valueConcepts[concept].join("\\s+")}\\b`,
-      "gi"
-    );
+  const haystack = content.slice(start, end);
+  const indexes: number[] = [];
+  for (const word of conceptWords) {
+    const pattern = new RegExp(wordFormSource(word), "gi");
     let match: RegExpExecArray | null;
-    while ((match = pattern.exec(scan)) !== null) {
-      anchors.push({
-        start: start + match.index,
-        end: start + match.index + match[0].length,
-        concept,
-      });
+    while ((match = pattern.exec(haystack)) !== null) {
+      indexes.push(start + match.index);
     }
   }
-  return anchors;
+  return indexes;
 }
 
 /**
- * The first active value-concept phrase within `[from, to)` that has a number
- * next to it, or `null`. A concept phrase next to a number is a
- * value-bearing statement ("significance level (a = 0.05)"), as opposed to a
- * passage that merely mentions the words apart from a number.
+ * The sentence bounds of the first value-bearing statement within `[from, to)`:
+ * a sentence containing a term of an active value concept together with a value
+ * notation anywhere in it. Real prose splits the concept phrase ("significant
+ * at α = 0.05 level"), so the whole sentence is the unit of evidence rather
+ * than a literal phrase sitting next to a number.
  */
 function valueStatementSpan(
   content: string,
@@ -607,15 +680,13 @@ function valueStatementSpan(
   from: number,
   to: number
 ): { start: number; end: number } | null {
-  for (const anchor of valuePhraseAnchors(content, valueConcepts, from, to)) {
-    if (
-      hasNumberNear(
-        content,
-        anchor.start - VALUE_WINDOW,
-        anchor.end + VALUE_WINDOW
-      )
-    ) {
-      return { start: anchor.start, end: anchor.end };
+  for (const concept of valueConcepts) {
+    for (const position of conceptTermIndexes(content, concept, from, to)) {
+      if (!sentenceHasValueNotation(content, position)) continue;
+      return {
+        start: sentenceStartIndex(content, position),
+        end: sentenceEndIndex(content, position),
+      };
     }
   }
   return null;
@@ -712,65 +783,67 @@ function bestCluster(
     //
     // When the question names a value concept ("significance level",
     // "recurrence intervals", ...), a numeric token only counts when it sits
-    // next to that concept phrase itself, not next to any stray keyword hit.
-    // Anchoring the value count on the concept keeps number-dense results
-    // sections (thresholds, return values, station counts) whose keywords merely
-    // sit among incidental numbers from outranking the methodological statement
-    // that actually pairs the concept with its value. Questions without a value
-    // concept ("how many stations?", "which year?") keep counting numbers near
-    // keyword hits.
+    // in a sentence that also carries a term of the concept. This keeps
+    // number-dense results sections (thresholds, return values, station
+    // counts) whose keywords merely sit among incidental numbers from
+    // outranking the methodological statement that actually pairs the concept
+    // with its value. The evidence unit is the whole sentence, because real
+    // prose splits the concept phrase ("statistically significant at α = 0.05
+    // level"); a literal phrase sitting next to a number is not required.
+    // Questions without a value concept ("how many stations?", "which year?")
+    // keep counting numbers near keyword hits.
     let valueCount = 0;
     let conceptValue = 0;
     if (valueSeeking) {
       const scanStart = Math.max(0, windowStart - VALUE_WINDOW);
       const scanEnd = Math.min(content.length, windowEnd + VALUE_WINDOW);
-      const phraseAnchors =
-        valueConcepts.length > 0
-          ? valuePhraseAnchors(content, valueConcepts, scanStart, scanEnd)
-          : null;
-      const valueSeen = new Set<string>();
-      const valuePattern = /[0-9]+(?:\.[0-9]+)?/g;
-      const scan = content.slice(scanStart, scanEnd);
-      valuePattern.lastIndex = 0;
-      let valueMatch: RegExpExecArray | null;
-      while ((valueMatch = valuePattern.exec(scan)) !== null) {
-        const token = valueMatch[0];
-        if (/^\d{4}$/.test(token)) continue;
-        const tokenIndex = scanStart + valueMatch.index;
-        const prevChar = content.charAt(tokenIndex - 1);
-        const nextChar = content.charAt(tokenIndex + token.length);
-        if (/\d/.test(prevChar) || /\d/.test(nextChar)) continue;
-        const nearValue =
-          phraseAnchors !== null
-            ? phraseAnchors.some(
-                (anchor) =>
-                  tokenIndex >= anchor.start - VALUE_WINDOW &&
-                  tokenIndex <= anchor.end + VALUE_WINDOW
-              )
-            : windowHits.some(
-                (hit) => Math.abs(hit.index - tokenIndex) <= VALUE_WINDOW
-              );
-        if (nearValue) valueSeen.add(token);
-      }
-      valueCount = valueSeen.size;
-
-      // Reward active value-concept phrases ("significance level", ...) that
-      // sit next to a number. This is the discriminator that lets the
-      // methodological "significance level (a = 0.05)" outrank a passage that
-      // only mentions "statistically significant ... 0.05" nearby.
-      if (phraseAnchors !== null) {
-        for (let concept = 0; concept < valueConcepts.length; concept += 1) {
-          const nearNumber = phraseAnchors.some(
-            (anchor) =>
-              anchor.concept === concept &&
-              hasNumberNear(
-                content,
-                anchor.start - VALUE_WINDOW,
-                anchor.end + VALUE_WINDOW
-              )
+      if (valueConcepts.length === 0) {
+        const valueSeen = new Set<string>();
+        const valuePattern = /[0-9]+(?:\.[0-9]+)?/g;
+        const scan = content.slice(scanStart, scanEnd);
+        valuePattern.lastIndex = 0;
+        let valueMatch: RegExpExecArray | null;
+        while ((valueMatch = valuePattern.exec(scan)) !== null) {
+          const token = valueMatch[0];
+          if (/^\d{4}$/.test(token)) continue;
+          const tokenIndex = scanStart + valueMatch.index;
+          const prevChar = content.charAt(tokenIndex - 1);
+          const nextChar = content.charAt(tokenIndex + token.length);
+          if (/\d/.test(prevChar) || /\d/.test(nextChar)) continue;
+          const nearHit = windowHits.some(
+            (hit) => Math.abs(hit.index - tokenIndex) <= VALUE_WINDOW
           );
+          if (nearHit) valueSeen.add(token);
+        }
+        valueCount = valueSeen.size;
+      } else {
+        const valueSeen = new Set<string>();
+        const valuePattern = /[0-9]+(?:\.[0-9]+)?/g;
+        for (const concept of valueConcepts) {
+          let nearNumber = false;
+          for (const position of conceptTermIndexes(
+            content,
+            concept,
+            scanStart,
+            scanEnd
+          )) {
+            if (!sentenceHasValueNotation(content, position)) continue;
+            nearNumber = true;
+            const sentence = content.slice(
+              sentenceStartIndex(content, position),
+              sentenceEndIndex(content, position)
+            );
+            valuePattern.lastIndex = 0;
+            let valueMatch: RegExpExecArray | null;
+            while ((valueMatch = valuePattern.exec(sentence)) !== null) {
+              const token = valueMatch[0];
+              if (/^\d{4}$/.test(token)) continue;
+              valueSeen.add(token);
+            }
+          }
           if (nearNumber) conceptValue += 1;
         }
+        valueCount = valueSeen.size;
       }
     }
 
@@ -996,7 +1069,9 @@ function buildPassageWindow(
  * concept. A concept only counts as covered when at least two *distinct* terms
  * of it appear: a single stray synonym (e.g. one "observed" inside a methods
  * section) is not the findings content itself, so it must not mark the concept
- * as covered and block a complementary findings passage.
+ * as covered and block a complementary findings passage. Matching is
+ * word-form aware, so "trend" in a title and "trends" in a passage are the
+ * two distinct terms the original rule already counted.
  */
 function coveredBy(text: string, concepts: Set<string>): Set<string> {
   const haystack = text.toLowerCase();
@@ -1004,7 +1079,7 @@ function coveredBy(text: string, concepts: Set<string>): Set<string> {
   for (const concept of concepts) {
     const seen = new Set<string>();
     for (const term of CONCEPT_TERMS[concept]) {
-      if (new RegExp(`\\b${term}\\b`).test(haystack)) seen.add(term);
+      if (new RegExp(wordFormSource(term), "g").test(haystack)) seen.add(term);
     }
     if (seen.size >= 2) covered.add(concept);
   }
