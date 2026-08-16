@@ -551,6 +551,66 @@ describe("generateAnswer", () => {
     );
   });
 
+  it("filters pre-existing web sources out of the context when the document is relevant", async () => {
+    const documentItem = {
+      kind: "document",
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      title: "The study PDF",
+      content: "A trend analysis of extreme precipitation.",
+      metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+    } as const;
+    const webItem = {
+      kind: "source",
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      title: "Web search result from an earlier question",
+      content: "",
+      metadata: {
+        publisher: "Web search",
+        url: "https://example.com/web-result",
+      },
+    } as const;
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: {
+        items: [documentItem, webItem],
+        hasBodyContent: true,
+      },
+    });
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.checkDocumentRelevance.mockResolvedValue({
+      relevant: true,
+      confidence: 0.95,
+      reason: "The document covers exactly this topic.",
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.checkDocumentRelevance).toHaveBeenCalledOnce();
+    expect(mocks.runWebResearch).not.toHaveBeenCalled();
+    expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
+      question.question,
+      expect.objectContaining({
+        items: [documentItem],
+      })
+    );
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({
+        fallback_reason: null,
+        source_mode: "document",
+      })
+    );
+  });
+
   it("passes full document content to the relevance check when under the ceiling", async () => {
     const content = "y".repeat(3_000);
     mocks.retrieveResearchContext.mockResolvedValue({

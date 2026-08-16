@@ -576,6 +576,10 @@ export async function generateAnswer(
           fallbackReason = FALLBACK_REASON_MESSAGE;
         } else {
           console.log("[research] selectedSource=document (relevant)");
+          context = {
+            items: context.items.filter((item) => item.kind === "document"),
+            hasBodyContent: context.hasBodyContent,
+          };
         }
       }
     }
