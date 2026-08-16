@@ -177,6 +177,10 @@ const CONCEPT_TERMS: Record<string, readonly string[]> = {
     "simulations",
     "modelled",
     "modelling",
+    // Analysis-verb synonyms so a question that asks how trends were
+    // "evaluated" also matches documents that say they were "assessed".
+    "evaluated",
+    "assessed",
   ],
   findings: [
     "findings",
@@ -225,6 +229,11 @@ const CONCEPT_TERMS: Record<string, readonly string[]> = {
     "correlated",
     "regression",
     "hypothesis",
+    // Paraphrase safety net: a question about a "significance level" should
+    // also match documents that phrase the value as an "alpha level", a
+    // "5% level" or a "confidence level".
+    "level",
+    "levels",
     "null",
     "alpha",
     "threshold",
@@ -1140,45 +1149,18 @@ function addSecondaryPassages(
   for (const concept of [...uncovered]) {
     if (!uncovered.has(concept)) continue;
     if (added >= capacity) break;
-    const focus = new Set(CONCEPT_TERMS[concept]);
 
     for (const candidate of candidates) {
       if (candidate.item.kind !== "document") continue;
-      const body = candidate.item.content;
-      if (body.trim().length === 0 || body.length <= MAX_CONTENT_CHARS) {
-        continue;
-      }
-
-      if (
-        keywordHits(body, focus, new Set<string>(), new Set<string>())
-          .length === 0
-      ) {
-        continue;
-      }
-
-      const focused = selectRelevantPassage(
-        body,
-        focus,
-        new Set<string>(),
-        new Set<string>(),
-        [],
-        false,
-        []
+      const alreadyIncluded = result
+        .filter((existing) => existing.item.id === candidate.item.id)
+        .map((existing) => existing.passage);
+      const focused = focusedConceptPassage(
+        { title: candidate.item.title, content: candidate.item.content },
+        concept,
+        alreadyIncluded
       );
-      if (focused.length === 0) continue;
-
-      const conceptCovered = coveredBy(
-        `${candidate.item.title} ${focused}`,
-        new Set([concept])
-      );
-      if (!conceptCovered.has(concept)) continue;
-
-      const duplicate = result.some(
-        (existing) =>
-          existing.item.id === candidate.item.id &&
-          existing.passage.includes(focused)
-      );
-      if (duplicate) continue;
+      if (focused === null) continue;
 
       const covered = coveredBy(
         `${candidate.item.title} ${focused}`,
@@ -1197,6 +1179,151 @@ function addSecondaryPassages(
   }
 
   return result;
+}
+
+/**
+ * The parsed view of a question that drives passage selection: its base
+ * keywords, multi-word phrases, value-seeking flag, active value concepts and
+ * the expanded concept groups. Computed once per question and shared by every
+ * passage selection for it, so the answer path (`retrieveResearchContext`) and
+ * the relevance gate (`selectRelevantPassages`) can never drift apart.
+ */
+export type QuestionAnalysis = {
+  base: Set<string>;
+  phrases: string[][];
+  valueSeeking: boolean;
+  valueConcepts: readonly (readonly string[])[];
+  expansion: Set<string>;
+  study: Set<string>;
+  concepts: Set<string>;
+};
+
+/**
+ * Parses a question into the analysis view used by all passage selection. This
+ * is the single entry point for the scoring pipeline: base keywords, multi-word
+ * phrases, value-seeking detection, the active value concepts and the expanded
+ * concept groups all come from here.
+ */
+export function analyzeQuestion(question: string): QuestionAnalysis {
+  const base = keywordsOf(question);
+  const phrases = phrasesOf(question, base);
+  const valueSeeking = isValueSeeking(question);
+  const valueConcepts = activeValueConcepts(question, base);
+  const { expansion, study, concepts } = matchSetsOf(base);
+  return {
+    base,
+    phrases,
+    valueSeeking,
+    valueConcepts,
+    expansion,
+    study,
+    concepts,
+  };
+}
+
+/**
+ * A distinct passage of a document that specifically targets a single
+ * still-uncovered question concept, or null when the document has no dedicated
+ * region for that concept. The concept must genuinely appear in the body with
+ * at least two distinct terms (a stray synonym is not content) and the focused
+ * passage must not already be part of the text given for the document. Shared
+ * by the answer path (`addSecondaryPassages`) and the relevance gate
+ * (`selectRelevantPassages`) so a multi-section document contributes
+ * complementary evidence to both.
+ */
+function focusedConceptPassage(
+  document: { title: string; content: string },
+  concept: string,
+  alreadyIncluded: string[]
+): string | null {
+  const { title, content } = document;
+  if (content.trim().length === 0 || content.length <= MAX_CONTENT_CHARS) {
+    return null;
+  }
+  const focus = new Set(CONCEPT_TERMS[concept]);
+  if (
+    keywordHits(content, focus, new Set<string>(), new Set<string>()).length ===
+    0
+  ) {
+    return null;
+  }
+  const focused = selectRelevantPassage(
+    content,
+    focus,
+    new Set<string>(),
+    new Set<string>(),
+    [],
+    false,
+    []
+  );
+  if (focused.length === 0) return null;
+  if (!coveredBy(`${title} ${focused}`, new Set([concept])).has(concept)) {
+    return null;
+  }
+  if (alreadyIncluded.some((existing) => existing.includes(focused))) {
+    return null;
+  }
+  return focused;
+}
+
+/**
+ * Selects the model-facing passages of a single document for a question: the
+ * primary passage (the best-scoring cluster region, or the whole body when it
+ * is short) plus one focused secondary passage per still-uncovered question
+ * concept, when the document carries that content in a separate region. This
+ * is what the relevance gate feeds the classifier instead of a fixed leading
+ * excerpt, so an answer sitting past the intro is still seen.
+ */
+export function selectRelevantPassages(
+  question: string,
+  document: { title: string; content: string }
+): string[] {
+  const { content } = document;
+  if (content.trim().length === 0) {
+    return [];
+  }
+
+  const {
+    base,
+    phrases,
+    valueSeeking,
+    valueConcepts,
+    expansion,
+    study,
+    concepts,
+  } = analyzeQuestion(question);
+
+  const primary = selectRelevantPassage(
+    content,
+    base,
+    study,
+    expansion,
+    phrases,
+    valueSeeking,
+    valueConcepts
+  );
+  if (content.length <= MAX_CONTENT_CHARS) {
+    return [primary];
+  }
+
+  const passages = [primary];
+  const covered = coveredBy(`${document.title} ${primary}`, concepts);
+  const uncovered = new Set(concepts);
+  for (const concept of covered) uncovered.delete(concept);
+  if (uncovered.size === 0) return passages;
+
+  for (const concept of [...uncovered]) {
+    if (!uncovered.has(concept)) continue;
+    const focused = focusedConceptPassage(document, concept, passages);
+    if (focused === null) continue;
+    passages.push(focused);
+    const newlyCovered = coveredBy(`${document.title} ${focused}`, uncovered);
+    for (const coveredConcept of newlyCovered) {
+      uncovered.delete(coveredConcept);
+    }
+  }
+
+  return passages;
 }
 
 /**
@@ -1251,11 +1378,15 @@ export async function retrieveResearchContext(
     return fail(sourcesResult.error, { items: [], hasBodyContent: false });
   }
 
-  const base = keywordsOf(question);
-  const phrases = phrasesOf(question, base);
-  const valueSeeking = isValueSeeking(question);
-  const valueConcepts = activeValueConcepts(question, base);
-  const { expansion, study, concepts } = matchSetsOf(base);
+  const {
+    base,
+    phrases,
+    valueSeeking,
+    valueConcepts,
+    expansion,
+    study,
+    concepts,
+  } = analyzeQuestion(question);
 
   const documentItems = documentsResult.data
     .filter((document) => document.status === "ready")

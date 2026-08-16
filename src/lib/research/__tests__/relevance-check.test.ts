@@ -9,7 +9,7 @@ vi.mock("server-only", () => ({}));
 
 // Stub only the provider client: the real `@/lib/ai` module (including its
 // `assertPromptBounds` prompt guard) keeps running, so this test proves the
-// bounded excerpt summary can never produce a prompt-too-long error.
+// bounded targeted-passage summary can never produce a prompt-too-long error.
 vi.mock("@/lib/ai/client", () => ({
   getAiClient: () => ({
     models: {
@@ -62,16 +62,20 @@ describe("relevance check prompt sizing", () => {
     clientState.prompts = [];
   });
 
-  it("does not throw a prompt-too-long error for a test-PDF-sized document (~50k+ chars) via the excerpt summary", async () => {
+  it("does not throw a prompt-too-long error for a test-PDF-sized document (~50k+ chars) via the targeted-passage summary", async () => {
     const content = "x".repeat(52_000);
     vi.mocked(getDocuments).mockResolvedValue({
       error: null,
       data: [makeReadyDocument(content)],
     });
 
-    const summary = await readyDocumentsSummary(fakeSupabase, researchId);
+    const summary = await readyDocumentsSummary(
+      fakeSupabase,
+      researchId,
+      "Is extreme precipitation increasing in the study region?"
+    );
     expect(summary).not.toBeNull();
-    expect(summary!.length).toBe(4_000);
+    expect(summary!.length).toBeLessThanOrEqual(4_000);
     expect(summary!.length).toBeLessThanOrEqual(12_000);
 
     await expect(
@@ -91,5 +95,54 @@ describe("relevance check prompt sizing", () => {
     expect(sentPrompt).toContain(
       "Is extreme precipitation increasing in the study region?"
     );
+  });
+});
+
+describe("relevance check targets question-relevant passages", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clientState.prompts = [];
+  });
+
+  it("sees a significance-level answer that sits past the old 4000-char excerpt cutoff", async () => {
+    const filler =
+      "Regional rainfall and climate variability are discussed across the study area. ".repeat(
+        90
+      );
+    const methods =
+      "Trend detection was carried out with the Mann-Kendall test for each station. " +
+      "The statistical significance of the trends was evaluated at conventional " +
+      "significance levels, and a significance level of 0.05 was used for every " +
+      "trend analysis.";
+    const content = filler + methods;
+    const body = `The study PDF\n${content}`;
+
+    // Reproduce the exact failure from tonight: the answer is only reachable
+    // past the old leading-excerpt cutoff, so the gate must find it through
+    // passage selection rather than a fixed excerpt.
+    expect(body.indexOf("0.05")).toBeGreaterThan(4_000);
+
+    vi.mocked(getDocuments).mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument(content)],
+    });
+
+    const summary = await readyDocumentsSummary(
+      fakeSupabase,
+      researchId,
+      "At what statistical significance level were trends evaluated?"
+    );
+
+    expect(summary).not.toBeNull();
+    expect(summary!.length).toBeLessThanOrEqual(4_000);
+    expect(summary!).toContain("0.05");
+    expect(summary!).toContain("significance level");
+
+    await expect(
+      checkDocumentRelevance(
+        "At what statistical significance level were trends evaluated?",
+        summary!
+      )
+    ).resolves.toMatchObject({ relevant: true });
   });
 });

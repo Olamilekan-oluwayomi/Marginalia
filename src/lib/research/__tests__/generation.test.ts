@@ -41,6 +41,10 @@ vi.mock("@/lib/research/citations", () => ({
 vi.mock("@/lib/research/context", () => ({
   retrieveResearchContext: mocks.retrieveResearchContext,
   buildResearchPrompt: mocks.buildResearchPrompt,
+  selectRelevantPassages: (
+    question: string,
+    document: { title: string; content: string }
+  ) => [document.content],
 }));
 vi.mock("@/lib/research/questions", () => ({
   getQuestionById: mocks.getQuestionById,

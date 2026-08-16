@@ -17,7 +17,12 @@ import {
   toAnswerCitations,
   type GeneratedAnswerOutput,
 } from "./citation-generation";
-import { buildResearchPrompt, retrieveResearchContext, type ResearchContextItem } from "./context";
+import {
+  buildResearchPrompt,
+  retrieveResearchContext,
+  selectRelevantPassages,
+  type ResearchContextItem,
+} from "./context";
 import { getDocuments } from "./documents";
 import {
   appError,
@@ -273,25 +278,29 @@ async function markFailed(
 
 /**
  * Ceilings on the smart-mode relevance summary. A relevance check is a
- * topical classifier: it only needs each ready document's title plus a
- * leading excerpt, not the full extracted content. Both bounds sit far below
- * the AI layer's prompt guard (`MAX_PROMPT_CHARS`) so the check can never
- * fail with a prompt-too-long error, and the totals keep the call cheap and
- * fast. Hitting either ceiling logs a warning so we can tell whether the
- * bounds are ever hit in practice.
+ * topical classifier: it needs each ready document's title plus the
+ * question-targeted passages selected by the same pipeline that feeds the
+ * answer path, not the full extracted content. Both bounds sit far below the
+ * AI layer's prompt guard (`MAX_PROMPT_CHARS`) so the check can never fail
+ * with a prompt-too-long error, and the totals keep the call cheap and fast.
+ * Hitting either ceiling logs a warning so we can tell whether the bounds are
+ * ever hit in practice.
  */
 const MAX_RELEVANCE_DOCUMENT_CHARS = 4_000;
 const MAX_RELEVANCE_SUMMARY_CHARS = 12_000;
 
 /**
- * Builds the smart-mode relevance summary from the research's ready
- * documents: each document's title plus a leading excerpt of its content,
- * bounded per document and in total. Returns `null` when there are no ready
- * documents (or the lookup fails), in which case smart mode must not run.
+ * Builds the smart-mode relevance summary from the research's ready documents,
+ * using the same passage-selection pipeline as the answer path: each
+ * document's title plus the question-targeted primary and secondary passages
+ * from `selectRelevantPassages`, bounded per document and in total. Returns
+ * `null` when there are no ready documents (or the lookup fails), in which
+ * case smart mode must not run.
  */
 export async function readyDocumentsSummary(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
+  question: string
 ): Promise<string | null> {
   const documentsResult = await getDocuments(supabase, researchId);
   if (documentsResult.error) {
@@ -316,7 +325,11 @@ export async function readyDocumentsSummary(
     if (remaining <= 0) {
       break;
     }
-    const body = `${document.title}\n${document.content}`;
+    const passages = selectRelevantPassages(question, {
+      title: document.title,
+      content: document.content ?? "",
+    });
+    const body = [document.title, ...passages].join("\n");
     const truncated = body.length > MAX_RELEVANCE_DOCUMENT_CHARS;
     const excerpt = truncated
       ? body.slice(0, MAX_RELEVANCE_DOCUMENT_CHARS)
@@ -477,7 +490,11 @@ export async function generateAnswer(
     // directly; otherwise the document is used when it looks relevant, and web
     // research runs as a fallback (with a user-facing reason) when it does
     // not. With no ready document, web research runs automatically.
-    const summary = await readyDocumentsSummary(supabase, researchId);
+    const summary = await readyDocumentsSummary(
+      supabase,
+      researchId,
+      question.question
+    );
     if (summary === null) {
       // No ready document: there is nothing to gate on, so the web is the
       // source for this question. User-pasted sources stay in the context.
