@@ -168,7 +168,7 @@ describe("runWebResearch", () => {
 
   it("skips results whose URL already exists in the research", async () => {
     const existing: WebSearchResult[] = [
-      { title: "New page", url: "https://example.com/page" },
+      { title: "New page", url: "https://example.com/page", content: "A snippet." },
     ];
     mocks.searchWeb.mockResolvedValue(existing);
     const { supabase, insertCalls } = makeSupabase({
@@ -185,16 +185,38 @@ describe("runWebResearch", () => {
     expect(insertCalls).not.toHaveBeenCalled();
   });
 
-  it("persists new sources and returns metadata-only items", async () => {
+  it("persists new sources with their snippets and returns content-bearing items", async () => {
     mocks.searchWeb.mockResolvedValue([
-      { title: "First result", url: "https://example.com/one" },
-      { title: "Second result", url: "https://example.com/two" },
+      {
+        title: "First result",
+        url: "https://example.com/one",
+        content: "First snippet.",
+      },
+      {
+        title: "Second result",
+        url: "https://example.com/two",
+        content: "Second snippet.",
+      },
     ]);
     const { supabase, insertCalls } = makeSupabase({
       listResult: { data: [], error: null },
       insertResults: [
-        { data: makeSource({ title: "First result", url: "https://example.com/one" }), error: null },
-        { data: makeSource({ title: "Second result", url: "https://example.com/two" }), error: null },
+        {
+          data: makeSource({
+            title: "First result",
+            url: "https://example.com/one",
+            content: "First snippet.",
+          }),
+          error: null,
+        },
+        {
+          data: makeSource({
+            title: "Second result",
+            url: "https://example.com/two",
+            content: "Second snippet.",
+          }),
+          error: null,
+        },
       ],
     });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -207,10 +229,17 @@ describe("runWebResearch", () => {
       expect(result.data.items).toHaveLength(2);
       expect(result.data.items[0]).toMatchObject({
         kind: "source",
-        content: "",
+        content: "First snippet.",
         metadata: { publisher: "Web search", url: "https://example.com/one" },
       });
+      expect(result.data.items[1]).toMatchObject({
+        content: "Second snippet.",
+      });
       expect(insertCalls).toHaveBeenCalledTimes(2);
+      expect(insertCalls.mock.calls[0][0]).toMatchObject({
+        content: "First snippet.",
+        url: "https://example.com/one",
+      });
       const joined = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
       expect(joined).toContain("[research] webSearch:provider_success results=2");
       expect(joined).toContain("[research] webSearch:source_insert_success count=2");
@@ -219,9 +248,37 @@ describe("runWebResearch", () => {
     }
   });
 
+  it("keeps items metadata-only when a result carries no snippet", async () => {
+    mocks.searchWeb.mockResolvedValue([
+      { title: "No snippet", url: "https://example.com/none", content: "" },
+    ]);
+    const { supabase } = makeSupabase({
+      listResult: { data: [], error: null },
+      insertResults: [
+        {
+          data: makeSource({
+            title: "No snippet",
+            url: "https://example.com/none",
+            content: null,
+          }),
+          error: null,
+        },
+      ],
+    });
+
+    const result = await runWebResearch(supabase, RESEARCH_ID, "q");
+
+    expect(result.error).toBeNull();
+    expect(result.data.addedCount).toBe(1);
+    expect(result.data.items[0]).toMatchObject({
+      kind: "source",
+      content: "",
+    });
+  });
+
   it("truncates titles to the cap", async () => {
     mocks.searchWeb.mockResolvedValue([
-      { title: "x".repeat(400), url: "https://example.com/long" },
+      { title: "x".repeat(400), url: "https://example.com/long", content: "S." },
     ]);
     const { supabase, insertCalls } = makeSupabase({
       insertResults: [
@@ -238,8 +295,8 @@ describe("runWebResearch", () => {
 
   it("skips a failed insert and keeps the remaining results", async () => {
     mocks.searchWeb.mockResolvedValue([
-      { title: "Failing", url: "https://example.com/fail" },
-      { title: "Ok", url: "https://example.com/ok" },
+      { title: "Failing", url: "https://example.com/fail", content: "F." },
+      { title: "Ok", url: "https://example.com/ok", content: "O." },
     ]);
     const { supabase } = makeSupabase({
       listResult: { data: [], error: null },
@@ -270,6 +327,7 @@ describe("runWebResearch", () => {
     const results: WebSearchResult[] = Array.from({ length: 8 }, (_, i) => ({
       title: `Result ${i}`,
       url: `https://example.com/${i}`,
+      content: `Snippet ${i}.`,
     }));
     mocks.searchWeb.mockResolvedValue(results);
     const { supabase, insertCalls } = makeSupabase({

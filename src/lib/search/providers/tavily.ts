@@ -39,6 +39,8 @@ export function isTavilyConfigured(): boolean {
 type TavilyResult = {
   title?: string;
   url?: string;
+  /** Tavily's snippet of the page's text (empty when the provider returns none). */
+  content?: string;
 };
 
 type TavilyResponse = {
@@ -143,8 +145,8 @@ function toProviderError(error: unknown, apiKey: string): SearchError {
  *
  * Reads `TAVILY_API_KEY` from the environment at call time, calls Tavily's
  * `/search` endpoint, and normalizes the response into the app's canonical
- * `WebSearchResult` shape ({ title, url }) via the shared normalization
- * used by every provider.
+ * `WebSearchResult` shape ({ title, url, content }) via the shared
+ * normalization used by every provider.
  *
  * Not yet wired into the live research flow — importable for use as an
  * alternate provider behind the `WebSearchProvider` contract.
@@ -174,6 +176,7 @@ export class TavilyWebSearchProvider implements WebSearchProvider {
         (response.results ?? []).map((result) => ({
           title: result.title ?? "",
           url: result.url ?? "",
+          content: result.content ?? "",
         }))
       );
     } catch (error) {

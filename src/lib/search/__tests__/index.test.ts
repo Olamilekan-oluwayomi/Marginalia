@@ -14,8 +14,15 @@ vi.mock("@/lib/search/providers/tavily", () => ({
 import { searchError } from "@/lib/search/errors";
 import { searchWeb } from "@/lib/search";
 
-function groundResult(overrides: Partial<{ title: string; url: string }> = {}) {
-  return { title: "A page", url: "https://example.com/page", ...overrides };
+function groundResult(
+  overrides: Partial<{ title: string; url: string; content: string }> = {}
+) {
+  return {
+    title: "A page",
+    url: "https://example.com/page",
+    content: "A snippet returned by the provider.",
+    ...overrides,
+  };
 }
 
 beforeEach(() => {
@@ -105,7 +112,35 @@ describe("searchWeb", () => {
 
     const results = await searchWeb("a question");
 
-    expect(results).toEqual([{ title: "A page", url: "https://example.com/page" }]);
+    expect(results).toEqual([
+      {
+        title: "A page",
+        url: "https://example.com/page",
+        content: "A snippet returned by the provider.",
+      },
+    ]);
+  });
+
+  it("preserves each result's content snippet and sanitizes it", async () => {
+    mocks.tavilySearch.mockResolvedValue([
+      groundResult({ content: "  Snippet with control\u0000characters.  " }),
+      groundResult({
+        title: "No text",
+        url: "https://example.com/other",
+        content: "",
+      }),
+    ]);
+
+    const results = await searchWeb("a question");
+
+    expect(results).toEqual([
+      {
+        title: "A page",
+        url: "https://example.com/page",
+        content: "Snippet with control characters.",
+      },
+      { title: "No text", url: "https://example.com/other", content: "" },
+    ]);
   });
 
   it("deduplicates by canonical URL", async () => {

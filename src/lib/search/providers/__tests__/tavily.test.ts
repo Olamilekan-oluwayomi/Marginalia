@@ -27,7 +27,7 @@ function tavilyResult(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     title: "A page",
     url: "https://example.com/page",
-    content: "A snippet the app does not consume.",
+    content: "Tavily's snippet for the page.",
     score: 0.9,
     ...overrides,
   };
@@ -60,8 +60,16 @@ describe("TavilyWebSearchProvider", () => {
     const results = await provider.search("climate change");
 
     expect(results).toEqual([
-      { title: "A page", url: "https://example.com/one" },
-      { title: "Second", url: "https://example.com/two" },
+      {
+        title: "A page",
+        url: "https://example.com/one",
+        content: "Tavily's snippet for the page.",
+      },
+      {
+        title: "Second",
+        url: "https://example.com/two",
+        content: "Tavily's snippet for the page.",
+      },
     ]);
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
     const [url, init] = mocks.fetch.mock.calls[0] as [string, RequestInit];
@@ -87,12 +95,42 @@ describe("TavilyWebSearchProvider", () => {
     const results = await new TavilyWebSearchProvider().search("q");
 
     expect(results).toHaveLength(5);
-    expect(results[0]).toEqual({ title: "Title 0", url: "https://example.com/0" });
+    expect(results[0]).toEqual({
+      title: "Title 0",
+      url: "https://example.com/0",
+      content: "Tavily's snippet for the page.",
+    });
     const urls = results.map((r) => r.url);
     expect(urls).not.toContain("https://example.com/1?utm_source=news");
     expect(urls).not.toContain("ftp://bad.example");
     expect(urls).not.toContain("not a url");
     expect(urls).toHaveLength(new Set(urls).size);
+  });
+
+  it("preserves each result's content snippet and maps a missing one to an empty string", async () => {
+    mocks.fetch.mockResolvedValue(
+      jsonResponse({
+        results: [
+          tavilyResult({ title: "Has text", content: "  Snippet with text.\u0000" }),
+          tavilyResult({
+            title: "No text",
+            url: "https://example.com/other",
+            content: undefined,
+          }),
+        ],
+      })
+    );
+
+    const results = await new TavilyWebSearchProvider().search("q");
+
+    expect(results).toEqual([
+      {
+        title: "Has text",
+        url: "https://example.com/page",
+        content: "Snippet with text.",
+      },
+      { title: "No text", url: "https://example.com/other", content: "" },
+    ]);
   });
 
   it("returns an empty array when the provider returns no results", async () => {

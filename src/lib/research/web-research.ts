@@ -22,9 +22,9 @@ const TITLE_MAX_LENGTH = 300;
 
 export type RunWebResearchResult = {
   /**
-   * Metadata-only context items for the sources discovered by web research.
-   * They carry no body text, so they are reference metadata only — never
-   * citable by the citation protocol.
+   * Context items for the sources discovered by web research. They carry the
+   * provider's text snippet when one was returned; items with no snippet are
+   * reference metadata only — never citable by the citation protocol.
    */
   items: ResearchContextItem[];
   /** Number of new source rows persisted for this research. */
@@ -36,10 +36,13 @@ export type RunWebResearchResult = {
  *
  * The discovered results are validated (well-formed http(s) URLs supplied by
  * the search provider — never invented by the model) and persisted as
- * metadata-only `sources` rows in the research, deduplicated by URL against
- * the sources already present. Persisting them makes the found references
- * visible in the workspace and reusable on later questions; the user can paste
- * body text into them later to make them citable.
+ * `sources` rows in the research, deduplicated by URL against the sources
+ * already present. The provider's snippet is stored as the source's body text
+ * when one is returned, making it available to the answer model and to later
+ * questions; a result with no snippet is persisted as metadata only. Persisting
+ * them makes the found references visible in the workspace and reusable on
+ * later questions; the user can paste body text into them later to make
+ * snippet-less sources citable.
  *
  * Web research is best-effort and never fails the surrounding answer's
  * routing, but a real search failure is never converted into a silent empty
@@ -113,6 +116,7 @@ export async function runWebResearch(
       title: result.title.slice(0, TITLE_MAX_LENGTH),
       url: result.url,
       publisher: WEB_SOURCE_PUBLISHER,
+      content: result.content,
       retrieved_at: new Date().toISOString(),
     });
 
@@ -132,7 +136,7 @@ export async function runWebResearch(
       kind: "source",
       id: created.data.id,
       title: created.data.title,
-      content: "",
+      content: created.data.content ?? "",
       metadata: {
         publisher: created.data.publisher ?? undefined,
         url: created.data.url ?? undefined,

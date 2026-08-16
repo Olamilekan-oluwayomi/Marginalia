@@ -12,8 +12,8 @@ export const SEARCH_QUERY_MAX_LENGTH = 500;
  */
 export const MAX_SEARCH_RESULTS = 5;
 
-export function sanitizeTitle(title: string): string {
-  return title
+export function sanitizeText(value: string): string {
+  return value
     .replace(/[\u0000-\u001f\u007f]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -31,8 +31,8 @@ export function isValidUrl(value: string): boolean {
 /**
  * Normalizes raw provider results into the app's canonical `WebSearchResult`
  * shape: keeps only well-formed http(s) URLs, deduplicates by canonical URL,
- * sanitizes titles, and bounds the result count. Shared by every provider so
- * each one surfaces exactly the same normalized output.
+ * sanitizes titles and content, and bounds the result count. Shared by every
+ * provider so each one surfaces exactly the same normalized output.
  */
 export function normalizeResults(raw: WebSearchResult[]): WebSearchResult[] {
   const seen = new Set<string>();
@@ -45,8 +45,9 @@ export function normalizeResults(raw: WebSearchResult[]): WebSearchResult[] {
     seen.add(key);
 
     results.push({
-      title: sanitizeTitle(entry.title) || entry.url,
+      title: sanitizeText(entry.title) || entry.url,
       url: entry.url,
+      content: sanitizeText(entry.content),
     });
 
     if (results.length >= MAX_SEARCH_RESULTS) break;
