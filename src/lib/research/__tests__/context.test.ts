@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildContextSection,
   retrieveResearchContext,
+  selectRelevantPassages,
 } from "@/lib/research/context";
 import { resolveCitations } from "@/lib/research/citation-generation";
 import type { DocumentRow, SourceRow, Supabase } from "@/lib/research/types";
@@ -838,6 +839,60 @@ describe("conceptual retrieval", () => {
     for (const item of context.items) {
       expect(item.content.length).toBeLessThanOrEqual(2000);
     }
+  });
+});
+
+describe("selectRelevantPassages", () => {
+  it("surfaces the value-bearing results sections alongside the methods statement when the sections are far apart", () => {
+    // Real text from the rainfall paper. The question names a value concept, and
+    // the paper states α = 0.05 in three places separated by thousands of
+    // characters: the wavelet-coherence method (Section 2.2.4) and the trend
+    // results (Sections 3.2 and 3.4). The literal phrase bonus crowns the
+    // methods sentence, and that sentence's cluster covers every question
+    // concept, so the old selector returned only the methods passage and the
+    // model never saw the results sections that actually state the finding.
+    const p224 =
+      "The statistical significance level (α = 0.05) of the wavelet coherence " +
+      "against background red noise was estimated using Monte Carlo sampling.";
+    const p32 =
+      "Southeast Coast and Northwest China have the largest trend magnitude and " +
+      "statistics, which are statistically significant at α = 0.05 level based " +
+      "on Kendall nonparameter testing.";
+    const p34 =
+      "a statistically significant (at α = 0.05 level) decreasing trend based " +
+      "on the Kendall test";
+    const filler = "Background material includes various unrelated topics. ".repeat(
+      76
+    );
+    const gap = "Additional background paragraphs provide further context. ".repeat(
+      84
+    );
+
+    const passages = selectRelevantPassages(
+      "What is the statistical significance level used for trend analysis?",
+      {
+        title: "Trend analysis of annual precipitation in China",
+        content: [
+          "This report describes the dataset assembled for the current work. " +
+            "The following sections present background material and the complete narrative.",
+          filler,
+          p224,
+          gap,
+          p32,
+          p34,
+        ].join(" "),
+      }
+    );
+
+    const hasMethods = passages.some((passage) =>
+      passage.includes("wavelet coherence")
+    );
+    const hasResults = passages.some(
+      (passage) => passage.includes("Kendall")
+    );
+    expect(passages.length).toBeGreaterThan(1);
+    expect(hasMethods).toBe(true);
+    expect(hasResults).toBe(true);
   });
 });
 

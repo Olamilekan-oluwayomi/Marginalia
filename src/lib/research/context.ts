@@ -18,6 +18,13 @@ const MAX_CONTEXT_ITEMS = 6;
 /** Upper bound on body text per context item. */
 const MAX_CONTENT_CHARS = 2_000;
 
+/**
+ * A secondary value-bearing region must score at least this fraction of the
+ * primary cluster's score to be surfaced as additional evidence. Keeps
+ * incidental passages that merely carry the same number out of the context.
+ */
+const VALUE_CANDIDATE_SCORE_RATIO = 0.45;
+
 const STOPWORDS = new Set([
   "about",
   "and",
@@ -717,7 +724,7 @@ function bestCluster(
   content: string,
   valueSeeking: boolean,
   valueConcepts: readonly (readonly string[])[]
-): Cluster {
+): { cluster: Cluster; valueCandidates: Cluster[] } {
   let bestStart = hits[0].index;
   let bestEnd = hits[0].index;
   let bestScore = -Infinity;
@@ -728,6 +735,7 @@ function bestCluster(
   let bestValueCount = 0;
   let bestConceptValue = 0;
   let left = 0;
+  const valueCandidates: Cluster[] = [];
 
   for (let right = 0; right < hits.length; right += 1) {
     while (hits[right].index - hits[left].index > MAX_CONTENT_CHARS) {
@@ -865,9 +873,26 @@ function bestCluster(
       bestValueCount = valueCount;
       bestConceptValue = conceptValue;
     }
+
+    // Remember every value-bearing window so other regions that pair a value
+    // concept with a number can be surfaced as complementary evidence. The
+    // primary cluster is excluded later by span overlap.
+    if (valueSeeking && conceptValue > 0) {
+      valueCandidates.push({
+        start: windowStart,
+        end: windowEnd,
+        score,
+        distinctBase,
+        distinctStudy,
+        distinctExpansion,
+        phraseCount,
+        valueCount,
+        conceptValue,
+      });
+    }
   }
 
-  return {
+  const cluster: Cluster = {
     start: bestStart,
     end: bestEnd,
     score: bestScore,
@@ -878,6 +903,38 @@ function bestCluster(
     valueCount: bestValueCount,
     conceptValue: bestConceptValue,
   };
+
+  return {
+    cluster,
+    valueCandidates: collectValueCandidates(valueCandidates, cluster),
+  };
+}
+
+/**
+ * Orders the value-bearing windows by score and keeps the distinct regions,
+ * dropping any that overlap the primary cluster's span or an already-kept
+ * region. Windows slide continuously over a region, so this collapses each
+ * region to its single best-scoring window. Bounded by `MAX_CONTEXT_ITEMS` so
+ * a long document can never contribute a whole stack of candidates.
+ */
+function collectValueCandidates(
+  candidates: Cluster[],
+  primary: Cluster
+): Cluster[] {
+  const sorted = [...candidates].sort((a, b) => b.score - a.score);
+  const kept: Cluster[] = [];
+  for (const candidate of sorted) {
+    if (spansOverlap(candidate, primary)) continue;
+    if (kept.some((keptCandidate) => spansOverlap(candidate, keptCandidate)))
+      continue;
+    kept.push(candidate);
+    if (kept.length >= MAX_CONTEXT_ITEMS) break;
+  }
+  return kept;
+}
+
+function spansOverlap(a: Cluster, b: Cluster): boolean {
+  return a.start <= b.end && b.start <= a.end;
 }
 
 /**
@@ -906,14 +963,30 @@ function selectRelevantPassage(
     return truncate(content);
   }
 
-  const budget = MAX_CONTENT_CHARS;
-  const cluster = bestCluster(
+  const { cluster } = bestCluster(
     hits,
     phrases,
     content,
     valueSeeking,
     valueConcepts
   );
+  return passageFromCluster(content, cluster, valueSeeking, valueConcepts);
+}
+
+/**
+ * Builds the model-facing passage for a cluster: a bounded window anchored on
+ * the sentence that carries the cluster's tail evidence, with a re-anchor onto
+ * the value statement so a value-seeking passage can never lose the concept
+ * phrase together with its number. Shared by the primary passage and every
+ * secondary so all passages are built identically.
+ */
+function passageFromCluster(
+  content: string,
+  cluster: Cluster,
+  valueSeeking: boolean,
+  valueConcepts: readonly (readonly string[])[]
+): string {
+  const budget = MAX_CONTENT_CHARS;
   const clusterStart = cluster.start;
   const clusterEnd = cluster.end;
 
@@ -1109,7 +1182,7 @@ function rankCandidate(
     const hits = keywordHits(body, base, study, expansion);
     if (hits.length > 0) {
       bodyScore = bestCluster(hits, phrases, body, valueSeeking, valueConcepts)
-        .score;
+        .cluster.score;
       if (body.length > MAX_CONTENT_CHARS) {
         passage = selectRelevantPassage(
           body,
@@ -1344,10 +1417,12 @@ function focusedConceptPassage(
 /**
  * Selects the model-facing passages of a single document for a question: the
  * primary passage (the best-scoring cluster region, or the whole body when it
- * is short) plus one focused secondary passage per still-uncovered question
- * concept, when the document carries that content in a separate region. This
- * is what the relevance gate feeds the classifier instead of a fixed leading
- * excerpt, so an answer sitting past the intro is still seen.
+ * is short), the other value-bearing regions within a margin of the primary
+ * for value-seeking questions, plus one focused secondary passage per
+ * still-uncovered question concept, when the document carries that content in
+ * a separate region. Bounded at `MAX_CONTEXT_ITEMS` passages. This is what
+ * the relevance gate feeds the classifier instead of a fixed leading excerpt,
+ * so an answer sitting past the intro is still seen.
  */
 export function selectRelevantPassages(
   question: string,
@@ -1368,30 +1443,69 @@ export function selectRelevantPassages(
     concepts,
   } = analyzeQuestion(question);
 
-  const primary = selectRelevantPassage(
-    content,
-    base,
-    study,
-    expansion,
+  if (content.length <= MAX_CONTENT_CHARS) {
+    return [content];
+  }
+
+  const hits = keywordHits(content, base, study, expansion);
+  if (hits.length === 0) {
+    return [truncate(content)];
+  }
+
+  const { cluster, valueCandidates } = bestCluster(
+    hits,
     phrases,
+    content,
     valueSeeking,
     valueConcepts
   );
-  if (content.length <= MAX_CONTENT_CHARS) {
-    return [primary];
+  const passages: string[] = [];
+  const addPassage = (passage: string): boolean => {
+    if (
+      passage.length === 0 ||
+      passages.length >= MAX_CONTEXT_ITEMS ||
+      passages.some(
+        (existing) => existing.includes(passage) || passage.includes(existing)
+      )
+    ) {
+      return false;
+    }
+    passages.push(passage);
+    return true;
+  };
+
+  addPassage(passageFromCluster(content, cluster, valueSeeking, valueConcepts));
+
+  // Value-redundancy secondaries: when the question targets a value concept,
+  // every other value-bearing region that scores within a margin of the
+  // primary is surfaced as additional evidence, even when the primary already
+  // covers every concept. A literal phrase bonus can otherwise crown a single
+  // passage (e.g. the methods sentence "statistical significance level
+  // (a = 0.05)") and silently suppress the results sections that actually
+  // state the finding at the same level.
+  if (valueSeeking && valueConcepts.length > 0) {
+    for (const candidate of valueCandidates) {
+      if (candidate.score < cluster.score * VALUE_CANDIDATE_SCORE_RATIO) {
+        continue;
+      }
+      addPassage(
+        passageFromCluster(content, candidate, valueSeeking, valueConcepts)
+      );
+    }
   }
 
-  const passages = [primary];
-  const covered = coveredBy(`${document.title} ${primary}`, concepts);
+  const covered = coveredBy(
+    `${document.title} ${passages.join(" ")}`,
+    concepts
+  );
   const uncovered = new Set(concepts);
   for (const concept of covered) uncovered.delete(concept);
-  if (uncovered.size === 0) return passages;
 
   for (const concept of [...uncovered]) {
     if (!uncovered.has(concept)) continue;
     const focused = focusedConceptPassage(document, concept, passages);
     if (focused === null) continue;
-    passages.push(focused);
+    addPassage(focused);
     const newlyCovered = coveredBy(`${document.title} ${focused}`, uncovered);
     for (const coveredConcept of newlyCovered) {
       uncovered.delete(coveredConcept);
