@@ -1,14 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_MODEL,
   GENERATION_RETRY_ATTEMPTS,
   MAX_PROMPT_CHARS,
   MAX_SYSTEM_CHARS,
+  aiError,
   generateJson,
   generateText,
   isTransientProviderError,
   searchWebWithGrounding,
+  toAiError,
 } from "@/lib/ai";
 
 const mocks = vi.hoisted(() => ({
@@ -225,5 +227,46 @@ describe("searchWebWithGrounding", () => {
     mocks.generateContent.mockResolvedValue({ candidates: [] });
 
     await expect(searchWebWithGrounding("cats")).resolves.toEqual([]);
+  });
+});
+
+describe("toAiError", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("preserves the HTTP status and RPC code from a raw provider failure", () => {
+    const error = toAiError({
+      status: 429,
+      error: { code: "RESOURCE_EXHAUSTED", message: "quota" },
+    });
+
+    expect(error.code).toBe("PROVIDER_ERROR");
+    expect(error.status).toBe(429);
+    expect(error.rpcCode).toBe("RESOURCE_EXHAUSTED");
+  });
+
+  it("reads the RPC code from a raw top-level code field", () => {
+    const error = toAiError({ code: "UNAVAILABLE" });
+
+    expect(error.rpcCode).toBe("UNAVAILABLE");
+    expect(error.status).toBeUndefined();
+  });
+
+  it("leaves markers off when the raw failure carries none", () => {
+    const error = toAiError(new Error("boom"));
+
+    expect(error.status).toBeUndefined();
+    expect(error.rpcCode).toBeUndefined();
+  });
+
+  it("passes an existing AiError through unchanged", () => {
+    const error = aiError("NOT_CONFIGURED", "no key");
+
+    expect(toAiError(error)).toBe(error);
   });
 });

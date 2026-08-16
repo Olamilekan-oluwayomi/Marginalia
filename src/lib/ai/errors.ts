@@ -7,6 +7,17 @@ export type AiErrorCode =
 export type AiError = {
   code: AiErrorCode;
   message: string;
+  /**
+   * Preserved HTTP status when the raw provider failure carried one (e.g.
+   * 429). Lets downstream fallback decisions classify quota/overload errors
+   * after normalization.
+   */
+  status?: number;
+  /**
+   * Preserved provider RPC code when the raw failure carried one (e.g.
+   * RESOURCE_EXHAUSTED).
+   */
+  rpcCode?: string;
 };
 
 export function aiError(code: AiErrorCode, message: string): AiError {
@@ -45,8 +56,26 @@ export function toAiError(error: unknown): AiError {
 
   const detail = toLogMessage(error);
   console.error("[ai] provider error:", detail);
-  return aiError(
-    "PROVIDER_ERROR",
-    `The AI provider could not complete the request: ${detail}`
-  );
+
+  const candidate = error as {
+    status?: unknown;
+    error?: { code?: unknown };
+    code?: unknown;
+  };
+  const status =
+    typeof candidate.status === "number" ? candidate.status : undefined;
+  const rpcCode =
+    (typeof candidate.error === "object" &&
+      candidate.error !== null &&
+      typeof candidate.error.code === "string"
+      ? candidate.error.code
+      : undefined) ??
+    (typeof candidate.code === "string" ? candidate.code : undefined);
+
+  return {
+    code: "PROVIDER_ERROR",
+    message: `The AI provider could not complete the request: ${detail}`,
+    ...(status !== undefined ? { status } : {}),
+    ...(rpcCode !== undefined ? { rpcCode } : {}),
+  };
 }

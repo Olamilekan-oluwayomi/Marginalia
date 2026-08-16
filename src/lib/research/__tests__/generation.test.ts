@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   retrieveResearchContext: vi.fn(),
   buildResearchPrompt: vi.fn(),
   generateJson: vi.fn(),
+  groqGenerate: vi.fn(),
   createAnswer: vi.fn(),
   createCitation: vi.fn(),
   isAiError: vi.fn(),
@@ -27,6 +28,11 @@ vi.mock("@/lib/ai", () => ({
   DEFAULT_MODEL: "test-model",
   generateJson: mocks.generateJson,
   isAiError: mocks.isAiError,
+}));
+vi.mock("@/lib/research/providers/groq", () => ({
+  GroqAnswerProvider: class {
+    generate = mocks.groqGenerate;
+  },
 }));
 vi.mock("@/lib/research/answers", () => ({ createAnswer: mocks.createAnswer }));
 vi.mock("@/lib/research/citations", () => ({
@@ -343,6 +349,7 @@ describe("generateAnswer", () => {
     });
 
     expect(result.error).toBeNull();
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
     expect(mocks.runWebResearch).toHaveBeenCalledWith(
       fakeSupabase,
       question.research_id,
@@ -398,6 +405,7 @@ describe("generateAnswer", () => {
       question.question,
       expect.stringContaining("A trend analysis of extreme precipitation.")
     );
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
     expect(mocks.runWebResearch).toHaveBeenCalledWith(
       fakeSupabase,
       question.research_id,
@@ -1432,6 +1440,7 @@ describe("generateAnswer", () => {
     });
 
     expect(result.error).toBeNull();
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
@@ -1572,6 +1581,245 @@ describe("system prompt selection by source mode", () => {
       question.id,
       question.research_id,
       expect.objectContaining({ source_mode: "web" })
+    );
+  });
+});
+
+describe("answer generation fallback", () => {
+  it("falls back to Groq on a 429 primary failure and persists the fallback answer", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    mocks.generateJson.mockRejectedValue({
+      code: "PROVIDER_ERROR",
+      message: "Rate limit exceeded.",
+      status: 429,
+    });
+    mocks.groqGenerate.mockResolvedValue({
+      answer: "Paris is the capital of France.",
+      citations: [],
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+    expect(mocks.groqGenerate).toHaveBeenCalledOnce();
+    // Research is never re-run for the fallback: the exact same input is
+    // retried as-is.
+    expect(mocks.groqGenerate.mock.calls[0][0]).toEqual(
+      mocks.generateJson.mock.calls[0][0]
+    );
+    expect(mocks.runWebResearch).toHaveBeenCalledOnce();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "web" })
+    );
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "complete"
+    );
+  });
+
+  it("falls back on a 503 primary failure", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    mocks.generateJson.mockRejectedValue({
+      code: "PROVIDER_ERROR",
+      message: "Unavailable.",
+      status: 503,
+    });
+    mocks.groqGenerate.mockResolvedValue({
+      answer: "Paris is the capital of France.",
+      citations: [],
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.groqGenerate).toHaveBeenCalledOnce();
+  });
+
+  it("falls back on a transient RPC code", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    mocks.generateJson.mockRejectedValue({
+      code: "PROVIDER_ERROR",
+      message: "Quota exhausted.",
+      rpcCode: "RESOURCE_EXHAUSTED",
+    });
+    mocks.groqGenerate.mockResolvedValue({
+      answer: "Paris is the capital of France.",
+      citations: [],
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.groqGenerate).toHaveBeenCalledOnce();
+  });
+
+  it("does not fall back on a permanent primary failure", async () => {
+    mocks.generateJson.mockRejectedValue(
+      aiError("PROVIDER_ERROR", "Provider exploded.")
+    );
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error?.code).toBe("DATABASE_ERROR");
+    expect(mocks.groqGenerate).not.toHaveBeenCalled();
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "failed"
+    );
+  });
+
+  it("does not fall back on a permanent RPC code", async () => {
+    mocks.generateJson.mockRejectedValue({
+      code: "PROVIDER_ERROR",
+      message: "Bad request.",
+      rpcCode: "INVALID_ARGUMENT",
+    });
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error?.code).toBe("DATABASE_ERROR");
+    expect(mocks.groqGenerate).not.toHaveBeenCalled();
+  });
+
+  it("never invokes the fallback when the primary provider succeeds", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+    expect(mocks.groqGenerate).not.toHaveBeenCalled();
+  });
+
+  it("fails the question with a safe error when the fallback also fails", async () => {
+    mocks.runWebResearch.mockResolvedValue({
+      error: null,
+      data: { items: [makeWebItem()], addedCount: 1 },
+    });
+    mocks.generateJson.mockRejectedValue({
+      code: "PROVIDER_ERROR",
+      message: "Rate limit exceeded.",
+      status: 429,
+    });
+    mocks.groqGenerate.mockRejectedValue(
+      aiError("PROVIDER_ERROR", "Groq exploded.")
+    );
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error?.code).toBe("DATABASE_ERROR");
+    expect(result.error?.message).toContain("try again");
+    expect(mocks.createAnswer).not.toHaveBeenCalled();
+    expect(mocks.groqGenerate).toHaveBeenCalledOnce();
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "failed"
+    );
+  });
+
+  it("resolves document citations from a fallback answer", async () => {
+    const documentItem = {
+      kind: "document",
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      title: "The study PDF",
+      content: "alpha of 0.05 was used for every trend analysis.",
+      metadata: { file_name: "study.pdf", mime_type: "application/pdf" },
+    } as const;
+    mocks.getDocuments.mockResolvedValue({
+      error: null,
+      data: [makeReadyDocument()],
+    });
+    mocks.detectExplicitSearchIntent.mockReturnValue("document");
+    mocks.retrieveResearchContext.mockResolvedValue({
+      error: null,
+      data: { items: [documentItem], hasBodyContent: true },
+    });
+    mocks.generateJson.mockRejectedValue({
+      code: "PROVIDER_ERROR",
+      message: "Rate limit exceeded.",
+      status: 429,
+    });
+    mocks.groqGenerate.mockResolvedValue({
+      answer: "The analysis used a 0.05 significance level [1].",
+      citations: [{ citation_number: 1, evidence: 1 }],
+    });
+    mocks.createCitation.mockResolvedValue({ error: null, data: {} });
+
+    const result = await generateAnswer(fakeSupabase, {
+      questionId: question.id,
+      researchId: question.research_id,
+    });
+
+    expect(result.error).toBeNull();
+    expect(mocks.groqGenerate).toHaveBeenCalledOnce();
+    expect(mocks.createAnswer).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      question.research_id,
+      expect.objectContaining({ source_mode: "document" })
+    );
+    expect(mocks.createCitation).toHaveBeenCalledWith(
+      expect.anything(),
+      "44444444-4444-4444-4444-444444444444",
+      expect.objectContaining({
+        citation_number: 1,
+        document_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        source_id: undefined,
+        excerpt: "alpha of 0.05 was used for every trend analysis.",
+      })
+    );
+    expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      question.id,
+      "complete"
     );
   });
 });

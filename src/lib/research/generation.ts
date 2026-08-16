@@ -1,7 +1,14 @@
 import "server-only";
 
-import { DEFAULT_MODEL, generateJson, isAiError } from "@/lib/ai";
+import { DEFAULT_MODEL, isAiError } from "@/lib/ai";
 import { createAnswer } from "./answers";
+import { GeminiAnswerProvider } from "./providers/gemini";
+import { GroqAnswerProvider } from "./providers/groq";
+import { isLlmFallbackEligible } from "./providers/fallback";
+import type {
+  AnswerGenerationInput,
+  AnswerGenerationProvider,
+} from "./providers/types";
 import { createCitation } from "./citations";
 import {
   ANSWER_OUTPUT_SCHEMA,
@@ -59,6 +66,23 @@ const NO_WEB_SOURCES_MESSAGE =
 
 /** Upper bound on generated answer length. Keeps answers concise and costs bounded. */
 const ANSWER_MAX_OUTPUT_TOKENS = 2000;
+
+/**
+ * The provider used for answer generation. Holds the Gemini-backed
+ * implementation; the `AnswerGenerationProvider` contract keeps the
+ * generation layer independent of which provider runs.
+ */
+const answerGenerationProvider: AnswerGenerationProvider =
+  new GeminiAnswerProvider();
+
+/**
+ * Fallback provider used when the primary provider fails with a transient
+ * condition (rate limit / overload / temporary outage). The same assembled
+ * prompt, context, and budget are retried as-is — research, relevance
+ * checks, and web search are never re-run for the fallback.
+ */
+const fallbackAnswerGenerationProvider: AnswerGenerationProvider =
+  new GroqAnswerProvider();
 
 /**
  * Instructions that shape every generated answer, regardless of mode. Phase
@@ -577,14 +601,26 @@ export async function generateAnswer(
 
   let output: GeneratedAnswerOutput;
   try {
-    const prompt = buildResearchPrompt(question.question, context);
-    const raw = await generateJson({
-      prompt,
+    const generationInput: AnswerGenerationInput = {
+      prompt: buildResearchPrompt(question.question, context),
       system: systemPromptFor(sourceMode),
       model: DEFAULT_MODEL,
       maxOutputTokens: ANSWER_MAX_OUTPUT_TOKENS,
       schema: ANSWER_OUTPUT_SCHEMA,
-    });
+    };
+
+    let raw: unknown;
+    try {
+      raw = await answerGenerationProvider.generate(generationInput);
+    } catch (error) {
+      if (!isLlmFallbackEligible(error)) {
+        throw error;
+      }
+      // Transient primary-provider failure (rate limit / overload / outage):
+      // retry the exact same prompt on the fallback provider. The compiled
+      // prompt and budget are reused as-is — research is never re-run.
+      raw = await fallbackAnswerGenerationProvider.generate(generationInput);
+    }
 
     const parsed = parseGeneratedAnswerOutput(raw);
     if (!parsed.ok) {
