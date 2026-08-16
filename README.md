@@ -1,207 +1,368 @@
 # Marginalia — AI Research Assistant
 
-A private, AI-assisted research workspace. Organize papers into research
-spaces, upload PDFs and collect web sources, then ask questions that are
-answered from your own documents — with every claim footnoted to the exact
-evidence it draws on.
+> **Research, read, connect.**
 
-**Research, read, connect.**
+Marginalia is a private, single-user research workspace that turns your own
+documents and web sources into cited, evidence-first answers. Upload a PDF,
+drop in a source, ask a question — and get a concise answer with inline margin
+notes that point back to the exact passages it was built from.
+
+The product is built around a strict rule: **an AI answer is only as good as
+the evidence behind it, and the evidence must be verifiable.** Every claim the
+assistant makes is anchored to a numbered citation that resolves to real
+content you provided, and the model is structurally prevented from inventing
+sources.
 
 ---
 
-## Overview
+## Table of contents
 
-Marginalia is a single-user-per-workspace application. Each authenticated
-user has their own research library and workspaces, isolated by Postgres
-row-level security. The app is built for focused reading, not chat: answers
-are typeset like a manuscript, and citations appear as margin notes beside
-the text rather than as stacked chat bubbles.
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [How it works](#how-it-works)
+  - [The question pipeline](#the-question-pipeline)
+  - [Answering modes](#answering-modes)
+  - [Document processing](#document-processing)
+  - [Evidence retrieval](#evidence-retrieval)
+  - [Citation integrity](#citation-integrity)
+  - [Reliability](#reliability)
+- [Project layout](#project-layout)
+- [Data model](#data-model)
+- [Getting started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Environment variables](#environment-variables)
+  - [Local development](#local-development)
+- [Scripts](#scripts)
+- [Testing](#testing)
+- [Security](#security)
+- [Documentation](#documentation)
 
-## Main features
+---
 
-- **Research workspaces** — a named space for a question you're trying to
-  answer, holding its own documents, sources, and question history.
-- **PDF library** — upload PDFs into a private storage bucket; body text is
-  extracted automatically and made available as searchable evidence.
-- **Web sources** — add links by hand or opt into web research when asking a
-  question; discovered sources are saved to the workspace.
-- **Question → answer flow** — ask a question and the assistant answers from
-  your workspace's evidence (documents, sources, and optionally the web).
-- **Citation integrity** — answers carry inline `[n]` markers; a citation is
-  only persisted when it resolves to real body text in the provided context.
-  Clicking a marker scrolls to and highlights the source note.
-- **Robust failure handling** — background generation, transient provider
-  retries, question status machine (`pending → generating → complete/failed`),
-  retry controls, and stale-state recovery.
+## Features
+
+- **Private research workspaces.** Each workspace is its own library of
+  documents, web sources, and questions. Multi-user isolation is enforced at
+  the database level with Postgres Row Level Security — you can only ever see
+  your own content, and server actions can only touch your own rows.
+- **Document upload.** Upload PDFs up to 10&nbsp;MB. The text is extracted in
+  the background server-side and stored, then the document moves through a
+  `Pending → Processing → Ready` status machine. Failed extractions surface a
+  retry control.
+- **Web sources.** Add a source manually with a title, URL, publisher, and
+  pasted body text. Duplicate URLs are rejected. Sources are searchable as
+  citable evidence just like documents.
+- **Live web research.** When a question asks for web evidence, the app runs a
+  real web search (Tavily) and feeds the best results into the answer as
+  citable sources.
+- **Three explicit answering modes** — document, web, or both — plus a
+  **smart mode** that decides automatically:
+  - When the question explicitly scopes itself ("in the document", "search the
+    web"), that intent wins.
+  - Otherwise a relevance classifier checks whether your document actually
+    answers the question. If it does, the answer comes from your document; if
+    not, the app falls back to the web and tells you so: *"This wasn't found in
+    your document, so I searched the web instead."*
+- **Evidence-first answers with margin citations.** Answers are short prose
+  paragraphs with inline `[n]` markers. Each marker resolves to the exact
+  document passage or web source that supports it. The model cannot fabricate
+  citations — every display field is filled server-side from real evidence,
+  and unresolvable markers are dropped.
+- **Background generation.** Asking a question returns instantly; the research
+  and generation run after the response, and the UI polls the question's
+  status (`pending` → `generating` → `complete`/`failed`) until the answer is
+  ready.
+- **Bounded, predictable costs.** A 2,000-token answer cap, 30-second provider
+  timeouts, a single bounded retry, and a per-user question rate limit keep
+  each answer cheap and fast.
+
+---
 
 ## Tech stack
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router, React 19, TypeScript) |
-| Styling | Tailwind CSS v4, custom design tokens (`design-system.md`) |
-| Database / Auth / Storage | Supabase (Postgres + RLS, Google OAuth + email, private storage bucket) |
-| AI | Google Gemini (`@google/genai`): text/JSON generation + Google Search grounding |
-| PDF extraction | `unpdf` |
-| Tests | Vitest (unit tests, node environment, providers mocked at app boundaries) |
+| Layer | Technology |
+| --- | --- |
+| Framework | Next.js 16 (App Router, Server Actions, React Compiler, `after()`) |
+| UI | React 19, Tailwind CSS, lucide-react |
+| Language | TypeScript (strict) |
+| Database & auth | Supabase (Postgres, Auth, Storage) + `@supabase/ssr` |
+| Answer generation | Google Gemini (`@google/genai`) — default `gemini-3.5-flash-lite` |
+| Generation fallback | Groq (OpenAI-compatible API) — default `openai/gpt-oss-120b` |
+| Web search | Tavily API |
+| PDF text extraction | `unpdf` (server-side) |
+| Testing | Vitest + React Testing Library (478 unit tests across 33 files) |
+| Lint / types | ESLint, `tsc --noEmit` |
 
-## Architecture overview
+---
+
+## How it works
+
+### The question pipeline
 
 ```
-src/app/            Next.js routes (pages + server actions per feature)
-  ├─ page.tsx               Workspace home
-  ├─ research/              Research list, create form, workspace page
-  ├─ documents/             Document library
-  ├─ settings/              Profile + appearance
-  ├─ login|register|auth/   Authentication
-  └─ api/health             Dev-only Supabase connectivity check
-src/components/     UI components (layout shell, research, documents, ui primitives)
-src/lib/            Business logic, layered:
-  ├─ supabase/              Browser + server client factories (RLS-scoped)
-  ├─ auth/                  Session helpers
-  ├─ ai/                    The only code that touches Gemini (text/JSON/web search,
-  │                         timeouts, retry, sanitized errors)
-  ├─ search/                Web search wrapper over the AI layer
-  └─ research/              Data layer per entity, validation, errors (AppResult<T>),
-                            context retrieval, generation orchestration, document
-                            processing, workspace assembly
-supabase/migrations/  SQL schema: tables, RLS policies, ownership triggers
+ask a question
+      │
+      ▼
+server action  ── creates question row (status = pending) ── returns immediately
+      │
+      ▼
+runAfterResponse()  (runs after the HTTP response is sent)
+      │
+      ▼
+1. Load the workspace's ready documents + sources     (RLS-scoped, caller's rows only)
+2. Choose mode ── explicit intent, or smart-mode relevance check
+3. If web research is needed → Tavily search → store sources
+4. Build the RESEARCH CONTEXT: numbered evidence items
+5. selectRelevantPassages ── pick the most relevant stretches of each document
+6. generateJson ── Gemini (or Groq fallback) returns { answer, citations }
+7. Validate citations against the provided evidence; drop anything unresolvable
+8. Persist the answer, mark the question complete (or failed)
+      │
+      ▼
+UI polls status → renders the answer with its margin citations
 ```
 
-Key patterns:
+### Answering modes
 
-- **Server-first.** Pages are React Server Components; every mutation is a
-  server action in `src/app/**/actions.ts`. The client never talks to the
-  database directly except through the auth/profile providers.
-- **`AppResult<T>` result pattern.** Every data-layer function returns
-  `ok(value)` or `fail(AppError)`; raw database/provider errors are logged
-  server-side and reduced to safe messages before reaching the UI.
-- **Ownership everywhere.** The Supabase server client is RLS-scoped to the
-  current user, and database triggers additionally enforce that child rows
-  belong to their parent workspace's owner. Client-supplied ownership is
-  never trusted.
-- **Background generation.** Answer generation runs after the HTTP response
-  (`after()`), so asking a question returns immediately; the UI polls the
-  question's status and renders the terminal state.
-- **Metadata-only payloads.** Document/source `content` (up to 200k chars)
-  and private storage paths are excluded from UI payloads; only server-side
-  retrieval paths read full evidence text.
+`SourceMode` is `"document" | "web" | "both"`, selected per question:
 
-## Local setup
+- **Explicit intent.** Phrase cues like *"check the document"* or *"search the
+  web"* set the mode directly.
+- **Smart mode.** With no explicit cue, the app checks whether the workspace's
+  document would actually answer the question:
+  1. It builds a compact, relevance-focused summary of the document (bounded to
+     4,000 characters per document / 12,000 total).
+  2. A Gemini classifier returns `{ relevant, confidence, reason }`.
+  3. Relevant → answer from the document. Not relevant → fall back to web
+     research, persisting a user-facing fallback reason on the answer.
+- **Web-only safety.** If a web-only question produces no usable web evidence,
+  the question is failed rather than emitting an answer that claims a search
+  that never produced results.
 
-Prerequisites: Node.js 20+, a Supabase project, and a Google AI API key.
+### Document processing
+
+1. The upload action validates the file client- and server-side: `.pdf` name,
+   `application/pdf` MIME, ≤ 10&nbsp;MB — the rules live in one shared,
+   dependency-free module so the client and server can never drift apart.
+2. The PDF is uploaded to the private `documents` bucket, and the row is
+   created with `status = pending`.
+3. A background task atomically claims the document (`pending → processing`),
+   re-loads it through the RLS-enforced data layer, and downloads the file.
+4. `unpdf` extracts the body text server-side, the text is persisted to
+   `documents.content`, and the status flips to `ready`.
+5. Only `ready` documents are eligible as evidence. `pending`, `processing`,
+   and `failed` documents are never used to answer.
+
+### Evidence retrieval
+
+Documents are often long, and a question usually has several concepts. The
+retrieval layer (`src/lib/research/context.ts`) is what makes answers precise:
+
+- **Keyword expansion.** Question terms are expanded with lemmas and synonyms
+  from a shared concept map, so a document that says "assessed" matches a
+  question about "evaluated".
+- **Document-level scoring.** Each document is ranked by how well it covers the
+  question's concepts.
+- **Passage selection.** For the top documents, the pipeline finds the single
+  most relevant stretch (the *best cluster*), then looks for additional
+  **value-bearing passages** that cover question concepts the primary passage
+  missed — even when the primary cluster already touches every concept, other
+  strong passages still surface so a multi-section document contributes
+  complementary evidence. Results are de-duplicated and capped at six passages
+  per document.
+- **Strict evidence boundaries.** Only content actually handed to the model can
+  be cited, and a citation's display fields are resolved server-side from the
+  evidence — never from the model.
+
+### Citation integrity
+
+- The model sees the research context as a numbered list and cites by
+  **1-based list index**, never by document or source id, so it cannot
+  reference an item that wasn't provided.
+- After generation, the app validates every citation against the provided
+  evidence. Unresolvable markers are dropped; the answer still persists.
+- Items marked as **reference metadata only** (never read) are never quoted,
+  summarized, or cited — the answer may only point the user at them for review.
+
+### Reliability
+
+- **Provider fallback.** Answer generation goes to Gemini first. On transient
+  conditions (HTTP 429/5xx), the exact same assembled prompt, context, and
+  budget are retried once against Groq — research and relevance checks are
+  never re-run for the fallback. Keys are redacted from every log and error.
+- **Timeouts.** Generation and Groq calls cap at 30&nbsp;seconds; web search at
+  15&nbsp;seconds. A hung provider cannot run indefinitely.
+- **Stale-state recovery.** If a background task is killed mid-flight, the
+  question is left `generating`/`pending`; the database status is the source of
+  truth and the recovery path reconciles it.
+- **Health check.** `/api/ai/health` (development) verifies the AI layer's
+  connectivity without a full pipeline run.
+
+---
+
+## Project layout
+
+```
+├── src/
+│   ├── app/                      # App Router routes
+│   │   ├── api/ai/health         #   dev AI health check
+│   │   ├── auth/                 #   auth callbacks
+│   │   ├── documents/            #   document management + upload action
+│   │   ├── login/  register/     #   email + Google auth
+│   │   ├── research/             #   workspaces, ask UI, question pages
+│   │   └── settings/
+│   ├── components/               # server + client UI components
+│   └── lib/
+│       ├── ai/                   # Gemini client, generateText/generateJson,
+│       │                         #   retry, timeout, error normalization
+│       ├── auth/                 # session helpers
+│       ├── research/             # the core pipeline
+│       │   ├── providers/        #   AnswerGenerationProvider abstraction:
+│       │   │                     #   gemini.ts, groq.ts, fallback.ts, types.ts
+│       │   ├── context.ts        #   evidence retrieval + passage selection
+│       │   ├── generation.ts     #   orchestration, prompts, citation protocol
+│       │   ├── relevance-check.ts#   smart-mode relevance classifier
+│       │   ├── web-research.ts   #   Tavily-backed source gathering
+│       │   ├── document-*.ts     #   upload / parse / processing
+│       │   ├── background.ts     #   runAfterResponse wrapper
+│       │   └── ...
+│       ├── search/               # web search provider abstraction (Tavily)
+│       └── supabase/             # Supabase client
+├── supabase/
+│   └── migrations/               # 7 SQL migrations: schema + RLS policies
+├── AGENTS.md                     # agent/contributor guardrails
+├── SMOKE-TEST.md                 # production deployment checklist
+├── design-system.md              # UI design system reference
+└── PHASE-*.md                    # phase completion reports
+```
+
+---
+
+## Data model
+
+Managed entirely by SQL migrations in `supabase/migrations/`, with RLS enabled
+on every table:
+
+- **profiles** — one row per user, created by trigger on sign-up.
+- **research_workspaces** — a user's research library.
+- **documents** — uploaded PDFs, with extracted body text in `content` and a
+  `status` lifecycle (`pending | processing | ready | failed`).
+- **sources** — manually added web sources; `url` is unique per workspace.
+- **questions** — asked questions with `source_mode` and a status machine.
+- **answers** — generated answers, with the resolved citations (`type:
+  document | web`), the fallback reason when smart mode went to the web, and
+  the source mode that produced them.
+
+All tables scoped by workspace and filtered by `auth.uid()` via RLS policies;
+storage access to the private `documents` bucket is similarly locked down.
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 20+ and npm
+- A Supabase project (Postgres + Auth + Storage)
+- API keys for Gemini, Tavily, and (for the fallback) Groq
+
+### Environment variables
+
+Copy `.env.example` to `.env.local` and fill it in:
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable (anon) key |
+| `GEMINI_API_KEY` | Yes | Primary answer-generation provider |
+| `TAVILY_API_KEY` | Yes | Web search provider |
+| `GROQ_API_KEY` | No | Enables the Groq fallback for transient failures |
+| `GROQ_MODEL` | No | Groq model; defaults to `openai/gpt-oss-120b` |
+
+The app works with only Supabase + Gemini; add the Tavily key to enable web
+research, and the Groq key to enable the resilience fallback. Keys are read
+server-side only, are never logged (and are redacted even if echoed back), and
+never reach the client bundle.
+
+### Local development
 
 ```bash
 npm install
-```
-
-## Environment variables
-
-Copy `.env.example` to `.env.local` and fill in the values. Never commit
-`.env.local`.
-
-| Variable | Where | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | client + server | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | client + server | Supabase publishable (anon) key — never the service role key |
-| `GEMINI_API_KEY` | server only | Google AI Studio key for Gemini generation and web search |
-
-## Database / Supabase setup
-
-1. **Create a Supabase project** and copy the project URL and publishable key
-   into `.env.local`.
-2. **Apply the migrations** in `supabase/migrations/` (in filename order).
-   They create the `profiles` trigger, the six research tables
-   (`research`, `research_questions`, `documents`, `sources`, `answers`,
-   `citations`), row-level security policies, and ownership triggers. With
-   the Supabase CLI: `supabase db push`. The SQL files can also be run
-   manually in the SQL editor.
-3. **Enable auth providers**: Google OAuth (and optionally email) under
-   Authentication → Providers. Set the site URL and redirect URLs to include
-   `http://localhost:3000/auth/callback` (dev) and your production origin.
-4. **Create a private storage bucket** named `documents` (Storage →
-   New bucket, public access **off**) and set its file size limit to 10 MB
-   (the app enforces the same limit client- and server-side).
-
-## Running the development server
-
-```bash
+cp .env.example .env.local   # then fill in your keys
+npx supabase db push         # or apply supabase/migrations/*.sql to your project
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The dev-only health
-checks live at `/api/health` (Supabase connectivity) and are 404 outside of
-`next dev`.
+Open http://localhost:3000, register (email/password or Google), and upload a
+PDF or add a source to start asking questions.
 
-## Running tests and checks
+---
+
+## Scripts
+
+| Script | Description |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run start` | Run the production build |
+| `npm run lint` | ESLint |
+| `npm test` / `npx vitest run` | Run the test suite |
+
+---
+
+## Testing
+
+The suite is **478 unit tests across 33 files** (`npx vitest run`). The
+highest-value coverage is in `src/lib/research/`:
+
+- **`context.test.ts`** — passage selection, keyword expansion, relevance
+  ranking, and multi-passage surface behavior (including a regression test that
+  locks in the value-redundancy fix: secondaries within the score margin still
+  surface even when the primary cluster covers all concepts).
+- **`citation-generation.test.ts`** — the citation protocol, marker
+  sanitization, and drop-unresolvable behavior.
+- **`providers/`** — Gemini/Groq provider contracts, timeout, redaction, and
+  fallback eligibility.
+- Plus coverage for relevance checking, web research, document upload/parse,
+  auth guards, and the UI.
+
+Run lint and type checking before committing:
 
 ```bash
-npm run lint          # ESLint
-npx tsc --noEmit      # TypeScript typecheck
-npx vitest run        # Unit tests (382+ tests across the data, AI, search layers)
+npx vitest run
+npm run lint
+npx tsc --noEmit
 ```
 
-## Building for production
+---
 
-```bash
-npm run build
-npm run start
-```
+## Security
 
-## Document processing flow
+- **Row Level Security everywhere.** Multi-user isolation is enforced in the
+  database, not in application code. Server actions additionally scope every
+  query by the caller's session.
+- **No secrets in the client.** Provider keys live in server-only modules
+  (`import "server-only"`) and are never bundled or logged; error paths redact
+  key material.
+- **Trust boundaries for the LLM.** Research context is treated as *data, never
+  instructions*; untrusted content can never override the system prompt, and
+  the model is told plainly when evidence is missing or metadata-only.
+- **Validation on both sides.** Upload rules (type, size) are enforced
+  identically in the browser and on the server from a single source of truth.
+- See `SMOKE-TEST.md` for the manual production checklist (auth redirects,
+  cross-account isolation, upload rejection paths, and more).
 
-1. A server action validates the upload (PDF only, ≤ 10 MB, owned research
-   workspace) and uploads the file to the private `documents` bucket at
-   `{user_id}/{research_id}/{document_id}.pdf`.
-2. A `documents` row is created with status `pending`.
-3. The document is claimed atomically (`pending → processing`), downloaded
-   from storage, and its body text is extracted with `unpdf`.
-4. Extracted text is persisted to `documents.content` and the row becomes
-   `ready`. Failures mark the row `failed` (with a Retry control), and a
-   failed row insert removes the just-uploaded file so no orphan remains.
+---
 
-## AI / research flow
+## Documentation
 
-1. Asking a question creates a `research_questions` row (`pending`) and
-   returns immediately; generation is scheduled after the response.
-2. Context retrieval assembles the workspace's documents and sources as a
-   numbered evidence list (body text only — metadata-only items are labeled
-   as such and never quoted).
-3. If the question opted into web research, a grounded web search runs and
-   discovered sources are saved to the workspace (best-effort; failure never
-   fails the answer).
-4. Gemini is asked to produce strict JSON: prose plus a citations array.
-   Markers must resolve to actual context items; unresolvable citations are
-   dropped, never fabricated.
-5. The answer and its citations are persisted, and the question transitions
-   to `complete` (or `failed`, offering retry). If a run dies mid-task, the
-   stale-state recovery control resets the question so it can be retried.
+| File | Purpose |
+| --- | --- |
+| `AGENTS.md` | Contributor and agent guardrails for this codebase |
+| `SMOKE-TEST.md` | Manual pass/fail checklist for a deployed environment |
+| `PHASE-*.md` | Phase completion reports (design rationale and decisions) |
+| `design-system.md` | UI design system reference |
 
-## Security considerations
+---
 
-- **RLS is the security boundary.** Every table is per-user; the data layer
-  additionally never trusts caller-supplied ownership.
-- **No secrets in the client.** Only the Supabase publishable key is
-  public; `GEMINI_API_KEY` and any service role key stay server-side.
-- **Sanitized errors.** Raw database/provider messages are logged for
-  developers but never surfaced to users.
-- **Payload hygiene.** Document/source body text and storage paths are never
-  serialized into UI payloads.
-- **Safe external links.** Source links open in new tabs with
-  `rel="noopener noreferrer"`.
-- **Private by default.** Search engines are told not to index the app, and
-  the health check is dev-only.
-
-## Deployment
-
-Deployment has **not** been performed as part of this project's development.
-To deploy:
-
-- Choose a Next.js host (e.g. Vercel) and set the three environment
-  variables above in the platform's environment settings.
-- Ensure the platform supports the route's `maxDuration = 60` for background
-  generation (or lower it to the platform's limit).
-- Point the Supabase project's auth redirect URLs at the production origin
-  (`https://your-domain/auth/callback`).
-- See `SMOKE-TEST.md` for the manual production checklist to run before and
-  after going live.
+*Built with Next.js, Supabase, and the Gemini / Groq / Tavily APIs.*
