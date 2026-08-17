@@ -9,7 +9,6 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { createClient } from "@/lib/supabase/client";
 
 const DEFAULT_NAME = "New Researcher";
 
@@ -52,7 +51,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
     const id = userId;
-    const supabase = createClient();
 
     const metadata = userRef.current?.user_metadata;
     const fallbackName =
@@ -63,6 +61,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           : DEFAULT_NAME;
 
     async function fetchProfile() {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+
       try {
         const { data } = await supabase
           .from("profiles")
@@ -105,6 +106,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const previous = profile?.name ?? null;
       setProfile({ userId: user.id, name: trimmed });
 
+      const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const { error } = await supabase
         .from("profiles")

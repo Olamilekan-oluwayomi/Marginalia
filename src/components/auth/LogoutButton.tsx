@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 type LogoutButtonProps = {
   variant?: "secondary" | "menu";
@@ -22,6 +21,7 @@ export function LogoutButton({ variant = "secondary" }: LogoutButtonProps) {
     setPending(true);
     setError(null);
 
+    const { createClient } = await import("@/lib/supabase/client");
     const supabase = createClient();
     const { error: signOutError } = await supabase.auth.signOut();
 

@@ -2,6 +2,12 @@
   "name": "ai-research-assistant",
   "version": "0.1.0",
   "private": true,
+  "browserslist": [
+    "Chrome >= 93",
+    "Firefox >= 90",
+    "Safari >= 15.4",
+    "Edge >= 93"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

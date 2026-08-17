@@ -4,10 +4,10 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import type { User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
 
 type AuthContextValue = {
   user: User | null;
@@ -19,28 +19,36 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const unsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    const supabase = createClient();
 
-    supabase.auth.getUser().then(({ data }) => {
+    import("@/lib/supabase/client").then(({ createClient }) => {
       if (!mounted) return;
-      setUser(data.user ?? null);
-      setLoading(false);
-    });
+      const supabase = createClient();
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      supabase.auth.getUser().then(({ data }) => {
         if (!mounted) return;
-        setUser(event === "SIGNED_OUT" ? null : (session?.user ?? null));
+        setUser(data.user ?? null);
         setLoading(false);
-      }
-    );
+      });
+
+      const { data: subscription } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          if (!mounted) return;
+          setUser(event === "SIGNED_OUT" ? null : (session?.user ?? null));
+          setLoading(false);
+        }
+      );
+
+      unsubRef.current = () => subscription.subscription.unsubscribe();
+    });
 
     return () => {
       mounted = false;
-      subscription.subscription.unsubscribe();
+      unsubRef.current?.();
+      unsubRef.current = null;
     };
   }, []);
 

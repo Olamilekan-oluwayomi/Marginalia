@@ -8,12 +8,14 @@ import "./globals.css";
 const newsreader = Newsreader({
   variable: "--font-reading",
   subsets: ["latin"],
-  style: ["normal", "italic"],
+  style: ["normal"],
+  weight: "400",
 });
 
 const workSans = Work_Sans({
   variable: "--font-ui",
   subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -29,23 +31,26 @@ export const metadata: Metadata = {
   },
   description:
     "Research, read, connect. A private workspace for reading, organizing, and exploring your sources with an AI research assistant.",
-  robots: { index: false, follow: false },
+  robots: { index: true, follow: true },
   openGraph: {
     title: "Marginalia",
-    description: "Research, read, connect.",
+    description:
+      "A private workspace for reading, organizing, and exploring your sources with an AI research assistant.",
     type: "website",
+    siteName: "Marginalia",
   },
   twitter: {
     card: "summary",
     title: "Marginalia",
-    description: "Research, read, connect.",
+    description:
+      "A private workspace for reading, organizing, and exploring your sources with an AI research assistant.",
   },
 };
 
 /**
  * Mobile browser chrome (address bar / status bar) matches the app's paper
- * background in both color schemes. The app is private (`robots: noindex`),
- * so no social sharing metadata beyond the root defaults is needed.
+ * background in both color schemes. Public-facing pages are indexable; private
+ * authenticated routes use per-page `robots: { index: false }` overrides.
  */
 export const viewport: Viewport = {
   themeColor: [
