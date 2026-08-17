@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth/get-user";
 
 export const metadata: Metadata = {
   title: "Create your research workspace",
+  robots: { index: false, follow: false },
 };
 
 type RegisterPageProps = {

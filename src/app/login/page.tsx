@@ -8,6 +8,7 @@ import { resolveInternalPath } from "@/lib/auth/internal-path";
 
 export const metadata: Metadata = {
   title: "Sign in to your research workspace",
+  robots: { index: false, follow: false },
 };
 
 type LoginPageProps = {
