@@ -1,28 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { Monitor, Moon, Sun } from "lucide-react";
-import { AccountMenu } from "@/components/layout/AccountMenu";
-import { useTheme } from "@/components/theme/ThemeProvider";
+import { ThemeToggle } from "./ThemeToggle";
+import { ClientAccountMenu } from "./ClientAccountMenu";
 
 type HeaderProps = {
   title?: string;
   showTitle?: boolean;
 };
 
-const themeIcons = {
-  system: Monitor,
-  light: Sun,
-  dark: Moon,
-} as const;
-
 export function Header({ title, showTitle = true }: HeaderProps) {
-  const { theme, setTheme } = useTheme();
-
-  const ThemeIcon = themeIcons[theme];
-  const next = theme === "system" ? "light" : theme === "light" ? "dark" : "system";
-  const themeLabel = `Theme: ${theme}. Switch to ${next}.`;
-
   return (
     <header className="relative sticky top-0 z-30 flex h-14 items-center border-b border-rule bg-paper">
       <div className="flex min-w-0 flex-1 pl-5 sm:pl-8">
@@ -43,17 +28,8 @@ export function Header({ title, showTitle = true }: HeaderProps) {
       ) : null}
 
       <div className="flex shrink-0 items-center gap-1 pr-5 sm:pr-8">
-        <button
-          type="button"
-          onClick={() => setTheme(next)}
-          aria-label={themeLabel}
-          title={themeLabel}
-          className="flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-paper-raised hover:text-ink"
-        >
-          <ThemeIcon size={17} strokeWidth={1.7} />
-        </button>
-
-        <AccountMenu />
+        <ThemeToggle />
+        <ClientAccountMenu />
       </div>
     </header>
   );
