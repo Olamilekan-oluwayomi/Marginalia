@@ -8,10 +8,25 @@ function greetingForHour(hour: number): string {
   return "Good evening";
 }
 
-export function Greeting() {
-  const { name } = useProfile();
+/**
+ * Renders a time-of-day greeting that upgrades with the user's name once
+ * the profile loads. `fallbackGreeting` is computed on the server so the
+ * LCP element has meaningful text immediately — no client-side data fetch
+ * required for the initial paint.
+ */
+export function Greeting({
+  fallbackGreeting,
+}: {
+  fallbackGreeting?: string;
+}) {
+  const { name, loading } = useProfile();
   const greeting = greetingForHour(new Date().getHours());
-  const label = name ? `${greeting}, ${name}` : greeting;
+  const label =
+    loading && fallbackGreeting
+      ? fallbackGreeting
+      : name
+        ? `${greeting}, ${name}`
+        : greeting;
 
   // The greeting depends on the visitor's local time, which the server can't
   // know — suppressHydrationWarning lets React adopt the client value without
