@@ -69,11 +69,9 @@ function makeSupabase(options: {
     return {
       select: vi.fn().mockReturnValue({
         order: vi.fn().mockResolvedValue(listResult),
-        eq: vi
-          .fn()
-          .mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue(maybeSingleResult),
-          }),
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue(maybeSingleResult),
+        }),
       }),
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({

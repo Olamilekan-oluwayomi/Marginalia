@@ -90,7 +90,7 @@ sources.
 | Generation fallback | Groq (OpenAI-compatible API) — default `openai/gpt-oss-120b`       |
 | Web search          | Tavily API                                                         |
 | PDF text extraction | `unpdf` (server-side)                                              |
-| Testing             | Vitest + React Testing Library (478 unit tests across 33 files)    |
+| Testing             | Vitest (478 unit tests across 33 files)                            |
 | Lint / types        | ESLint, `tsc --noEmit`                                             |
 
 ---
@@ -244,11 +244,11 @@ Managed entirely by SQL migrations in `supabase/migrations/`, with RLS enabled
 on every table:
 
 - **profiles** — one row per user, created by trigger on sign-up.
-- **research_workspaces** — a user's research library.
+- **research** — a user's research library.
 - **documents** — uploaded PDFs, with extracted body text in `content` and a
   `status` lifecycle (`pending | processing | ready | failed`).
 - **sources** — manually added web sources; `url` is unique per workspace.
-- **questions** — asked questions with `source_mode` and a status machine.
+- **research_questions** — asked questions with `source_mode` and a status machine.
 - **answers** — generated answers, with the resolved citations (`type:
 document | web`), the fallback reason when smart mode went to the web, and
   the source mode that produced them.
@@ -338,7 +338,7 @@ npx tsc --noEmit
 
 ## Security
 
-- **Row Level Security everywhere.** Multi-user isolation is enforced in the
+- **Row Level Security on application data.** Multi-user isolation is enforced in the
   database, not in application code. Server actions additionally scope every
   query by the caller's session.
 - **No secrets in the client.** Provider keys live in server-only modules
