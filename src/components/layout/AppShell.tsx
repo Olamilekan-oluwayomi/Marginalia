@@ -1,6 +1,6 @@
 import { Header } from "./Header";
 import { MainContent } from "./MainContent";
-import { Sidebar } from "./Sidebar";
+import { SlidingNav } from "./SlidingNav";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -17,7 +17,7 @@ export function AppShell({ children, title, showTitle = true }: AppShellProps) {
       >
         Skip to content
       </a>
-      <Sidebar />
+      <SlidingNav />
       <div className="flex min-w-0 flex-1 flex-col md:pl-14">
         <Header title={title} showTitle={showTitle} />
         <MainContent>{children}</MainContent>
