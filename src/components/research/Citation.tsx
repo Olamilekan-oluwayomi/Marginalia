@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type CitationProps = {
   index: number;
@@ -19,9 +19,11 @@ const FLASH_DURATION_MS = 1500;
 /** Fallback used only if the browser never emits `scrollend` for the scroll. */
 const SCROLL_SETTLE_FALLBACK_MS = 400;
 
-let flashTimer: number | undefined;
-let settleTimer: number | undefined;
-let removeSettleListener: (() => void) | undefined;
+type CitationTimers = {
+  flashTimer?: number;
+  settleTimer?: number;
+  removeSettleListener?: () => void;
+};
 
 /**
  * True when the element is already fully within the viewport, so the smooth
@@ -37,7 +39,10 @@ function isFullyVisible(element: Element): boolean {
   );
 }
 
-function focusCitationTarget(targetId?: string) {
+function focusCitationTarget(
+  targetId: string | undefined,
+  timers: CitationTimers,
+) {
   if (!targetId) return;
   const element = document.getElementById(`citation-${targetId}`);
   if (!element) return;
@@ -60,8 +65,8 @@ function focusCitationTarget(targetId?: string) {
     void element.offsetWidth;
     element.classList.add("citation-flash");
 
-    window.clearTimeout(flashTimer);
-    flashTimer = window.setTimeout(() => {
+    window.clearTimeout(timers.flashTimer);
+    timers.flashTimer = window.setTimeout(() => {
       element.classList.remove("citation-flash");
     }, FLASH_DURATION_MS);
 
@@ -78,25 +83,25 @@ function focusCitationTarget(targetId?: string) {
   // the scroll land with no highlight. Start the flash once the scroll
   // settles, with a timeout fallback in case `scrollend` never fires.
   const settle = () => {
-    if (removeSettleListener) {
-      removeSettleListener();
-      removeSettleListener = undefined;
+    if (timers.removeSettleListener) {
+      timers.removeSettleListener();
+      timers.removeSettleListener = undefined;
     }
-    window.clearTimeout(settleTimer);
-    settleTimer = undefined;
+    window.clearTimeout(timers.settleTimer);
+    timers.settleTimer = undefined;
     startFlash();
   };
 
-  if (removeSettleListener) {
-    removeSettleListener();
+  if (timers.removeSettleListener) {
+    timers.removeSettleListener();
   }
-  window.clearTimeout(settleTimer);
+  window.clearTimeout(timers.settleTimer);
 
   const scrollTargets: EventTarget[] = [
     window,
     document.scrollingElement ?? document.documentElement,
   ];
-  removeSettleListener = () => {
+  timers.removeSettleListener = () => {
     for (const target of scrollTargets) {
       target.removeEventListener("scrollend", settle);
     }
@@ -104,7 +109,7 @@ function focusCitationTarget(targetId?: string) {
   for (const target of scrollTargets) {
     target.addEventListener("scrollend", settle, { once: true });
   }
-  settleTimer = window.setTimeout(settle, SCROLL_SETTLE_FALLBACK_MS);
+  timers.settleTimer = window.setTimeout(settle, SCROLL_SETTLE_FALLBACK_MS);
 }
 
 export function Citation({
@@ -117,10 +122,20 @@ export function Citation({
   onClick,
 }: CitationProps) {
   const [expanded, setExpanded] = useState(false);
+  const timers = useRef<CitationTimers>({});
+
+  useEffect(() => {
+    const currentTimers = timers.current;
+    return () => {
+      window.clearTimeout(currentTimers.flashTimer);
+      window.clearTimeout(currentTimers.settleTimer);
+      currentTimers.removeSettleListener?.();
+    };
+  }, []);
 
   const handleClick = () => {
     setExpanded((prev) => !prev);
-    focusCitationTarget(targetId);
+    focusCitationTarget(targetId, timers.current);
     onClick?.();
   };
 
