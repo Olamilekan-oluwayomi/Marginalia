@@ -1,5 +1,6 @@
 import type {
   CreateResearchInput,
+  ListRange,
   ResearchRow,
   Supabase,
   UpdateResearchInput,
@@ -31,16 +32,20 @@ function validateCreateInput(input: CreateResearchInput): string | null {
 
 export async function getResearchList(
   supabase: Supabase,
+  range?: ListRange,
 ): Promise<AppResult<ResearchRow[]>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
     return fail(session.error, []);
   }
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("research")
     .select("*")
     .order("updated_at", { ascending: false });
+  const { data, error } = range
+    ? await query.range(range.from, range.to)
+    : await query;
 
   if (error) {
     return fail(toAppError(error), []);
@@ -60,8 +65,9 @@ export type ResearchListWithCounts = ResearchRow & {
  */
 export async function getResearchListWithCounts(
   supabase: Supabase,
+  range?: ListRange,
 ): Promise<AppResult<ResearchListWithCounts[]>> {
-  const list = await getResearchList(supabase);
+  const list = await getResearchList(supabase, range);
   if (list.error) {
     return fail(list.error, []);
   }

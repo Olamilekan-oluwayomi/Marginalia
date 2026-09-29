@@ -19,6 +19,13 @@ type ResearchListItem = {
   updatedAt: string;
 };
 
+const PAGE_SIZE = 20;
+
+function pageFromParam(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
 function toResearchListItem(item: ResearchListWithCounts): ResearchListItem {
   return {
     id: item.id,
@@ -35,10 +42,23 @@ export const metadata: Metadata = {
     "Organize papers into focused research spaces and ask questions across your sources.",
 };
 
-export default async function ResearchPage() {
+export default async function ResearchPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = pageFromParam(pageParam);
+  const from = (page - 1) * PAGE_SIZE;
   const supabase = await createSupabaseClient();
-  const { data, error } = await getResearchListWithCounts(supabase);
-  const research = error ? [] : data.map(toResearchListItem);
+  const { data, error } = await getResearchListWithCounts(supabase, {
+    from,
+    to: from + PAGE_SIZE,
+  });
+  const hasMore = !error && data.length > PAGE_SIZE;
+  const research = error
+    ? []
+    : data.slice(0, PAGE_SIZE).map(toResearchListItem);
 
   return (
     <AppShell title="Research">
@@ -87,46 +107,79 @@ export default async function ResearchPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-0">
-              {research.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/research/${item.id}`}
-                  aria-label={`Open ${item.title}`}
-                  className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-7 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
-                >
-                  <div className="min-w-0 max-w-2xl">
-                    <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
-                      {item.title}
-                    </h2>
+            <>
+              <div className="space-y-0">
+                {research.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/research/${item.id}`}
+                    aria-label={`Open ${item.title}`}
+                    className="group flex items-start justify-between gap-4 border-b border-rule px-4 py-7 transition-colors last:border-b-0 hover:bg-paper-raised sm:gap-8"
+                  >
+                    <div className="min-w-0 max-w-2xl">
+                      <h2 className="break-words font-reading text-2xl text-ink transition-colors group-hover:text-pine-dim">
+                        {item.title}
+                      </h2>
 
-                    {item.description ? (
-                      <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
-                        {item.description}
-                      </p>
-                    ) : null}
+                      {item.description ? (
+                        <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
+                          {item.description}
+                        </p>
+                      ) : null}
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                      <span className="flex items-center gap-2 font-mono text-xs text-muted">
-                        <FileText size={14} strokeWidth={1.5} />
-                        {item.documentCount}{" "}
-                        {item.documentCount === 1 ? "document" : "documents"}
-                      </span>
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                        <span className="flex items-center gap-2 font-mono text-xs text-muted">
+                          <FileText size={14} strokeWidth={1.5} />
+                          {item.documentCount}{" "}
+                          {item.documentCount === 1 ? "document" : "documents"}
+                        </span>
 
-                      <span className="font-mono text-xs text-muted">
-                        Updated {formatDisplayDate(item.updatedAt)}
-                      </span>
+                        <span className="font-mono text-xs text-muted">
+                          Updated {formatDisplayDate(item.updatedAt)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <ArrowRight
-                    size={17}
-                    strokeWidth={1.6}
-                    className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
-                  />
-                </Link>
-              ))}
-            </div>
+                    <ArrowRight
+                      size={17}
+                      strokeWidth={1.6}
+                      className="mt-1 shrink-0 text-muted transition-colors md:opacity-0 md:group-hover:text-pine md:group-hover:opacity-100"
+                    />
+                  </Link>
+                ))}
+              </div>
+
+              {page > 1 || hasMore ? (
+                <nav
+                  aria-label="Research pagination"
+                  className="mt-6 flex items-center justify-between gap-4"
+                >
+                  {page > 1 ? (
+                    <Link
+                      href={`/research?page=${page - 1}`}
+                      className="font-ui text-sm text-pine underline underline-offset-4"
+                    >
+                      Previous
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="font-mono text-xs text-muted">
+                    Page {page}
+                  </span>
+                  {hasMore ? (
+                    <Link
+                      href={`/research?page=${page + 1}`}
+                      className="font-ui text-sm text-pine underline underline-offset-4"
+                    >
+                      Next
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                </nav>
+              ) : null}
+            </>
           )}
         </section>
 

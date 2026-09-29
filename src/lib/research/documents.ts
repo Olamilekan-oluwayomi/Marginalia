@@ -2,6 +2,7 @@ import type {
   CreateDocumentInput,
   DocumentRow,
   DocumentSummary,
+  ListRange,
   Supabase,
 } from "./types";
 import {
@@ -101,16 +102,20 @@ const DOCUMENT_METADATA_COLUMNS =
  */
 export async function getAllDocuments(
   supabase: Supabase,
+  range?: ListRange,
 ): Promise<AppResult<DocumentSummary[]>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
     return fail(session.error, []);
   }
 
-  const { data, error } = await supabase
+  const query = supabase
     .from("documents")
     .select(DOCUMENT_METADATA_COLUMNS)
     .order("created_at", { ascending: false });
+  const { data, error } = range
+    ? await query.range(range.from, range.to)
+    : await query;
 
   if (error) {
     return fail(toAppError(error), []);

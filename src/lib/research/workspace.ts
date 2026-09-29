@@ -1,6 +1,7 @@
 import type {
   AnswerWithCitations,
   DocumentSummary,
+  ListRange,
   QuestionWithAnswers,
   ResearchWorkspace,
   SourceSummary,
@@ -29,17 +30,25 @@ const DOCUMENT_METADATA_COLUMNS =
 const SOURCE_METADATA_COLUMNS =
   "id, research_id, user_id, title, url, publisher, retrieved_at, created_at";
 
+export type WorkspaceOptions = {
+  /** Fetch one extra question to determine whether the next page exists. */
+  questionRange?: ListRange;
+  /** Fetch one extra document to determine whether the next page exists. */
+  documentRange?: ListRange;
+  /** Fetch one extra source to determine whether the next page exists. */
+  sourceRange?: ListRange;
+};
+
 /**
- * Loads everything needed to render a research workspace in one pass:
- * the research record, its questions (each with the latest answers and their
- * citations), documents and sources. Documents and sources come back as
- * metadata-only summaries; the `has_content` flag on sources is resolved with
- * a separate lightweight query so the page can still label citable sources
- * without shipping their body text.
+ * Loads one paginated slice of each workspace collection. Answers are queried
+ * only for the displayed question slice; documents and sources are metadata
+ * summaries, and the source citable-status lookup is limited to displayed
+ * source ids so no evidence body text is serialized into the page response.
  */
 export async function getResearchWorkspace(
   supabase: Supabase,
   researchId: string,
+  options: WorkspaceOptions = {},
 ): Promise<AppResult<ResearchWorkspace | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -51,41 +60,41 @@ export async function getResearchWorkspace(
     return fail(session.error, null);
   }
 
-  const [
-    researchRes,
-    questionsRes,
-    answersRes,
-    documentsRes,
-    sourcesRes,
-    citableSourcesRes,
-  ] = await Promise.all([
-    supabase.from("research").select("*").eq("id", researchId).maybeSingle(),
-    supabase
-      .from("research_questions")
-      .select("*")
-      .eq("research_id", researchId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("answers")
-      .select("*, citations(*)")
-      .eq("research_id", researchId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("documents")
-      .select(DOCUMENT_METADATA_COLUMNS)
-      .eq("research_id", researchId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("sources")
-      .select(SOURCE_METADATA_COLUMNS)
-      .eq("research_id", researchId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("sources")
-      .select("id")
-      .eq("research_id", researchId)
-      .not("content", "is", null),
-  ]);
+  const questionsQuery = supabase
+    .from("research_questions")
+    .select("*")
+    .eq("research_id", researchId)
+    .order("created_at", { ascending: true });
+  const documentsQuery = supabase
+    .from("documents")
+    .select(DOCUMENT_METADATA_COLUMNS)
+    .eq("research_id", researchId)
+    .order("created_at", { ascending: true });
+  const sourcesQuery = supabase
+    .from("sources")
+    .select(SOURCE_METADATA_COLUMNS)
+    .eq("research_id", researchId)
+    .order("created_at", { ascending: true });
+
+  const [researchRes, questionsRes, documentsRes, sourcesRes] =
+    await Promise.all([
+      supabase.from("research").select("*").eq("id", researchId).maybeSingle(),
+      options.questionRange
+        ? questionsQuery.range(
+            options.questionRange.from,
+            options.questionRange.to,
+          )
+        : questionsQuery,
+      options.documentRange
+        ? documentsQuery.range(
+            options.documentRange.from,
+            options.documentRange.to,
+          )
+        : documentsQuery,
+      options.sourceRange
+        ? sourcesQuery.range(options.sourceRange.from, options.sourceRange.to)
+        : sourcesQuery,
+    ]);
 
   if (researchRes.error) {
     return fail(toAppError(researchRes.error), null);
@@ -94,16 +103,40 @@ export async function getResearchWorkspace(
     return fail(notFound("Research not found."), null);
   }
 
-  for (const result of [
-    questionsRes,
-    answersRes,
-    documentsRes,
-    sourcesRes,
-    citableSourcesRes,
-  ]) {
+  for (const result of [questionsRes, documentsRes, sourcesRes]) {
     if (result.error) {
       return fail(toAppError(result.error), null);
     }
+  }
+
+  const questionRows = questionsRes.data ?? [];
+  const questionIds = questionRows.map((question) => question.id);
+  const answersQuery = supabase
+    .from("answers")
+    .select("*, citations(*)")
+    .eq("research_id", researchId);
+  const answersRes =
+    options.questionRange && questionIds.length > 0
+      ? await answersQuery
+          .in("question_id", questionIds)
+          .order("created_at", { ascending: true })
+      : await answersQuery.order("created_at", { ascending: true });
+
+  if (answersRes.error) {
+    return fail(toAppError(answersRes.error), null);
+  }
+
+  const sourceIds = (sourcesRes.data ?? []).map((source) => source.id);
+  const citableSourcesQuery = supabase
+    .from("sources")
+    .select("id")
+    .eq("research_id", researchId);
+  const citableSourcesRes =
+    options.sourceRange && sourceIds.length > 0
+      ? await citableSourcesQuery.in("id", sourceIds).not("content", "is", null)
+      : await citableSourcesQuery.not("content", "is", null);
+  if (citableSourcesRes.error) {
+    return fail(toAppError(citableSourcesRes.error), null);
   }
 
   const answersByQuestion = new Map<string, AnswerWithCitations[]>();
@@ -113,7 +146,13 @@ export async function getResearchWorkspace(
     answersByQuestion.set(answer.question_id, list);
   }
 
-  const questions: QuestionWithAnswers[] = (questionsRes.data ?? []).map(
+  const hasMoreQuestions =
+    options.questionRange !== undefined &&
+    questionRows.length > options.questionRange.to - options.questionRange.from;
+  const visibleQuestionRows = hasMoreQuestions
+    ? questionRows.slice(0, -1)
+    : questionRows;
+  const questions: QuestionWithAnswers[] = visibleQuestionRows.map(
     (question) => ({
       ...question,
       answers: answersByQuestion.get(question.id) ?? [],
@@ -124,9 +163,20 @@ export async function getResearchWorkspace(
     (citableSourcesRes.data ?? []).map((source) => source.id),
   );
 
-  const documents = (documentsRes.data ?? []) as DocumentSummary[];
+  const documentRows = (documentsRes.data ?? []) as DocumentSummary[];
+  const hasMoreDocuments =
+    options.documentRange !== undefined &&
+    documentRows.length > options.documentRange.to - options.documentRange.from;
+  const documents = hasMoreDocuments ? documentRows.slice(0, -1) : documentRows;
+  const sourceRows = (sourcesRes.data ?? []) as Omit<
+    SourceSummary,
+    "has_content"
+  >[];
+  const hasMoreSources =
+    options.sourceRange !== undefined &&
+    sourceRows.length > options.sourceRange.to - options.sourceRange.from;
   const sources: SourceSummary[] = (
-    (sourcesRes.data ?? []) as Omit<SourceSummary, "has_content">[]
+    hasMoreSources ? sourceRows.slice(0, -1) : sourceRows
   ).map((source) => ({
     ...source,
     has_content: citableSourceIds.has(source.id),
@@ -135,7 +185,10 @@ export async function getResearchWorkspace(
   return ok({
     research: researchRes.data,
     questions,
+    hasMoreQuestions,
     documents,
+    hasMoreDocuments,
     sources,
+    hasMoreSources,
   });
 }

@@ -22,7 +22,10 @@ function toRecentDocumentItem(item: DocumentSummary) {
 
 export async function RecentDocumentsSection() {
   const supabase = await createSupabaseClient();
-  const { data, error } = await getAllDocuments(supabase);
+  const { data, error } = await getAllDocuments(supabase, {
+    from: 0,
+    to: RECENT_DOCUMENT_LIMIT,
+  });
   const docs = error ? [] : data.map(toRecentDocumentItem);
   const recentDocuments = docs.slice(0, RECENT_DOCUMENT_LIMIT);
 

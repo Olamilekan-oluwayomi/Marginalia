@@ -88,9 +88,31 @@ const SOURCE_MODE_LABELS: Record<SourceMode, string> = {
   both: "Document + web",
 };
 
+const QUESTIONS_PER_PAGE = 10;
+const EVIDENCE_PER_PAGE = 20;
+
+function pageFromParam(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
+function workspacePageHref(
+  questionPage: number,
+  documentPage: number,
+  sourcePage: number,
+): string {
+  const params = new URLSearchParams();
+  if (questionPage > 1) params.set("questionPage", String(questionPage));
+  if (documentPage > 1) params.set("documentPage", String(documentPage));
+  if (sourcePage > 1) params.set("sourcePage", String(sourcePage));
+  const query = params.toString();
+  return query ? `?${query}` : "?";
+}
+
 function toCitationNote(
   citation: CitationRow,
   workspace: Pick<ResearchWorkspace, "documents" | "sources">,
+  number = citation.citation_number,
 ): CitationNote {
   if (citation.document_id) {
     const document = workspace.documents.find(
@@ -98,7 +120,7 @@ function toCitationNote(
     );
     return {
       id: citation.id,
-      number: citation.citation_number,
+      number,
       kind: "document",
       sourceName: document?.title ?? "Document",
       date: document ? formatDisplayDate(document.created_at) : "",
@@ -113,7 +135,7 @@ function toCitationNote(
   );
   return {
     id: citation.id,
-    number: citation.citation_number,
+    number,
     kind: "web",
     sourceName: source?.title ?? "Source",
     date: source?.retrieved_at ? formatDisplayDate(source.retrieved_at) : "",
@@ -177,12 +199,42 @@ function renderParagraph(
 
 export default async function ResearchWorkspacePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    questionPage?: string;
+    documentPage?: string;
+    sourcePage?: string;
+  }>;
 }) {
   const { id } = await params;
+  const {
+    questionPage: questionPageParam,
+    documentPage: documentPageParam,
+    sourcePage: sourcePageParam,
+  } = await searchParams;
+  const questionPage = pageFromParam(questionPageParam);
+  const documentPage = pageFromParam(documentPageParam);
+  const sourcePage = pageFromParam(sourcePageParam);
+  const questionFrom = (questionPage - 1) * QUESTIONS_PER_PAGE;
+  const documentFrom = (documentPage - 1) * EVIDENCE_PER_PAGE;
+  const sourceFrom = (sourcePage - 1) * EVIDENCE_PER_PAGE;
   const supabase = await createSupabaseClient();
-  const { data: workspace, error } = await getResearchWorkspace(supabase, id);
+  const { data: workspace, error } = await getResearchWorkspace(supabase, id, {
+    questionRange: {
+      from: questionFrom,
+      to: questionFrom + QUESTIONS_PER_PAGE,
+    },
+    documentRange: {
+      from: documentFrom,
+      to: documentFrom + EVIDENCE_PER_PAGE,
+    },
+    sourceRange: {
+      from: sourceFrom,
+      to: sourceFrom + EVIDENCE_PER_PAGE,
+    },
+  });
 
   if (error) {
     if (error.code === "NOT_FOUND" || error.code === "UNAUTHORIZED") {
@@ -210,17 +262,22 @@ export default async function ResearchWorkspacePage({
 
   const { research, questions, documents, sources } = workspace;
 
+  const citationNumberById = new Map<string, number>();
   const notes: CitationNote[] = [];
+  let nextCitationNumber = 1;
   for (const question of questions) {
     if (question.answer_status !== "complete") continue;
     const latest = question.answers[question.answers.length - 1];
     if (!latest) continue;
     if (splitAnswerParagraphs(latest.content).length === 0) continue;
-    for (const citation of latest.citations) {
-      notes.push(toCitationNote(citation, workspace));
+    for (const citation of latest.citations
+      .slice()
+      .sort((a, b) => a.citation_number - b.citation_number)) {
+      citationNumberById.set(citation.id, nextCitationNumber);
+      notes.push(toCitationNote(citation, workspace, nextCitationNumber));
+      nextCitationNumber += 1;
     }
   }
-  notes.sort((a, b) => a.number - b.number);
 
   const hasWaitingQuestions = questions.some(
     (question) =>
@@ -280,15 +337,20 @@ export default async function ResearchWorkspacePage({
                     ? splitAnswerParagraphs(latest.content)
                     : [];
 
-                  const answerNotes = latest
-                    ? latest.citations
-                        .slice()
-                        .sort((a, b) => a.citation_number - b.citation_number)
-                        .map((citation) => toCitationNote(citation, workspace))
-                    : [];
-
                   const notesByNumber = new Map(
-                    answerNotes.map((note) => [note.number, note] as const),
+                    latest
+                      ? latest.citations.map(
+                          (citation) =>
+                            [
+                              citation.citation_number,
+                              toCitationNote(
+                                citation,
+                                workspace,
+                                citationNumberById.get(citation.id),
+                              ),
+                            ] as const,
+                        )
+                      : [],
                   );
 
                   const isWaiting =
@@ -407,6 +469,45 @@ export default async function ResearchWorkspacePage({
                 })}
               </div>
             )}
+
+            {questionPage > 1 || workspace.hasMoreQuestions ? (
+              <nav
+                aria-label="Question pagination"
+                className="mt-8 flex items-center justify-between gap-4 border-t border-rule pt-6"
+              >
+                {questionPage > 1 ? (
+                  <a
+                    href={workspacePageHref(
+                      questionPage - 1,
+                      documentPage,
+                      sourcePage,
+                    )}
+                    className="font-ui text-sm text-pine underline underline-offset-4"
+                  >
+                    Previous questions
+                  </a>
+                ) : (
+                  <span />
+                )}
+                <span className="font-mono text-xs text-muted">
+                  Page {questionPage}
+                </span>
+                {workspace.hasMoreQuestions ? (
+                  <a
+                    href={workspacePageHref(
+                      questionPage + 1,
+                      documentPage,
+                      sourcePage,
+                    )}
+                    className="font-ui text-sm text-pine underline underline-offset-4"
+                  >
+                    More questions
+                  </a>
+                ) : (
+                  <span />
+                )}
+              </nav>
+            ) : null}
 
             <div className="mt-12 border-t border-rule pt-6">
               <QuestionComposer
@@ -528,6 +629,44 @@ export default async function ResearchWorkspacePage({
               })}
             </div>
           )}
+          {documentPage > 1 || workspace.hasMoreDocuments ? (
+            <nav
+              aria-label="Document pagination"
+              className="mt-6 flex items-center justify-between gap-4"
+            >
+              {documentPage > 1 ? (
+                <a
+                  href={workspacePageHref(
+                    questionPage,
+                    documentPage - 1,
+                    sourcePage,
+                  )}
+                  className="font-ui text-sm text-pine underline underline-offset-4"
+                >
+                  Previous documents
+                </a>
+              ) : (
+                <span />
+              )}
+              <span className="font-mono text-xs text-muted">
+                Page {documentPage}
+              </span>
+              {workspace.hasMoreDocuments ? (
+                <a
+                  href={workspacePageHref(
+                    questionPage,
+                    documentPage + 1,
+                    sourcePage,
+                  )}
+                  className="font-ui text-sm text-pine underline underline-offset-4"
+                >
+                  More documents
+                </a>
+              ) : (
+                <span />
+              )}
+            </nav>
+          ) : null}
         </section>
 
         <section className="mt-16 border-t border-rule pt-8">
@@ -609,6 +748,44 @@ export default async function ResearchWorkspacePage({
               })}
             </div>
           )}
+          {sourcePage > 1 || workspace.hasMoreSources ? (
+            <nav
+              aria-label="Source pagination"
+              className="mt-6 flex items-center justify-between gap-4"
+            >
+              {sourcePage > 1 ? (
+                <a
+                  href={workspacePageHref(
+                    questionPage,
+                    documentPage,
+                    sourcePage - 1,
+                  )}
+                  className="font-ui text-sm text-pine underline underline-offset-4"
+                >
+                  Previous sources
+                </a>
+              ) : (
+                <span />
+              )}
+              <span className="font-mono text-xs text-muted">
+                Page {sourcePage}
+              </span>
+              {workspace.hasMoreSources ? (
+                <a
+                  href={workspacePageHref(
+                    questionPage,
+                    documentPage,
+                    sourcePage + 1,
+                  )}
+                  className="font-ui text-sm text-pine underline underline-offset-4"
+                >
+                  More sources
+                </a>
+              ) : (
+                <span />
+              )}
+            </nav>
+          ) : null}
         </section>
 
         <section className="mt-16 border-t border-rule pt-8">

@@ -5,6 +5,8 @@ import type { Database } from "@/types/database";
 export type Supabase = SupabaseClient<Database>;
 
 export type ResearchRow = Database["public"]["Tables"]["research"]["Row"];
+/** Inclusive database row bounds for a paginated list query. */
+export type ListRange = { from: number; to: number };
 export type ResearchQuestionRow =
   Database["public"]["Tables"]["research_questions"]["Row"];
 export type DocumentRow = Database["public"]["Tables"]["documents"]["Row"];
@@ -192,6 +194,9 @@ export type SourceSummary = Omit<SourceRow, "content"> & {
 export type ResearchWorkspace = {
   research: ResearchRow;
   questions: QuestionWithAnswers[];
+  hasMoreQuestions: boolean;
   documents: DocumentSummary[];
+  hasMoreDocuments: boolean;
   sources: SourceSummary[];
+  hasMoreSources: boolean;
 };

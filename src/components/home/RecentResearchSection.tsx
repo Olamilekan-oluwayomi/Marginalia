@@ -20,7 +20,10 @@ function toResearchListItem(item: ResearchListWithCounts) {
 
 export async function RecentResearchSection() {
   const supabase = await createSupabaseClient();
-  const { data, error } = await getResearchListWithCounts(supabase);
+  const { data, error } = await getResearchListWithCounts(supabase, {
+    from: 0,
+    to: 4,
+  });
   const research = error ? [] : data.map(toResearchListItem);
 
   return (

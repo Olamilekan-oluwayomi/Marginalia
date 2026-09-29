@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { AddDocumentForm } from "@/components/documents/AddDocumentForm";
 import { DocumentActions } from "@/components/documents/DocumentActions";
@@ -29,6 +30,13 @@ type DocumentListItem = {
   status: string;
 };
 
+const PAGE_SIZE = 20;
+
+function pageFromParam(value: string | undefined): number {
+  const page = Number(value);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
+}
+
 function toDocumentListItem(item: DocumentSummary): DocumentListItem {
   return {
     id: item.id,
@@ -46,14 +54,24 @@ export const metadata: Metadata = {
     "Upload PDFs to build your research library. Documents are stored securely and processed automatically.",
 };
 
-export default async function DocumentsPage() {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = pageFromParam(pageParam);
+  const from = (page - 1) * PAGE_SIZE;
   const supabase = await createSupabaseClient();
   const [documentsResult, researchResult] = await Promise.all([
-    getAllDocuments(supabase),
+    getAllDocuments(supabase, { from, to: from + PAGE_SIZE }),
     getResearchList(supabase),
   ]);
   const { data, error } = documentsResult;
-  const documents = error ? [] : data.map(toDocumentListItem);
+  const hasMore = !error && data.length > PAGE_SIZE;
+  const documents = error
+    ? []
+    : data.slice(0, PAGE_SIZE).map(toDocumentListItem);
 
   const researchOptions = researchResult.error
     ? []
@@ -76,9 +94,9 @@ export default async function DocumentsPage() {
             <p className="mt-3 font-ui text-sm text-muted">
               {error
                 ? "Your documents can&rsquo;t be shown right now."
-                : `${documents.length} ${
+                : `Showing ${documents.length} ${
                     documents.length === 1 ? "document" : "documents"
-                  } in your research library`}
+                  } on this page`}
             </p>
           </div>
         </header>
@@ -127,79 +145,114 @@ export default async function DocumentsPage() {
               </p>
             </div>
           ) : (
-            <div>
-              {documents.map((document) => {
-                const status = toDocumentStatus(document.status);
+            <>
+              <div>
+                {documents.map((document) => {
+                  const status = toDocumentStatus(document.status);
 
-                return (
-                  <article
-                    key={document.id}
-                    className="flex items-start gap-4 border-b border-rule py-5 sm:grid sm:grid-cols-[1fr_120px_auto] sm:items-center sm:gap-x-8"
-                  >
-                    <div className="min-w-0 flex-1 sm:flex-none">
-                      <div className="flex min-w-0 items-start gap-4">
-                        <div className="mt-0.5 shrink-0 text-pine">
-                          <FileText size={18} strokeWidth={1.6} />
-                        </div>
+                  return (
+                    <article
+                      key={document.id}
+                      className="flex items-start gap-4 border-b border-rule py-5 sm:grid sm:grid-cols-[1fr_120px_auto] sm:items-center sm:gap-x-8"
+                    >
+                      <div className="min-w-0 flex-1 sm:flex-none">
+                        <div className="flex min-w-0 items-start gap-4">
+                          <div className="mt-0.5 shrink-0 text-pine">
+                            <FileText size={18} strokeWidth={1.6} />
+                          </div>
 
-                        <div className="min-w-0">
-                          <h2 className="break-words font-reading text-lg text-ink">
-                            {document.title}
-                          </h2>
+                          <div className="min-w-0">
+                            <h2 className="break-words font-reading text-lg text-ink">
+                              {document.title}
+                            </h2>
 
-                          <p className="mt-1 font-mono text-xs text-muted">
-                            {/* Each part stays intact (no lone "2026" wraps);
+                            <p className="mt-1 font-mono text-xs text-muted">
+                              {/* Each part stays intact (no lone "2026" wraps);
                               the group wraps between parts instead. */}
-                            {[
-                              document.fileType,
-                              formatFileSize(document.fileSize),
-                              `Added ${document.addedAt}`,
-                            ]
-                              .filter(Boolean)
-                              .map((part, index) => (
-                                <span key={index} className="whitespace-nowrap">
-                                  {index > 0 ? " · " : ""}
-                                  {part}
-                                </span>
-                              ))}
-                          </p>
+                              {[
+                                document.fileType,
+                                formatFileSize(document.fileSize),
+                                `Added ${document.addedAt}`,
+                              ]
+                                .filter(Boolean)
+                                .map((part, index) => (
+                                  <span
+                                    key={index}
+                                    className="whitespace-nowrap"
+                                  >
+                                    {index > 0 ? " · " : ""}
+                                    {part}
+                                  </span>
+                                ))}
+                            </p>
 
-                          <p className="mt-2 font-mono text-xs sm:hidden">
-                            <span className={documentStatusClass(status)}>
-                              {documentStatusLabel(status)}
-                            </span>
-                          </p>
+                            <p className="mt-2 font-mono text-xs sm:hidden">
+                              <span className={documentStatusClass(status)}>
+                                {documentStatusLabel(status)}
+                              </span>
+                            </p>
 
-                          <div className="mt-3 sm:hidden">
-                            <DocumentActions
-                              documentId={document.id}
-                              title={document.title}
-                              status={status}
-                            />
+                            <div className="mt-3 sm:hidden">
+                              <DocumentActions
+                                documentId={document.id}
+                                title={document.title}
+                                status={status}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <p
-                      className={`hidden font-mono text-xs sm:block ${documentStatusClass(
-                        status,
-                      )}`}
+                      <p
+                        className={`hidden font-mono text-xs sm:block ${documentStatusClass(
+                          status,
+                        )}`}
+                      >
+                        {documentStatusLabel(status)}
+                      </p>
+
+                      <div className="hidden sm:block">
+                        <DocumentActions
+                          documentId={document.id}
+                          title={document.title}
+                          status={status}
+                        />
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {page > 1 || hasMore ? (
+                <nav
+                  aria-label="Document pagination"
+                  className="mt-6 flex items-center justify-between gap-4"
+                >
+                  {page > 1 ? (
+                    <Link
+                      href={`/documents?page=${page - 1}`}
+                      className="font-ui text-sm text-pine underline underline-offset-4"
                     >
-                      {documentStatusLabel(status)}
-                    </p>
-
-                    <div className="hidden sm:block">
-                      <DocumentActions
-                        documentId={document.id}
-                        title={document.title}
-                        status={status}
-                      />
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                      Previous
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="font-mono text-xs text-muted">
+                    Page {page}
+                  </span>
+                  {hasMore ? (
+                    <Link
+                      href={`/documents?page=${page + 1}`}
+                      className="font-ui text-sm text-pine underline underline-offset-4"
+                    >
+                      Next
+                    </Link>
+                  ) : (
+                    <span />
+                  )}
+                </nav>
+              ) : null}
+            </>
           )}
         </section>
 
