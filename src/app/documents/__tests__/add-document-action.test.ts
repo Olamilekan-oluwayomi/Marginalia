@@ -8,12 +8,16 @@ const mocks = vi.hoisted(() => ({
   requireUuid: vi.fn(),
   processDocument: vi.fn(),
   revalidatePath: vi.fn(),
+  runAfterResponse: vi.fn(),
   upload: vi.fn(),
   remove: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("@/lib/research/background", () => ({
+  runAfterResponse: mocks.runAfterResponse,
+}));
 vi.mock("@/lib/research", () => ({
   createSupabaseClient: mocks.createSupabaseClient,
   createDocument: mocks.createDocument,
@@ -74,6 +78,7 @@ beforeEach(() => {
   mocks.upload.mockResolvedValue({ error: null, data: { path: "x" } });
   mocks.remove.mockResolvedValue({ error: null });
   mocks.processDocument.mockResolvedValue({ error: null, data: {} });
+  mocks.runAfterResponse.mockImplementation(() => undefined);
 });
 
 describe("addDocumentAction", () => {
@@ -180,7 +185,7 @@ describe("addDocumentAction", () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
-  it("uploads, creates the document row, processes it, and revalidates", async () => {
+  it("uploads, creates the document row, and schedules processing", async () => {
     const state = await addDocumentAction(initialState, pdfFormData());
 
     expect(state.success).toBe(true);
@@ -205,6 +210,10 @@ describe("addDocumentAction", () => {
     expect(createArgs[2].mime_type).toBe("application/pdf");
     expect(createArgs[2].file_size).toBeGreaterThan(0);
 
+    expect(mocks.runAfterResponse).toHaveBeenCalledOnce();
+    expect(mocks.processDocument).not.toHaveBeenCalled();
+    const task = mocks.runAfterResponse.mock.calls[0][0];
+    await task();
     expect(mocks.processDocument).toHaveBeenCalledWith(
       expect.anything(),
       createArgs[2].id,
@@ -230,7 +239,7 @@ describe("addDocumentAction", () => {
     expect(mocks.processDocument).not.toHaveBeenCalled();
   });
 
-  it("surfaces the processing error message", async () => {
+  it("returns success while background processing reports failures", async () => {
     mocks.processDocument.mockResolvedValue({
       error: { code: "DATABASE_ERROR", message: "Extraction failed." },
       data: null,
@@ -238,8 +247,10 @@ describe("addDocumentAction", () => {
 
     const state = await addDocumentAction(initialState, pdfFormData());
 
-    expect(state.success).toBe(false);
-    expect(state.formError).toBe("Extraction failed.");
+    expect(state.success).toBe(true);
+    expect(state.formError).toBeNull();
+    const task = mocks.runAfterResponse.mock.calls[0][0];
+    await expect(task()).resolves.toBeUndefined();
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/documents");
   });
 });

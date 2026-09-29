@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { runAfterResponse } from "@/lib/research/background";
 import {
   createDocument,
   createSupabaseClient,
@@ -19,6 +20,7 @@ import {
   PDF_MIME,
 } from "@/lib/research/document-upload";
 import { processDocument } from "@/lib/research/document-processing";
+import { describeError } from "@/lib/research/errors";
 
 export type AddDocumentState = {
   formError: string | null;
@@ -34,8 +36,8 @@ export type AddDocumentState = {
  *   1. Server-side validation (PDF only, size limit, research ownership).
  *   2. Storage upload to `{user_id}/{research_id}/{document_id}.pdf`.
  *   3. `documents` row insert with the real storage path; status `pending`.
- *   4. Synchronous processing (Phase 8.2): extract body text, persist it to
- *      `documents.content`, and mark the document `ready` (or `failed`).
+ *   4. Schedule processing after the response: extract body text, persist it
+ *      to `documents.content`, and mark the document `ready` (or `failed`).
  *   5. If the row insert fails, the just-uploaded file is removed so no
  *      orphaned object is left behind.
  *
@@ -45,6 +47,32 @@ export type AddDocumentState = {
  * `enforce_child_ownership` trigger, so a user can never create a document
  * under a research workspace they do not own.
  */
+function scheduleDocumentProcessing(
+  supabase: Awaited<ReturnType<typeof createSupabaseClient>>,
+  documentId: string,
+  researchId: string,
+): void {
+  runAfterResponse(async () => {
+    try {
+      const result = await processDocument(supabase, documentId, researchId);
+      if (result.error) {
+        console.error(
+          "[documents] background processing failed:",
+          result.error.message,
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[documents] background processing threw unexpectedly:",
+        describeError(error),
+      );
+    } finally {
+      revalidatePath("/documents");
+      revalidatePath(`/research/${researchId}`);
+    }
+  });
+}
+
 export async function addDocumentAction(
   _prevState: AddDocumentState,
   formData: FormData,
@@ -141,12 +169,9 @@ export async function addDocumentAction(
     };
   }
 
-  const processResult = await processDocument(supabase, documentId, researchId);
+  scheduleDocumentProcessing(supabase, documentId, researchId);
   revalidatePath("/documents");
   revalidatePath(`/research/${researchId}`);
-  if (processResult.error) {
-    return { formError: processResult.error.message, success: false };
-  }
 
   return { formError: null, success: true };
 }
