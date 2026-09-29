@@ -29,11 +29,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   } | null>(null);
   const lastUserId = useRef<string | null>(null);
   const userId = user?.id ?? null;
-  const userRef = useRef(user);
-
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
 
   useEffect(() => {
     if (loading) {
@@ -53,7 +48,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     const id = userId;
 
-    const metadata = userRef.current?.user_metadata;
+    const metadata = user?.user_metadata;
     const fallbackName =
       typeof metadata?.display_name === "string" && metadata.display_name.trim()
         ? metadata.display_name.trim()
@@ -92,7 +87,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loading, userId]);
+  }, [loading, userId, user?.user_metadata]);
 
   const name =
     profile && user && profile.userId === user.id ? profile.name : "";
@@ -105,8 +100,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      const previous = profile?.name ?? null;
-      setProfile({ userId: user.id, name: trimmed });
+      let previous: string | null = null;
+      setProfile((current) => {
+        previous = current?.userId === user.id ? current.name : null;
+        return { userId: user.id, name: trimmed };
+      });
 
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
@@ -127,7 +125,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       return true;
     },
-    [user, profile?.name],
+    [user],
   );
 
   return (
