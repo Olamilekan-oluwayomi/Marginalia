@@ -4,7 +4,9 @@ import { useEffect, useRef } from "react";
 import { useActionState, useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/input-class";
 import { Label } from "@/components/ui/Label";
+import { TextInput } from "@/components/ui/TextInput";
 import {
   addDocumentAction,
   type AddDocumentState,
@@ -26,10 +28,6 @@ const initialState: AddDocumentState = {
 };
 
 const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / (1024 * 1024);
-
-function inputClass() {
-  return "mt-2 w-full rounded-md border border-rule bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-pine";
-}
 
 function validateFile(file: File | null): string | null {
   if (!file) {
@@ -119,13 +117,12 @@ export function AddDocumentForm({
             <div>
               <Label htmlFor="document-file">File</Label>
 
-              <input
+              <TextInput
                 id="document-file"
                 name="file"
                 type="file"
                 accept=".pdf,application/pdf"
                 required
-                className={inputClass()}
               />
 
               <p className="mt-2 font-ui text-xs text-muted">

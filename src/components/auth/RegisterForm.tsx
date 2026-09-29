@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { TextInput } from "@/components/ui/TextInput";
 import { createClient } from "@/lib/supabase/client";
 
 type FieldName = "displayName" | "email" | "password" | "confirmPassword";
@@ -19,12 +20,6 @@ const FIELD_IDS: Record<FieldName, string> = {
   password: "password",
   confirmPassword: "confirm-password",
 };
-
-function inputClass(invalid: boolean) {
-  return `mt-2 w-full rounded-md border bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-pine ${
-    invalid ? "border-error" : "border-rule"
-  }`;
-}
 
 export function RegisterForm() {
   const router = useRouter();
@@ -151,26 +146,14 @@ export function RegisterForm() {
         >
           Display name
         </label>
-        <input
+        <TextInput
           id={FIELD_IDS.displayName}
           type="text"
           autoComplete="name"
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
-          aria-invalid={Boolean(errors.displayName)}
-          aria-describedby={
-            errors.displayName ? `${FIELD_IDS.displayName}-error` : undefined
-          }
-          className={inputClass(Boolean(errors.displayName))}
+          error={errors.displayName}
         />
-        {errors.displayName ? (
-          <p
-            id={`${FIELD_IDS.displayName}-error`}
-            className="mt-2 font-ui text-xs text-error"
-          >
-            {errors.displayName}
-          </p>
-        ) : null}
       </div>
 
       <div>
@@ -180,26 +163,14 @@ export function RegisterForm() {
         >
           Email
         </label>
-        <input
+        <TextInput
           id={FIELD_IDS.email}
           type="email"
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          aria-invalid={Boolean(errors.email)}
-          aria-describedby={
-            errors.email ? `${FIELD_IDS.email}-error` : undefined
-          }
-          className={inputClass(Boolean(errors.email))}
+          error={errors.email}
         />
-        {errors.email ? (
-          <p
-            id={`${FIELD_IDS.email}-error`}
-            className="mt-2 font-ui text-xs text-error"
-          >
-            {errors.email}
-          </p>
-        ) : null}
       </div>
 
       <div>
@@ -209,26 +180,14 @@ export function RegisterForm() {
         >
           Password
         </label>
-        <input
+        <TextInput
           id={FIELD_IDS.password}
           type="password"
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          aria-invalid={Boolean(errors.password)}
-          aria-describedby={
-            errors.password ? `${FIELD_IDS.password}-error` : undefined
-          }
-          className={inputClass(Boolean(errors.password))}
+          error={errors.password}
         />
-        {errors.password ? (
-          <p
-            id={`${FIELD_IDS.password}-error`}
-            className="mt-2 font-ui text-xs text-error"
-          >
-            {errors.password}
-          </p>
-        ) : null}
       </div>
 
       <div>
@@ -238,28 +197,14 @@ export function RegisterForm() {
         >
           Confirm password
         </label>
-        <input
+        <TextInput
           id={FIELD_IDS.confirmPassword}
           type="password"
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
-          aria-invalid={Boolean(errors.confirmPassword)}
-          aria-describedby={
-            errors.confirmPassword
-              ? `${FIELD_IDS.confirmPassword}-error`
-              : undefined
-          }
-          className={inputClass(Boolean(errors.confirmPassword))}
+          error={errors.confirmPassword}
         />
-        {errors.confirmPassword ? (
-          <p
-            id={`${FIELD_IDS.confirmPassword}-error`}
-            className="mt-2 font-ui text-xs text-error"
-          >
-            {errors.confirmPassword}
-          </p>
-        ) : null}
       </div>
 
       {formError ? (

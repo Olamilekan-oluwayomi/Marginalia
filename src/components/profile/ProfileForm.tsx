@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useProfile } from "./ProfileProvider";
 import { Button } from "@/components/ui/Button";
+import { TextInput } from "@/components/ui/TextInput";
 
 const MAX_DISPLAY_NAME_LENGTH = 60;
 const NAME_FIELD_ID = "display-name";
@@ -11,12 +12,6 @@ const NAME_FIELD_ID = "display-name";
 type ProfileFormProps = {
   email: string;
 };
-
-function inputClass(invalid: boolean, readOnly = false) {
-  return `mt-2 w-full rounded-md border bg-paper-raised px-4 py-3 font-ui text-sm outline-none transition-colors focus:border-pine ${
-    invalid ? "border-error" : "border-rule"
-  } ${readOnly ? "text-muted" : "text-ink"}`;
-}
 
 export function ProfileForm({ email }: ProfileFormProps) {
   const { name, loading, setName } = useProfile();
@@ -96,26 +91,15 @@ export function ProfileForm({ email }: ProfileFormProps) {
             Display name
           </label>
 
-          <input
+          <TextInput
             id={NAME_FIELD_ID}
             type="text"
             autoComplete="name"
             value={value}
             disabled={loading}
             onChange={(event) => setDraft(event.target.value)}
-            aria-invalid={Boolean(fieldError)}
-            aria-describedby={fieldError ? `${NAME_FIELD_ID}-error` : undefined}
-            className={inputClass(Boolean(fieldError))}
+            error={fieldError}
           />
-
-          {fieldError ? (
-            <p
-              id={`${NAME_FIELD_ID}-error`}
-              className="mt-2 font-ui text-xs text-error"
-            >
-              {fieldError}
-            </p>
-          ) : null}
         </div>
 
         <div>
@@ -126,13 +110,12 @@ export function ProfileForm({ email }: ProfileFormProps) {
             Email
           </label>
 
-          <input
+          <TextInput
             id="profile-email"
             type="email"
             value={email}
             readOnly
             disabled={loading}
-            className={inputClass(false, true)}
           />
         </div>
       </div>

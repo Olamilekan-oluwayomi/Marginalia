@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
+import { TextInput } from "@/components/ui/TextInput";
 import {
   addSourceAction,
   type AddSourceState,
@@ -21,12 +22,6 @@ const initialState: AddSourceState = {
   formError: null,
   success: false,
 };
-
-function inputClass(invalid: boolean) {
-  return `mt-2 w-full rounded-md border bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-pine ${
-    invalid ? "border-error" : "border-rule"
-  }`;
-}
 
 export function AddSourceForm({ researchId }: { researchId: string }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -54,7 +49,7 @@ export function AddSourceForm({ researchId }: { researchId: string }) {
             Title
           </label>
 
-          <input
+          <TextInput
             ref={titleRef}
             id={TITLE_FIELD_ID}
             name="title"
@@ -62,101 +57,45 @@ export function AddSourceForm({ researchId }: { researchId: string }) {
             maxLength={300}
             required
             placeholder="e.g. A systematic review of wetland loss"
-            aria-invalid={Boolean(state.fieldErrors.title)}
-            aria-describedby={
-              state.fieldErrors.title ? `${TITLE_FIELD_ID}-error` : undefined
-            }
-            className={inputClass(Boolean(state.fieldErrors.title))}
+            error={state.fieldErrors.title}
           />
-
-          {state.fieldErrors.title ? (
-            <p
-              id={`${TITLE_FIELD_ID}-error`}
-              className="mt-2 font-ui text-xs text-error"
-            >
-              {state.fieldErrors.title}
-            </p>
-          ) : null}
         </div>
 
         <div>
           <Label htmlFor={URL_FIELD_ID}>URL (optional)</Label>
 
-          <input
+          <TextInput
             id={URL_FIELD_ID}
             name="url"
             type="url"
             maxLength={500}
             placeholder="https://…"
-            aria-invalid={Boolean(state.fieldErrors.url)}
-            aria-describedby={
-              state.fieldErrors.url ? `${URL_FIELD_ID}-error` : undefined
-            }
-            className={inputClass(Boolean(state.fieldErrors.url))}
+            error={state.fieldErrors.url}
           />
-
-          {state.fieldErrors.url ? (
-            <p
-              id={`${URL_FIELD_ID}-error`}
-              className="mt-2 font-ui text-xs text-error"
-            >
-              {state.fieldErrors.url}
-            </p>
-          ) : null}
         </div>
 
         <div>
           <Label htmlFor={PUBLISHER_FIELD_ID}>Publisher (optional)</Label>
 
-          <input
+          <TextInput
             id={PUBLISHER_FIELD_ID}
             name="publisher"
             type="text"
             maxLength={200}
             placeholder="e.g. Journal of Hydrology"
-            aria-invalid={Boolean(state.fieldErrors.publisher)}
-            aria-describedby={
-              state.fieldErrors.publisher
-                ? `${PUBLISHER_FIELD_ID}-error`
-                : undefined
-            }
-            className={inputClass(Boolean(state.fieldErrors.publisher))}
+            error={state.fieldErrors.publisher}
           />
-
-          {state.fieldErrors.publisher ? (
-            <p
-              id={`${PUBLISHER_FIELD_ID}-error`}
-              className="mt-2 font-ui text-xs text-error"
-            >
-              {state.fieldErrors.publisher}
-            </p>
-          ) : null}
         </div>
 
         <div>
           <Label htmlFor={RETRIEVED_FIELD_ID}>Retrieved (optional)</Label>
 
-          <input
+          <TextInput
             id={RETRIEVED_FIELD_ID}
             name="retrievedAt"
             type="date"
-            aria-invalid={Boolean(state.fieldErrors.retrievedAt)}
-            aria-describedby={
-              state.fieldErrors.retrievedAt
-                ? `${RETRIEVED_FIELD_ID}-error`
-                : undefined
-            }
-            className={inputClass(Boolean(state.fieldErrors.retrievedAt))}
+            error={state.fieldErrors.retrievedAt}
           />
-
-          {state.fieldErrors.retrievedAt ? (
-            <p
-              id={`${RETRIEVED_FIELD_ID}-error`}
-              className="mt-2 font-ui text-xs text-error"
-            >
-              {state.fieldErrors.retrievedAt}
-            </p>
-          ) : null}
         </div>
       </div>
 

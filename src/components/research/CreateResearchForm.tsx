@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
+import { TextInput } from "@/components/ui/TextInput";
 import { Textarea } from "@/components/ui/Textarea";
 import {
   createResearchAction,
@@ -16,12 +17,6 @@ const initialState: CreateResearchState = {
   fieldErrors: {},
   formError: null,
 };
-
-function inputClass(invalid: boolean) {
-  return `mt-2 w-full rounded-md border bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-pine ${
-    invalid ? "border-error" : "border-rule"
-  }`;
-}
 
 export function CreateResearchForm() {
   const [state, formAction, pending] = useActionState(
@@ -40,7 +35,7 @@ export function CreateResearchForm() {
             Title
           </label>
 
-          <input
+          <TextInput
             id={TITLE_FIELD_ID}
             name="title"
             type="text"
@@ -48,21 +43,8 @@ export function CreateResearchForm() {
             required
             autoFocus
             placeholder="e.g. Rainfall variability and seasonal onset"
-            aria-invalid={Boolean(state.fieldErrors.title)}
-            aria-describedby={
-              state.fieldErrors.title ? `${TITLE_FIELD_ID}-error` : undefined
-            }
-            className={inputClass(Boolean(state.fieldErrors.title))}
+            error={state.fieldErrors.title}
           />
-
-          {state.fieldErrors.title ? (
-            <p
-              id={`${TITLE_FIELD_ID}-error`}
-              className="mt-2 font-ui text-xs text-error"
-            >
-              {state.fieldErrors.title}
-            </p>
-          ) : null}
         </div>
 
         <div>

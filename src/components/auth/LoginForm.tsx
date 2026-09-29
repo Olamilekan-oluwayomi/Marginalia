@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { TextInput } from "@/components/ui/TextInput";
 import { createClient } from "@/lib/supabase/client";
 
 type FieldName = "email" | "password";
@@ -16,12 +17,6 @@ const FIELD_IDS: Record<FieldName, string> = {
   email: "email",
   password: "password",
 };
-
-function inputClass(invalid: boolean) {
-  return `mt-2 w-full rounded-md border bg-paper-raised px-4 py-3 font-ui text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-pine ${
-    invalid ? "border-error" : "border-rule"
-  }`;
-}
 
 export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
   const router = useRouter();
@@ -92,26 +87,14 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
         >
           Email
         </label>
-        <input
+        <TextInput
           id={FIELD_IDS.email}
           type="email"
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          aria-invalid={Boolean(errors.email)}
-          aria-describedby={
-            errors.email ? `${FIELD_IDS.email}-error` : undefined
-          }
-          className={inputClass(Boolean(errors.email))}
+          error={errors.email}
         />
-        {errors.email ? (
-          <p
-            id={`${FIELD_IDS.email}-error`}
-            className="mt-2 font-ui text-xs text-error"
-          >
-            {errors.email}
-          </p>
-        ) : null}
       </div>
 
       <div>
@@ -121,26 +104,14 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
         >
           Password
         </label>
-        <input
+        <TextInput
           id={FIELD_IDS.password}
           type="password"
           autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          aria-invalid={Boolean(errors.password)}
-          aria-describedby={
-            errors.password ? `${FIELD_IDS.password}-error` : undefined
-          }
-          className={inputClass(Boolean(errors.password))}
+          error={errors.password}
         />
-        {errors.password ? (
-          <p
-            id={`${FIELD_IDS.password}-error`}
-            className="mt-2 font-ui text-xs text-error"
-          >
-            {errors.password}
-          </p>
-        ) : null}
       </div>
 
       {formError ? (
