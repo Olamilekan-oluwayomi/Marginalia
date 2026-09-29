@@ -43,7 +43,7 @@ function focusCitationTarget(targetId?: string) {
   if (!element) return;
 
   const reduceMotion = window.matchMedia(
-    "(prefers-reduced-motion: reduce)"
+    "(prefers-reduced-motion: reduce)",
   ).matches;
 
   element.scrollIntoView({

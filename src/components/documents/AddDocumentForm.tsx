@@ -57,7 +57,7 @@ export function AddDocumentForm({
 }) {
   const [state, formAction, pending] = useActionState(
     addDocumentAction,
-    initialState
+    initialState,
   );
   const [clientError, setClientError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -70,7 +70,7 @@ export function AddDocumentForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const input = event.currentTarget.elements.namedItem(
-      "file"
+      "file",
     ) as HTMLInputElement | null;
     const file = input?.files?.[0] ?? null;
     const error = validateFile(file);
@@ -134,7 +134,7 @@ export function AddDocumentForm({
             </div>
           </div>
 
-          {clientError ?? state.formError ? (
+          {(clientError ?? state.formError) ? (
             <p role="alert" className="mt-6 font-ui text-sm text-error">
               {clientError ?? state.formError}
             </p>

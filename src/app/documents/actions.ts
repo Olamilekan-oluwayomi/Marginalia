@@ -47,7 +47,7 @@ export type AddDocumentState = {
  */
 export async function addDocumentAction(
   _prevState: AddDocumentState,
-  formData: FormData
+  formData: FormData,
 ): Promise<AddDocumentState> {
   const researchId =
     (formData.get("researchId") as string | null)?.trim() ?? "";
@@ -83,7 +83,10 @@ export async function addDocumentAction(
   const supabase = await createSupabaseClient();
   const session = await requireUser(supabase);
   if ("error" in session) {
-    return { formError: "You need to be signed in to do that.", success: false };
+    return {
+      formError: "You need to be signed in to do that.",
+      success: false,
+    };
   }
   const userId = session.user.id;
 
@@ -105,7 +108,7 @@ export async function addDocumentAction(
   if (uploadResult.error) {
     console.error(
       "[documents] storage upload failed:",
-      uploadResult.error.message
+      uploadResult.error.message,
     );
     return {
       formError: "We couldn't upload your document. Please try again.",
@@ -129,7 +132,7 @@ export async function addDocumentAction(
     if (removeError) {
       console.error(
         "[documents] could not remove orphaned upload:",
-        removeError.message
+        removeError.message,
       );
     }
     return {
@@ -160,7 +163,7 @@ export type DeleteDocumentState = {
  */
 export async function deleteDocumentAction(
   _prevState: DeleteDocumentState,
-  formData: FormData
+  formData: FormData,
 ): Promise<DeleteDocumentState> {
   const documentId =
     (formData.get("documentId") as string | null)?.trim() ?? "";
@@ -202,7 +205,7 @@ export type RetryDocumentState = {
  */
 export async function retryDocumentAction(
   _prevState: RetryDocumentState,
-  formData: FormData
+  formData: FormData,
 ): Promise<RetryDocumentState> {
   const documentId =
     (formData.get("documentId") as string | null)?.trim() ?? "";
@@ -239,7 +242,7 @@ export async function retryDocumentAction(
   const processResult = await processDocument(
     supabase,
     document.id,
-    document.research_id
+    document.research_id,
   );
   revalidatePath("/documents");
   revalidatePath(`/research/${document.research_id}`);

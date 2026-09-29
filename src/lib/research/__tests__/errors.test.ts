@@ -87,7 +87,7 @@ describe("toAppError", () => {
     expect(result.message).not.toContain("invalid input syntax");
     expect(consoleSpy).toHaveBeenCalledWith(
       "[research-data] database error:",
-      "invalid input syntax for type uuid"
+      "invalid input syntax for type uuid",
     );
     expect(JSON.stringify(consoleSpy.mock.calls)).not.toContain("row data");
   });
@@ -98,13 +98,17 @@ describe("toAppError", () => {
     expect(result.code).toBe("DATABASE_ERROR");
     expect(consoleSpy).toHaveBeenCalledWith(
       "[research-data] database error:",
-      "connection refused"
+      "connection refused",
     );
   });
 
   it("never logs the raw object, only the message field", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const raw = { message: "only this", hint: "secret hint", details: "secret detail" };
+    const raw = {
+      message: "only this",
+      hint: "secret hint",
+      details: "secret detail",
+    };
     toAppError(raw);
     const logged = JSON.stringify(consoleSpy.mock.calls[0]);
     expect(logged).toContain("only this");
@@ -116,11 +120,11 @@ describe("toAppError", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const result = toAppError({ code: "500" });
     expect(result.message).toBe(
-      "Unable to access your data right now. Please try again."
+      "Unable to access your data right now. Please try again.",
     );
     expect(consoleSpy).toHaveBeenCalledWith(
       "[research-data] database error:",
-      "Unknown database error."
+      "Unknown database error.",
     );
   });
 });

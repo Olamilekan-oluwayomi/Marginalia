@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  isSearchError,
-  searchError,
-  type SearchError,
-} from "../errors";
+import { isSearchError, searchError, type SearchError } from "../errors";
 import {
   MAX_SEARCH_RESULTS,
   normalizeResults,
@@ -59,10 +55,15 @@ function redact(value: string, apiKey: string): string {
  * Pulls a safe message out of a Tavily error body (their `detail`/`error`
  * fields), redacting the API key, or falls back to a status-based message.
  */
-function extractErrorMessage(body: unknown, status: number, apiKey: string): string {
+function extractErrorMessage(
+  body: unknown,
+  status: number,
+  apiKey: string,
+): string {
   if (typeof body === "object" && body !== null) {
-    const candidate = (body as { detail?: unknown; error?: unknown }).detail
-      ?? (body as { detail?: unknown; error?: unknown }).error;
+    const candidate =
+      (body as { detail?: unknown; error?: unknown }).detail ??
+      (body as { detail?: unknown; error?: unknown }).error;
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return redact(candidate.trim(), apiKey);
     }
@@ -72,7 +73,7 @@ function extractErrorMessage(body: unknown, status: number, apiKey: string): str
 
 async function requestTavily(
   apiKey: string,
-  query: string
+  query: string,
 ): Promise<TavilyResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TAVILY_TIMEOUT_MS);
@@ -102,7 +103,7 @@ async function requestTavily(
     if (!response.ok) {
       throw searchError(
         "PROVIDER_ERROR",
-        extractErrorMessage(body, response.status, apiKey)
+        extractErrorMessage(body, response.status, apiKey),
       );
     }
 
@@ -111,10 +112,7 @@ async function requestTavily(
       body === null ||
       !Array.isArray((body as TavilyResponse).results)
     ) {
-      throw searchError(
-        "PROVIDER_ERROR",
-        "Web search could not be completed."
-      );
+      throw searchError("PROVIDER_ERROR", "Web search could not be completed.");
     }
     return body as TavilyResponse;
   } finally {
@@ -154,14 +152,14 @@ function toProviderError(error: unknown, apiKey: string): SearchError {
 export class TavilyWebSearchProvider implements WebSearchProvider {
   async search(query: string): Promise<WebSearchResult[]> {
     console.log(
-      `[research] webSearch:config tavilyApiKeyConfigured=${isTavilyConfigured()}`
+      `[research] webSearch:config tavilyApiKeyConfigured=${isTavilyConfigured()}`,
     );
 
     const apiKey = process.env[TAVILY_API_KEY_ENV];
     if (!apiKey) {
       throw searchError(
         "NOT_CONFIGURED",
-        "TAVILY_API_KEY is not set. Add it to .env.local to enable Tavily web search."
+        "TAVILY_API_KEY is not set. Add it to .env.local to enable Tavily web search.",
       );
     }
 
@@ -177,7 +175,7 @@ export class TavilyWebSearchProvider implements WebSearchProvider {
           title: result.title ?? "",
           url: result.url ?? "",
           content: result.content ?? "",
-        }))
+        })),
       );
     } catch (error) {
       throw toProviderError(error, apiKey);

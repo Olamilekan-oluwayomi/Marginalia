@@ -1,8 +1,5 @@
 export type AiErrorCode =
-  | "NOT_CONFIGURED"
-  | "PROVIDER_ERROR"
-  | "INVALID_RESPONSE"
-  | "INVALID_INPUT";
+  "NOT_CONFIGURED" | "PROVIDER_ERROR" | "INVALID_RESPONSE" | "INVALID_INPUT";
 
 export type AiError = {
   code: AiErrorCode;
@@ -66,8 +63,8 @@ export function toAiError(error: unknown): AiError {
     typeof candidate.status === "number" ? candidate.status : undefined;
   const rpcCode =
     (typeof candidate.error === "object" &&
-      candidate.error !== null &&
-      typeof candidate.error.code === "string"
+    candidate.error !== null &&
+    typeof candidate.error.code === "string"
       ? candidate.error.code
       : undefined) ??
     (typeof candidate.code === "string" ? candidate.code : undefined);

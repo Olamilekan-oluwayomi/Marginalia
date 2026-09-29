@@ -81,7 +81,10 @@ describe("getCitations", () => {
 
   it("returns the citations for an answer ordered by citation_number", async () => {
     const { supabase, from } = makeSupabase({
-      listResult: { data: [makeCitation(), makeCitation({ citation_number: 2 })], error: null },
+      listResult: {
+        data: [makeCitation(), makeCitation({ citation_number: 2 })],
+        error: null,
+      },
     });
 
     const result = await getCitations(supabase, ANSWER_ID);
@@ -178,7 +181,10 @@ describe("createCitation", () => {
 
   it("inserts a citation for a source link", async () => {
     const { supabase } = makeSupabase({
-      insertResult: { data: makeCitation({ source_id: SOURCE_ID, document_id: null }), error: null },
+      insertResult: {
+        data: makeCitation({ source_id: SOURCE_ID, document_id: null }),
+        error: null,
+      },
     });
 
     const result = await createCitation(supabase, ANSWER_ID, {

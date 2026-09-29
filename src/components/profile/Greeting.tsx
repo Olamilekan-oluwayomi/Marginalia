@@ -14,11 +14,7 @@ function greetingForHour(hour: number): string {
  * LCP element has meaningful text immediately — no client-side data fetch
  * required for the initial paint.
  */
-export function Greeting({
-  fallbackGreeting,
-}: {
-  fallbackGreeting?: string;
-}) {
+export function Greeting({ fallbackGreeting }: { fallbackGreeting?: string }) {
   const { name, loading } = useProfile();
   const greeting = greetingForHour(new Date().getHours());
   const label =

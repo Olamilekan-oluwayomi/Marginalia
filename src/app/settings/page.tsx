@@ -66,7 +66,9 @@ export default async function SettingsPage() {
 
                 {method ? (
                   <div className="flex items-baseline justify-between gap-6">
-                    <dt className="font-ui text-sm text-muted">Sign-in method</dt>
+                    <dt className="font-ui text-sm text-muted">
+                      Sign-in method
+                    </dt>
                     <dd className="font-ui text-sm text-ink">{method}</dd>
                   </div>
                 ) : null}

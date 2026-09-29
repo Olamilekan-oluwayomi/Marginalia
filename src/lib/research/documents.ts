@@ -32,7 +32,7 @@ function validateCreateInput(input: CreateDocumentInput): string | null {
   const fileNameError = requireText(
     input.file_name,
     "File name",
-    FILE_NAME_MAX_LENGTH
+    FILE_NAME_MAX_LENGTH,
   );
   if (fileNameError) {
     return fileNameError.message;
@@ -40,7 +40,7 @@ function validateCreateInput(input: CreateDocumentInput): string | null {
   const filePathError = requireText(
     input.file_path,
     "File path",
-    FILE_PATH_MAX_LENGTH
+    FILE_PATH_MAX_LENGTH,
   );
   if (filePathError) {
     return filePathError.message;
@@ -60,7 +60,7 @@ function validateCreateInput(input: CreateDocumentInput): string | null {
 
 export async function getDocuments(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<DocumentRow[]>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -100,7 +100,7 @@ const DOCUMENT_METADATA_COLUMNS =
  * evidence.
  */
 export async function getAllDocuments(
-  supabase: Supabase
+  supabase: Supabase,
 ): Promise<AppResult<DocumentSummary[]>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
@@ -126,7 +126,7 @@ export async function getAllDocuments(
  */
 export async function getDocumentById(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<DocumentRow | null>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {
@@ -157,7 +157,7 @@ export async function getDocumentById(
 export async function createDocument(
   supabase: Supabase,
   researchId: string,
-  input: CreateDocumentInput
+  input: CreateDocumentInput,
 ): Promise<AppResult<DocumentRow | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -213,7 +213,7 @@ export async function createDocument(
  */
 export async function setDocumentProcessing(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<boolean>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {
@@ -245,14 +245,14 @@ export async function setDocumentProcessing(
 
 export async function setDocumentReady(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<null>> {
   return setDocumentStatus(supabase, documentId, "ready");
 }
 
 export async function setDocumentFailed(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<null>> {
   return setDocumentStatus(supabase, documentId, "failed");
 }
@@ -260,7 +260,7 @@ export async function setDocumentFailed(
 async function setDocumentStatus(
   supabase: Supabase,
   documentId: string,
-  status: DocumentRow["status"]
+  status: DocumentRow["status"],
 ): Promise<AppResult<null>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {
@@ -294,7 +294,7 @@ const CONTENT_MAX_LENGTH = 200_000;
 export async function setDocumentContent(
   supabase: Supabase,
   documentId: string,
-  content: string
+  content: string,
 ): Promise<AppResult<DocumentRow | null>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {
@@ -335,7 +335,7 @@ export async function setDocumentContent(
 export async function setDocumentFilePath(
   supabase: Supabase,
   documentId: string,
-  filePath: string
+  filePath: string,
 ): Promise<AppResult<null>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {
@@ -373,7 +373,7 @@ export async function setDocumentFilePath(
  */
 export async function resetDocumentToPending(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<boolean>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {
@@ -414,7 +414,7 @@ export async function resetDocumentToPending(
  */
 export async function deleteDocumentWithStorage(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<null>> {
   const documentResult = await getDocumentById(supabase, documentId);
   if (documentResult.error) {
@@ -436,7 +436,7 @@ export async function deleteDocumentWithStorage(
   if (removeError) {
     console.error(
       "[documents] could not remove the deleted document's object:",
-      removeError.message
+      removeError.message,
     );
   }
 
@@ -445,7 +445,7 @@ export async function deleteDocumentWithStorage(
 
 export async function deleteDocument(
   supabase: Supabase,
-  documentId: string
+  documentId: string,
 ): Promise<AppResult<null>> {
   const idError = requireUuid(documentId, "Document id");
   if (idError) {

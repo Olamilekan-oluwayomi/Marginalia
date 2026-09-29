@@ -80,7 +80,11 @@ describe("processDocument", () => {
   it("requires authentication", async () => {
     mocks.requireUser.mockResolvedValue(UNATHORIZED_SESSION);
 
-    const result = await processDocument({} as Supabase, DOCUMENT_ID, RESEARCH_ID);
+    const result = await processDocument(
+      {} as Supabase,
+      DOCUMENT_ID,
+      RESEARCH_ID,
+    );
 
     expect(result.error?.code).toBe("UNAUTHORIZED");
     expect(mocks.getDocumentById).not.toHaveBeenCalled();
@@ -90,7 +94,7 @@ describe("processDocument", () => {
     const result = await processDocument(
       {} as Supabase,
       "not-a-uuid",
-      RESEARCH_ID
+      RESEARCH_ID,
     );
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
@@ -103,7 +107,11 @@ describe("processDocument", () => {
       error: notFound("Document not found."),
     });
 
-    const result = await processDocument({} as Supabase, DOCUMENT_ID, RESEARCH_ID);
+    const result = await processDocument(
+      {} as Supabase,
+      DOCUMENT_ID,
+      RESEARCH_ID,
+    );
 
     expect(result.error?.code).toBe("NOT_FOUND");
     expect(mocks.setDocumentProcessing).not.toHaveBeenCalled();
@@ -115,7 +123,11 @@ describe("processDocument", () => {
       error: null,
     });
 
-    const result = await processDocument({} as Supabase, DOCUMENT_ID, RESEARCH_ID);
+    const result = await processDocument(
+      {} as Supabase,
+      DOCUMENT_ID,
+      RESEARCH_ID,
+    );
 
     expect(result.error?.code).toBe("NOT_FOUND");
     expect(mocks.setDocumentProcessing).not.toHaveBeenCalled();
@@ -130,7 +142,7 @@ describe("processDocument", () => {
     const result = await processDocument(
       {} as Supabase,
       DOCUMENT_ID,
-      OTHER_RESEARCH_ID
+      OTHER_RESEARCH_ID,
     );
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
@@ -143,7 +155,11 @@ describe("processDocument", () => {
       error: null,
     });
 
-    const result = await processDocument({} as Supabase, DOCUMENT_ID, RESEARCH_ID);
+    const result = await processDocument(
+      {} as Supabase,
+      DOCUMENT_ID,
+      RESEARCH_ID,
+    );
 
     expect(result.error).toBeNull();
     expect(mocks.setDocumentProcessing).not.toHaveBeenCalled();
@@ -156,7 +172,11 @@ describe("processDocument", () => {
       error: null,
     });
 
-    const result = await processDocument({} as Supabase, DOCUMENT_ID, RESEARCH_ID);
+    const result = await processDocument(
+      {} as Supabase,
+      DOCUMENT_ID,
+      RESEARCH_ID,
+    );
 
     expect(result.error).toBeNull();
     expect(mocks.setDocumentProcessing).not.toHaveBeenCalled();
@@ -187,7 +207,11 @@ describe("processDocument", () => {
       error: null,
     });
 
-    const result = await processDocument({} as Supabase, DOCUMENT_ID, RESEARCH_ID);
+    const result = await processDocument(
+      {} as Supabase,
+      DOCUMENT_ID,
+      RESEARCH_ID,
+    );
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
     expect(mocks.setDocumentProcessing).not.toHaveBeenCalled();
@@ -213,7 +237,7 @@ describe("processDocument", () => {
       error: null,
     });
     mocks.extractDocumentText.mockRejectedValue(
-      new Error("No extractable text found in this document.")
+      new Error("No extractable text found in this document."),
     );
     const supabase = storageStub({ data: new Blob(["fake"]), error: null });
 
@@ -231,14 +255,14 @@ describe("processDocument", () => {
       error: null,
     });
     mocks.extractDocumentText.mockRejectedValue(
-      new Error("Unsupported document type (application/x-foo).")
+      new Error("Unsupported document type (application/x-foo)."),
     );
     const supabase = storageStub({ data: new Blob(["fake"]), error: null });
 
     const result = await processDocument(supabase, DOCUMENT_ID, RESEARCH_ID);
 
     expect(result.error?.message).toBe(
-      "Unsupported document type (application/x-foo)."
+      "Unsupported document type (application/x-foo).",
     );
     expect(mocks.setDocumentFailed).toHaveBeenCalledTimes(1);
   });
@@ -251,7 +275,7 @@ describe("processDocument", () => {
     mocks.extractDocumentText.mockRejectedValue(
       new Error("This PDF couldn't be read.", {
         cause: new Error("unexpected EOF while parsing xref table"),
-      })
+      }),
     );
     const supabase = storageStub({ data: new Blob(["fake"]), error: null });
 
@@ -268,7 +292,7 @@ describe("processDocument", () => {
       error: null,
     });
     mocks.extractDocumentText.mockRejectedValue(
-      new Error("Cannot read properties of undefined (reading 'pages')")
+      new Error("Cannot read properties of undefined (reading 'pages')"),
     );
     const supabase = storageStub({ data: new Blob(["fake"]), error: null });
 
@@ -315,18 +339,18 @@ describe("processDocument", () => {
     expect(result.error).toBeNull();
     expect(mocks.setDocumentProcessing).toHaveBeenCalledWith(
       supabase,
-      DOCUMENT_ID
+      DOCUMENT_ID,
     );
     expect(supabase.storage.from).toHaveBeenCalledWith("documents");
     expect(mocks.extractDocumentText).toHaveBeenCalledWith(
       expect.any(Uint8Array),
       "application/pdf",
-      "paper.pdf"
+      "paper.pdf",
     );
     expect(mocks.setDocumentContent).toHaveBeenCalledWith(
       supabase,
       DOCUMENT_ID,
-      "extracted body text"
+      "extracted body text",
     );
     expect(mocks.setDocumentReady).toHaveBeenCalledWith(supabase, DOCUMENT_ID);
     expect(mocks.setDocumentFailed).not.toHaveBeenCalled();

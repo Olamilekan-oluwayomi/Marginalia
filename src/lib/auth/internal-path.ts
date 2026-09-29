@@ -1,6 +1,6 @@
 export function resolveInternalPath(
   raw: string | null | undefined,
-  fallback = "/"
+  fallback = "/",
 ): string {
   if (!raw) {
     return fallback;

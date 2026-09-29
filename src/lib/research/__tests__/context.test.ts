@@ -65,7 +65,7 @@ async function retrieve(question: string) {
   const result = await retrieveResearchContext(
     fakeSupabase,
     RESEARCH_ID,
-    question
+    question,
   );
   expect(result.error).toBeNull();
   return result.data!;
@@ -75,10 +75,7 @@ describe("retrieveResearchContext", () => {
   it("loads documents and sources for the research through the data layer", async () => {
     await retrieve("extreme rainfall");
 
-    expect(mocks.getDocuments).toHaveBeenCalledWith(
-      fakeSupabase,
-      RESEARCH_ID
-    );
+    expect(mocks.getDocuments).toHaveBeenCalledWith(fakeSupabase, RESEARCH_ID);
     expect(mocks.getSources).toHaveBeenCalledWith(fakeSupabase, RESEARCH_ID);
   });
 
@@ -128,7 +125,7 @@ describe("retrieveResearchContext", () => {
 
       expect(context.items).toHaveLength(0);
       expect(context.hasBodyContent).toBe(false);
-    }
+    },
   );
 
   it("preserves the document id through retrieval", async () => {
@@ -165,11 +162,14 @@ describe("retrieveResearchContext", () => {
         answer: "text",
         citations: [{ citation_number: 1, evidence: 1 }],
       },
-      context
+      context,
     );
 
     expect(result.citations).toEqual([
-      { citation_number: 1, document_id: "22222222-2222-4222-8222-222222222222" },
+      {
+        citation_number: 1,
+        document_id: "22222222-2222-4222-8222-222222222222",
+      },
     ]);
     expect(result.rejectedCount).toBe(0);
   });
@@ -228,7 +228,7 @@ describe("retrieveResearchContext", () => {
     });
 
     const context = await retrieve(
-      "What methodology was used to analyze extreme rainfall in China?"
+      "What methodology was used to analyze extreme rainfall in China?",
     );
 
     const ids = context.items.map((item) => item.id);
@@ -240,7 +240,7 @@ describe("retrieveResearchContext", () => {
   it("keeps the context bounded to the item and character budgets", async () => {
     const longContent = Array.from(
       { length: 500 },
-      (_, i) => `Paragraph ${i} about extreme rainfall and wet weather.`
+      (_, i) => `Paragraph ${i} about extreme rainfall and wet weather.`,
     ).join("\n");
     mocks.getDocuments.mockResolvedValue({
       error: null,
@@ -249,7 +249,7 @@ describe("retrieveResearchContext", () => {
           id: `66666666-6666-4666-8666-00000000000${i}`,
           title: `Doc ${i}`,
           content: longContent,
-        })
+        }),
       ),
     });
 
@@ -276,7 +276,9 @@ describe("retrieveResearchContext", () => {
 
     const ids = context.items.map((item) => item.id);
     expect(ids).toHaveLength(new Set(ids).size);
-    expect(context.items.filter((item) => item.kind === "document")).toHaveLength(1);
+    expect(
+      context.items.filter((item) => item.kind === "document"),
+    ).toHaveLength(1);
   });
 
   it("selects the relevant passage from a long document rather than only the opening", async () => {
@@ -290,25 +292,28 @@ describe("retrieveResearchContext", () => {
     });
 
     const context = await retrieve(
-      "recurrence intervals durations extreme precipitation"
+      "recurrence intervals durations extreme precipitation",
     );
 
     expect(context.items).toHaveLength(1);
     expect(context.items[0].content).toContain(
-      "three recurrence intervals and four durations"
+      "three recurrence intervals and four durations",
     );
   });
 
   it("selects the methodology passage over a generic repeated phrase (real-paper pattern)", async () => {
     const filler =
       "Background introduction text without any question terms. ".repeat(50);
-    const genericEarly = (
-      "Seasonal distribution shows that most 1-day, 1-yr recurrence interval extreme rainfall events occur from April to September. "
-    ).repeat(20);
+    const genericEarly =
+      "Seasonal distribution shows that most 1-day, 1-yr recurrence interval extreme rainfall events occur from April to September. ".repeat(
+        20,
+      );
     const methodology =
       "Extreme events were defined by duration and recurrence interval. The event durations chosen were 1, 5, 10 and 30 days and the event thresholds were those associated with recurrence intervals of 1, 5 and 10 years. These extreme precipitation events were analysed across China.";
     const tail =
-      "Further results and discussion paragraphs about regional trends. ".repeat(80);
+      "Further results and discussion paragraphs about regional trends. ".repeat(
+        80,
+      );
 
     mocks.getDocuments.mockResolvedValue({
       error: null,
@@ -320,7 +325,7 @@ describe("retrieveResearchContext", () => {
     });
 
     const context = await retrieve(
-      "What were the three recurrence intervals and four durations used to define extreme precipitation events?"
+      "What were the three recurrence intervals and four durations used to define extreme precipitation events?",
     );
 
     expect(context.items).toHaveLength(1);
@@ -332,14 +337,19 @@ describe("retrieveResearchContext", () => {
 
   it("keeps an evidence statement complete when its values run past the window edge", async () => {
     const intro =
-      "Background introduction text that does not mention the question. ".repeat(20);
-    const dense = (
-      "The analysis of extreme precipitation events and their recurrence used the duration series approach. "
-    ).repeat(18);
+      "Background introduction text that does not mention the question. ".repeat(
+        20,
+      );
+    const dense =
+      "The analysis of extreme precipitation events and their recurrence used the duration series approach. ".repeat(
+        18,
+      );
     const methodology =
       "Event durations of 1, 5, 10 and 30 days were examined, and three precipitation total thresholds were used to identify events with recurrence intervals of 1, 5 and 10 years.";
     const tail =
-      "Further results and discussion paragraphs describing the remaining findings. ".repeat(30);
+      "Further results and discussion paragraphs describing the remaining findings. ".repeat(
+        30,
+      );
 
     mocks.getDocuments.mockResolvedValue({
       error: null,
@@ -351,7 +361,7 @@ describe("retrieveResearchContext", () => {
     });
 
     const context = await retrieve(
-      "What were the three recurrence intervals and four durations used to define extreme precipitation events?"
+      "What were the three recurrence intervals and four durations used to define extreme precipitation events?",
     );
 
     expect(context.items).toHaveLength(1);
@@ -403,7 +413,9 @@ describe("retrieveResearchContext", () => {
   it("returns no citable context when only a metadata-only source exists", async () => {
     mocks.getSources.mockResolvedValue({
       error: null,
-      data: [makeSource({ title: "Guide to rainfall", url: "https://example.com" })],
+      data: [
+        makeSource({ title: "Guide to rainfall", url: "https://example.com" }),
+      ],
     });
 
     const context = await retrieve("extreme rainfall");
@@ -434,11 +446,11 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "What were the main findings regarding rainfall?"
+      "What were the main findings regarding rainfall?",
     );
 
     expect(context.items.map((item) => item.id)[0]).toBe(
-      "77777777-7777-4777-8777-777777777701"
+      "77777777-7777-4777-8777-777777777701",
     );
     expect(context.items[0].content).toContain("results and conclusions");
   });
@@ -456,17 +468,20 @@ describe("conceptual retrieval", () => {
         makeDocument({
           id: "77777777-7777-4777-8777-777777777712",
           title: "Significant region",
-          content: "Significant levels of trend were reported for the region. ".repeat(150),
+          content:
+            "Significant levels of trend were reported for the region. ".repeat(
+              150,
+            ),
         }),
       ],
     });
 
     const context = await retrieve(
-      "Which statistical significance level was used to evaluate trends?"
+      "Which statistical significance level was used to evaluate trends?",
     );
 
     expect(context.items.map((item) => item.id)[0]).toBe(
-      "77777777-7777-4777-8777-777777777711"
+      "77777777-7777-4777-8777-777777777711",
     );
     expect(context.items[0].content).toContain("0.05");
   });
@@ -474,9 +489,10 @@ describe("conceptual retrieval", () => {
   it("retrieves the passage that states the significance level over repeated generic significance text", async () => {
     const filler =
       "Background introduction text without any question terms. ".repeat(50);
-    const genericEarly = (
-      "Statistically significant trends were observed during 1961-2009 across the study region. The significance of annual changes was evaluated at every station during the period 1961-2009. Statistical significance testing was applied to each of the 599 station records. "
-    ).repeat(12);
+    const genericEarly =
+      "Statistically significant trends were observed during 1961-2009 across the study region. The significance of annual changes was evaluated at every station during the period 1961-2009. Statistical significance testing was applied to each of the 599 station records. ".repeat(
+        12,
+      );
     const midFiller = "Unrelated filler text without keywords. ".repeat(60);
     const methods =
       "Trends were evaluated using the Mann-Kendall test at a statistical significance level (a = 0.05).";
@@ -493,7 +509,7 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     expect(context.items).toHaveLength(1);
@@ -506,9 +522,10 @@ describe("conceptual retrieval", () => {
   it("does not let a generic number-rich passage outrank the passage with the actual value", async () => {
     const filler =
       "Background introduction text without any question terms. ".repeat(50);
-    const numericGeneric = (
-      "Trends were evaluated during 1961-2009 at 599 stations across China. Statistical significance testing was applied during 1961-2009, and significant trends were found in 85 of the 599 station records between 1961 and 2009. "
-    ).repeat(10);
+    const numericGeneric =
+      "Trends were evaluated during 1961-2009 at 599 stations across China. Statistical significance testing was applied during 1961-2009, and significant trends were found in 85 of the 599 station records between 1961 and 2009. ".repeat(
+        10,
+      );
     const midFiller = "Unrelated filler text without keywords. ".repeat(60);
     const methods =
       "Trends were evaluated using the Mann-Kendall test at a statistical significance level (a = 0.05).";
@@ -525,7 +542,7 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     expect(context.items).toHaveLength(1);
@@ -537,9 +554,10 @@ describe("conceptual retrieval", () => {
   it("selects the significance level statement over a correlation passage carrying the same number", async () => {
     const filler =
       "Background introduction text without any question terms. ".repeat(50);
-    const correlationEarly = (
-      "Statistically significant correlations were found between the series at the 0.05 level. The correlation between the monthly series was statistically significant at the 0.05 level across the study region. "
-    ).repeat(8);
+    const correlationEarly =
+      "Statistically significant correlations were found between the series at the 0.05 level. The correlation between the monthly series was statistically significant at the 0.05 level across the study region. ".repeat(
+        8,
+      );
     const midFiller = "Unrelated filler text without keywords. ".repeat(60);
     const methods =
       "Trends were evaluated using the Mann-Kendall test at the statistical significance level (a = 0.05).";
@@ -556,7 +574,7 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     expect(context.items).toHaveLength(1);
@@ -570,9 +588,10 @@ describe("conceptual retrieval", () => {
   it("does not let unrelated number-rich content outrank the value-bearing methodological statement", async () => {
     const filler =
       "Background introduction text without any question terms. ".repeat(50);
-    const numericHeavy = (
-      "Statistical significance tests were applied during 1961-2009. Trends were evaluated at 45 stations, and the level of the test statistic was 0.05 for 85 of the 599 station records across the study region. "
-    ).repeat(8);
+    const numericHeavy =
+      "Statistical significance tests were applied during 1961-2009. Trends were evaluated at 45 stations, and the level of the test statistic was 0.05 for 85 of the 599 station records across the study region. ".repeat(
+        8,
+      );
     const midFiller = "Unrelated filler text without keywords. ".repeat(60);
     const methods =
       "Trends were evaluated using the Mann-Kendall test at the statistical significance level (a = 0.05).";
@@ -589,7 +608,7 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     expect(context.items).toHaveLength(1);
@@ -628,7 +647,7 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     expect(context.items.length).toBeGreaterThanOrEqual(1);
@@ -670,20 +689,20 @@ describe("conceptual retrieval", () => {
           title: "Correlation review",
           content:
             "Statistically significant correlations were found between the series at the 0.05 level. ".repeat(
-              40
+              40,
             ),
         }),
       ],
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     const primary = context.items[0];
     expect(primary.id).toBe("77777777-7777-4777-8777-777777777720");
     expect(primary.content).toContain(
-      "statistical significance level (a = 0.05)"
+      "statistical significance level (a = 0.05)",
     );
     expect(primary.content).toContain("0.05");
     expect(primary.content).not.toContain("correlations");
@@ -730,20 +749,20 @@ describe("conceptual retrieval", () => {
           title: "Correlation review",
           content:
             "Statistically significant correlations were found between the series at the 0.05 level. Correlations between the monthly series were statistically significant at the 0.05 level across the study region. ".repeat(
-              40
+              40,
             ),
         }),
       ],
     });
 
     const context = await retrieve(
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     const primary = context.items[0];
     expect(primary.id).toBe("77777777-7777-4777-8777-777777777718");
     expect(primary.content).toContain(
-      "statistical significance level (a = 0.05)"
+      "statistical significance level (a = 0.05)",
     );
     expect(primary.content).toContain("0.05");
     expect(primary.content).not.toContain("correlations");
@@ -753,16 +772,14 @@ describe("conceptual retrieval", () => {
 
     const section = buildContextSection(context);
     expect(section).not.toBeNull();
-    expect(section!).toContain(
-      "statistical significance level (a = 0.05)"
-    );
+    expect(section!).toContain("statistical significance level (a = 0.05)");
     expect(section!).toContain("0.05");
   });
 
   it("prioritizes the paper's own methodology and retrieves its findings over a prior-study review", async () => {
     const filler =
       "Background narrative paragraphs provide context for the reader. ".repeat(
-        45
+        45,
       );
     const litReview =
       "Earlier studies of extreme precipitation in the region applied the generalized extreme value distribution. Kim et al. (2005) applied a generalized extreme value distribution methodology to model precipitation extremes and used the Mann-Kendall test to evaluate temporal trends. Previous trend studies reported varied results across regions.";
@@ -778,19 +795,13 @@ describe("conceptual retrieval", () => {
           id: "77777777-7777-4777-8777-777777777714",
           title: "Extreme precipitation paper",
           content:
-            filler +
-            litReview +
-            filler +
-            methods +
-            filler +
-            findings +
-            filler,
+            filler + litReview + filler + methods + filler + findings + filler,
         }),
       ],
     });
 
     const context = await retrieve(
-      "What methodology did the authors use and what were the main findings regarding temporal variation?"
+      "What methodology did the authors use and what were the main findings regarding temporal variation?",
     );
 
     expect(context.items).toHaveLength(2);
@@ -815,7 +826,7 @@ describe("conceptual retrieval", () => {
       "The key findings indicated that rainfall increased over time. The results showed a rising trend across all stations.";
     const filler =
       "Background narrative paragraphs provide context for the reader. ".repeat(
-        40
+        40,
       );
     mocks.getDocuments.mockResolvedValue({
       error: null,
@@ -829,7 +840,7 @@ describe("conceptual retrieval", () => {
     });
 
     const context = await retrieve(
-      "Describe the methodology and the main findings of the study."
+      "Describe the methodology and the main findings of the study.",
     );
 
     expect(context.items).toHaveLength(2);
@@ -861,12 +872,10 @@ describe("selectRelevantPassages", () => {
     const p34 =
       "a statistically significant (at α = 0.05 level) decreasing trend based " +
       "on the Kendall test";
-    const filler = "Background material includes various unrelated topics. ".repeat(
-      76
-    );
-    const gap = "Additional background paragraphs provide further context. ".repeat(
-      84
-    );
+    const filler =
+      "Background material includes various unrelated topics. ".repeat(76);
+    const gap =
+      "Additional background paragraphs provide further context. ".repeat(84);
 
     const passages = selectRelevantPassages(
       "What is the statistical significance level used for trend analysis?",
@@ -881,15 +890,13 @@ describe("selectRelevantPassages", () => {
           p32,
           p34,
         ].join(" "),
-      }
+      },
     );
 
     const hasMethods = passages.some((passage) =>
-      passage.includes("wavelet coherence")
+      passage.includes("wavelet coherence"),
     );
-    const hasResults = passages.some(
-      (passage) => passage.includes("Kendall")
-    );
+    const hasResults = passages.some((passage) => passage.includes("Kendall"));
     expect(passages.length).toBeGreaterThan(1);
     expect(hasMethods).toBe(true);
     expect(hasResults).toBe(true);
@@ -898,8 +905,7 @@ describe("selectRelevantPassages", () => {
 
 describe("ranking quality", () => {
   it("ranks a clustered passage above documents with keywords scattered far apart", async () => {
-    const filler =
-      "Unrelated background narrative paragraphs. ".repeat(120);
+    const filler = "Unrelated background narrative paragraphs. ".repeat(120);
     mocks.getDocuments.mockResolvedValue({
       error: null,
       data: [
@@ -924,11 +930,11 @@ describe("ranking quality", () => {
     });
 
     const context = await retrieve(
-      "recurrence intervals durations extreme precipitation"
+      "recurrence intervals durations extreme precipitation",
     );
 
     expect(context.items.map((item) => item.id)[0]).toBe(
-      "77777777-7777-4777-8777-777777777732"
+      "77777777-7777-4777-8777-777777777732",
     );
   });
 
@@ -969,7 +975,10 @@ describe("ranking quality", () => {
     mocks.getSources.mockResolvedValue({
       error: null,
       data: [
-        makeSource({ title: "Crop guide", content: "Wheat production statistics." }),
+        makeSource({
+          title: "Crop guide",
+          content: "Wheat production statistics.",
+        }),
       ],
     });
 
@@ -1012,14 +1021,16 @@ describe("duplicate source handling", () => {
     expect(sourceItems).toHaveLength(2);
 
     const kept = sourceItems.find((item) =>
-      item.metadata.url?.startsWith("https://example.com/report")
+      item.metadata.url?.startsWith("https://example.com/report"),
     );
     expect(kept).toBeDefined();
     expect(kept!.content).toContain("Body text describing rainfall methods");
     expect(context.hasBodyContent).toBe(true);
 
     expect(
-      sourceItems.some((item) => item.metadata.url === "https://example.org/rain")
+      sourceItems.some(
+        (item) => item.metadata.url === "https://example.org/rain",
+      ),
     ).toBe(true);
   });
 });

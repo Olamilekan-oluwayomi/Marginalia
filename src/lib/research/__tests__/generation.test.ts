@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { aiError, isAiError } from "@/lib/ai/errors";
-import type {
-  ResearchQuestionRow,
-  Supabase,
-} from "@/lib/research/types";
+import type { ResearchQuestionRow, Supabase } from "@/lib/research/types";
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
@@ -43,7 +40,7 @@ vi.mock("@/lib/research/context", () => ({
   buildResearchPrompt: mocks.buildResearchPrompt,
   selectRelevantPassages: (
     question: string,
-    document: { title: string; content: string }
+    document: { title: string; content: string },
   ) => [document.content],
 }));
 vi.mock("@/lib/research/questions", () => ({
@@ -129,7 +126,9 @@ beforeEach(() => {
   });
   mocks.getDocuments.mockResolvedValue({ error: null, data: [] });
   mocks.detectExplicitSearchIntent.mockReturnValue(null);
-  mocks.buildResearchPrompt.mockReturnValue("Research question:\nWhat is the capital of France?");
+  mocks.buildResearchPrompt.mockReturnValue(
+    "Research question:\nWhat is the capital of France?",
+  );
   mocks.generateJson.mockResolvedValue({
     answer: "Paris is the capital of France.",
     citations: [],
@@ -170,18 +169,18 @@ describe("generateAnswer", () => {
       question.research_id,
       // No document is attached, so the question routes to the web; with a
       // successful web search the answer is labeled "web".
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "complete"
+      "complete",
     );
   });
 
   it("marks the question failed and returns a safe error on an empty provider response", async () => {
     mocks.generateJson.mockRejectedValue(
-      aiError("PROVIDER_ERROR", "The AI provider returned an empty response.")
+      aiError("PROVIDER_ERROR", "The AI provider returned an empty response."),
     );
     mocks.runWebResearch.mockResolvedValue({
       error: null,
@@ -199,13 +198,13 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
   it("marks the question failed and returns a safe error on provider failure", async () => {
     mocks.generateJson.mockRejectedValue(
-      aiError("PROVIDER_ERROR", "Provider exploded.")
+      aiError("PROVIDER_ERROR", "Provider exploded."),
     );
     mocks.runWebResearch.mockResolvedValue({
       error: null,
@@ -222,7 +221,7 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -243,7 +242,7 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -266,7 +265,7 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -303,7 +302,10 @@ describe("generateAnswer", () => {
   it("rejects a question that does not belong to the supplied research", async () => {
     mocks.getQuestionById.mockResolvedValue({
       error: null,
-      data: { ...question, research_id: "55555555-5555-5555-5555-555555555555" },
+      data: {
+        ...question,
+        research_id: "55555555-5555-5555-5555-555555555555",
+      },
     });
 
     const result = await generateAnswer(fakeSupabase, {
@@ -357,20 +359,20 @@ describe("generateAnswer", () => {
     expect(mocks.runWebResearch).toHaveBeenCalledWith(
       fakeSupabase,
       question.research_id,
-      question.question
+      question.question,
     );
     expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
     expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
       question.question,
       expect.objectContaining({
         items: expect.arrayContaining([webItem]),
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
   });
 
@@ -407,28 +409,29 @@ describe("generateAnswer", () => {
     expect(result.error).toBeNull();
     expect(mocks.checkDocumentRelevance).toHaveBeenCalledWith(
       question.question,
-      expect.stringContaining("A trend analysis of extreme precipitation.")
+      expect.stringContaining("A trend analysis of extreme precipitation."),
     );
     expect(mocks.runWebResearch).toHaveBeenCalledOnce();
     expect(mocks.runWebResearch).toHaveBeenCalledWith(
       fakeSupabase,
       question.research_id,
-      question.question
+      question.question,
     );
     expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
       question.question,
       expect.objectContaining({
         items: expect.arrayContaining([webItem]),
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
       expect.objectContaining({
-        fallback_reason: "This wasn't found in your document, so I searched the web instead.",
+        fallback_reason:
+          "This wasn't found in your document, so I searched the web instead.",
         source_mode: "web",
-      })
+      }),
     );
   });
 
@@ -491,16 +494,17 @@ describe("generateAnswer", () => {
       question.question,
       expect.objectContaining({
         items: [webItem],
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
       expect.objectContaining({
-        fallback_reason: "This wasn't found in your document, so I searched the web instead.",
+        fallback_reason:
+          "This wasn't found in your document, so I searched the web instead.",
         source_mode: "web",
-      })
+      }),
     );
     expect(mocks.createCitation).toHaveBeenCalledWith(
       expect.anything(),
@@ -509,7 +513,7 @@ describe("generateAnswer", () => {
         citation_number: 1,
         document_id: undefined,
         source_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-      })
+      }),
     );
   });
 
@@ -551,7 +555,10 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ fallback_reason: null, source_mode: "document" })
+      expect.objectContaining({
+        fallback_reason: null,
+        source_mode: "document",
+      }),
     );
   });
 
@@ -602,7 +609,7 @@ describe("generateAnswer", () => {
       question.question,
       expect.objectContaining({
         items: [documentItem],
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
@@ -611,7 +618,7 @@ describe("generateAnswer", () => {
       expect.objectContaining({
         fallback_reason: null,
         source_mode: "document",
-      })
+      }),
     );
   });
 
@@ -733,7 +740,7 @@ describe("generateAnswer", () => {
 
     expect(result.error).toBeNull();
     expect(mocks.detectExplicitSearchIntent).toHaveBeenCalledWith(
-      question.question
+      question.question,
     );
     expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
     expect(mocks.runWebResearch).toHaveBeenCalledOnce();
@@ -743,13 +750,13 @@ describe("generateAnswer", () => {
         items: expect.not.arrayContaining([
           expect.objectContaining({ kind: "document" }),
         ]),
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
   });
 
@@ -799,13 +806,16 @@ describe("generateAnswer", () => {
             id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
           }),
         ],
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ fallback_reason: null, source_mode: "document" })
+      expect.objectContaining({
+        fallback_reason: null,
+        source_mode: "document",
+      }),
     );
   });
 
@@ -830,7 +840,7 @@ describe("generateAnswer", () => {
       data: [makeReadyDocument()],
     });
     mocks.checkDocumentRelevance.mockRejectedValue(
-      aiError("PROVIDER_ERROR", "Provider exploded.")
+      aiError("PROVIDER_ERROR", "Provider exploded."),
     );
 
     const result = await generateAnswer(fakeSupabase, {
@@ -844,7 +854,10 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ fallback_reason: null, source_mode: "document" })
+      expect.objectContaining({
+        fallback_reason: null,
+        source_mode: "document",
+      }),
     );
   });
 
@@ -886,7 +899,9 @@ describe("generateAnswer", () => {
       error: null,
       data: { items: [webItem], addedCount: 1 },
     });
-    mocks.buildResearchPrompt.mockReturnValue("Research question:\nWhat is the capital of France?");
+    mocks.buildResearchPrompt.mockReturnValue(
+      "Research question:\nWhat is the capital of France?",
+    );
     mocks.generateJson.mockResolvedValue({
       answer: "Paris is the capital of France.",
       citations: [],
@@ -901,14 +916,14 @@ describe("generateAnswer", () => {
     expect(mocks.runWebResearch).toHaveBeenCalledWith(
       fakeSupabase,
       question.research_id,
-      question.question
+      question.question,
     );
     expect(mocks.checkDocumentRelevance).not.toHaveBeenCalled();
     expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
       question.question,
       expect.objectContaining({
         items: expect.arrayContaining([webItem]),
-      })
+      }),
     );
     expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
       question.question,
@@ -916,13 +931,13 @@ describe("generateAnswer", () => {
         items: expect.arrayContaining([
           expect.objectContaining({ kind: "document" }),
         ]),
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
   });
 
@@ -958,13 +973,13 @@ describe("generateAnswer", () => {
       question.question,
       expect.objectContaining({
         items: expect.arrayContaining([webItem]),
-      })
+      }),
     );
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
   });
 
@@ -1031,7 +1046,7 @@ describe("generateAnswer", () => {
       expect.objectContaining({
         content: "A significance level of 0.05 was used [1].",
         source_mode: "document",
-      })
+      }),
     );
     expect(mocks.createCitation).toHaveBeenCalledWith(
       expect.anything(),
@@ -1041,7 +1056,7 @@ describe("generateAnswer", () => {
         document_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         source_id: undefined,
         excerpt: "alpha of 0.05 was used for every trend analysis.",
-      })
+      }),
     );
   });
 
@@ -1079,7 +1094,7 @@ describe("generateAnswer", () => {
       question.research_id,
       expect.objectContaining({
         content: "A significance level of 0.05 was used.",
-      })
+      }),
     );
   });
 
@@ -1142,7 +1157,7 @@ describe("generateAnswer", () => {
       expect(result.error).toBeNull();
       expect(errorSpy).toHaveBeenCalledWith(
         "[research] webSearch failed:",
-        "Web search failed."
+        "Web search failed.",
       );
       expect(mocks.buildResearchPrompt).toHaveBeenCalledWith(
         question.question,
@@ -1153,7 +1168,7 @@ describe("generateAnswer", () => {
               id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             }),
           ],
-        })
+        }),
       );
       expect(mocks.createAnswer).toHaveBeenCalledWith(
         expect.anything(),
@@ -1162,7 +1177,7 @@ describe("generateAnswer", () => {
         expect.objectContaining({
           fallback_reason:
             "This wasn't found in your document, so I searched the web instead.",
-        })
+        }),
       );
     } finally {
       errorSpy.mockRestore();
@@ -1197,7 +1212,7 @@ describe("generateAnswer", () => {
 
   it("logs the provider message when generation fails with an AI error", async () => {
     mocks.generateJson.mockRejectedValue(
-      aiError("PROVIDER_ERROR", "Provider exploded.")
+      aiError("PROVIDER_ERROR", "Provider exploded."),
     );
     mocks.runWebResearch.mockResolvedValue({
       error: null,
@@ -1215,7 +1230,7 @@ describe("generateAnswer", () => {
       expect(result.error?.message).toContain("try again");
       expect(errorSpy).toHaveBeenCalledWith(
         "[research-data] answer generation failed:",
-        "Provider exploded."
+        "Provider exploded.",
       );
     } finally {
       errorSpy.mockRestore();
@@ -1266,7 +1281,7 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -1288,7 +1303,7 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -1309,14 +1324,14 @@ describe("generateAnswer", () => {
       expect(result.error?.message).toContain("web sources");
       expect(errorSpy).toHaveBeenCalledWith(
         "[research] webSearch failed:",
-        "Web search failed."
+        "Web search failed.",
       );
       expect(mocks.generateJson).not.toHaveBeenCalled();
       expect(mocks.createAnswer).not.toHaveBeenCalled();
       expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
         expect.anything(),
         question.id,
-        "failed"
+        "failed",
       );
     } finally {
       errorSpy.mockRestore();
@@ -1348,7 +1363,7 @@ describe("generateAnswer", () => {
         content: "The capital of France is Paris [1].",
         source_mode: "web",
         fallback_reason: null,
-      })
+      }),
     );
     expect(mocks.createCitation).toHaveBeenCalledWith(
       expect.anything(),
@@ -1358,7 +1373,7 @@ describe("generateAnswer", () => {
         document_id: undefined,
         source_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         excerpt: "The capital of France is Paris [1].",
-      })
+      }),
     );
   });
 
@@ -1399,7 +1414,7 @@ describe("generateAnswer", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -1444,12 +1459,12 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "document" })
+      expect.objectContaining({ source_mode: "document" }),
     );
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "complete"
+      "complete",
     );
   });
 
@@ -1509,7 +1524,7 @@ describe("generateAnswer", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "both", fallback_reason: null })
+      expect.objectContaining({ source_mode: "both", fallback_reason: null }),
     );
     expect(mocks.createCitation).toHaveBeenCalledWith(
       expect.anything(),
@@ -1519,7 +1534,7 @@ describe("generateAnswer", () => {
         document_id: undefined,
         source_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         excerpt: "Related guidance is available online [2].",
-      })
+      }),
     );
   });
 });
@@ -1557,7 +1572,7 @@ describe("system prompt selection by source mode", () => {
     expect(result.error).toBeNull();
     const args = mocks.generateJson.mock.calls[0][0] as { system: string };
     expect(args.system).toContain(
-      "You are answering from the user's uploaded documents only."
+      "You are answering from the user's uploaded documents only.",
     );
   });
 
@@ -1609,7 +1624,7 @@ describe("system prompt selection by source mode", () => {
     expect(result.error).toBeNull();
     const args = mocks.generateJson.mock.calls[0][0] as { system: string };
     expect(args.system).toContain(
-      "You are answering from the user's uploaded documents and web search results together."
+      "You are answering from the user's uploaded documents and web search results together.",
     );
   });
 
@@ -1644,7 +1659,7 @@ describe("system prompt selection by source mode", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
   });
 });
@@ -1676,19 +1691,19 @@ describe("answer generation fallback", () => {
     // Research is never re-run for the fallback: the exact same input is
     // retried as-is.
     expect(mocks.groqGenerate.mock.calls[0][0]).toEqual(
-      mocks.generateJson.mock.calls[0][0]
+      mocks.generateJson.mock.calls[0][0],
     );
     expect(mocks.runWebResearch).toHaveBeenCalledOnce();
     expect(mocks.createAnswer).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "complete"
+      "complete",
     );
   });
 
@@ -1742,7 +1757,7 @@ describe("answer generation fallback", () => {
 
   it("does not fall back on a permanent primary failure", async () => {
     mocks.generateJson.mockRejectedValue(
-      aiError("PROVIDER_ERROR", "Provider exploded.")
+      aiError("PROVIDER_ERROR", "Provider exploded."),
     );
     mocks.runWebResearch.mockResolvedValue({
       error: null,
@@ -1759,7 +1774,7 @@ describe("answer generation fallback", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -1810,7 +1825,7 @@ describe("answer generation fallback", () => {
       status: 429,
     });
     mocks.groqGenerate.mockRejectedValue(
-      aiError("PROVIDER_ERROR", "Groq exploded.")
+      aiError("PROVIDER_ERROR", "Groq exploded."),
     );
 
     const result = await generateAnswer(fakeSupabase, {
@@ -1825,7 +1840,7 @@ describe("answer generation fallback", () => {
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "failed"
+      "failed",
     );
   });
 
@@ -1868,7 +1883,7 @@ describe("answer generation fallback", () => {
       expect.anything(),
       question.id,
       question.research_id,
-      expect.objectContaining({ source_mode: "document" })
+      expect.objectContaining({ source_mode: "document" }),
     );
     expect(mocks.createCitation).toHaveBeenCalledWith(
       expect.anything(),
@@ -1878,12 +1893,12 @@ describe("answer generation fallback", () => {
         document_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         source_id: undefined,
         excerpt: "alpha of 0.05 was used for every trend analysis.",
-      })
+      }),
     );
     expect(mocks.updateQuestionStatus).toHaveBeenCalledWith(
       expect.anything(),
       question.id,
-      "complete"
+      "complete",
     );
   });
 });

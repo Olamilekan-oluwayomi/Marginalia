@@ -50,8 +50,8 @@ describe("createResearchAction", () => {
     await expect(
       createResearchAction(
         initialState,
-        formDataWith("  My research  ", "  A description  ")
-      )
+        formDataWith("  My research  ", "  A description  "),
+      ),
     ).rejects.toThrow("NEXT_REDIRECT");
 
     expect(mocks.createResearch).toHaveBeenCalledWith(expect.anything(), {
@@ -65,7 +65,7 @@ describe("createResearchAction", () => {
 
   it("drops a blank description", async () => {
     await expect(
-      createResearchAction(initialState, formDataWith("My research", "   "))
+      createResearchAction(initialState, formDataWith("My research", "   ")),
     ).rejects.toThrow("NEXT_REDIRECT");
 
     expect(mocks.createResearch).toHaveBeenCalledWith(expect.anything(), {
@@ -81,9 +81,7 @@ describe("createResearchAction", () => {
 
     const state = await createResearchAction(initialState, formDataWith("  "));
 
-    expect(state.fieldErrors.title).toBe(
-      "Title must be at least 1 character."
-    );
+    expect(state.fieldErrors.title).toBe("Title must be at least 1 character.");
     expect(state.formError).toBeNull();
     expect(mocks.createResearch).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
@@ -96,7 +94,7 @@ describe("createResearchAction", () => {
 
     const state = await createResearchAction(
       initialState,
-      formDataWith("My research", "too long")
+      formDataWith("My research", "too long"),
     );
 
     expect(state.fieldErrors.description).toBe("Description is too long.");
@@ -111,7 +109,7 @@ describe("createResearchAction", () => {
 
     const state = await createResearchAction(
       initialState,
-      formDataWith("My research")
+      formDataWith("My research"),
     );
 
     expect(state.formError).toContain("signed in");
@@ -126,7 +124,7 @@ describe("createResearchAction", () => {
 
     const state = await createResearchAction(
       initialState,
-      formDataWith("My research")
+      formDataWith("My research"),
     );
 
     expect(state.formError).toContain("couldn't create your research");

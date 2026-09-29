@@ -39,7 +39,7 @@ describe("generateText", () => {
     await generateText({ prompt: "hi" });
 
     expect(mocks.generateContent).toHaveBeenCalledWith(
-      expect.objectContaining({ model: DEFAULT_MODEL })
+      expect.objectContaining({ model: DEFAULT_MODEL }),
     );
   });
 
@@ -53,7 +53,7 @@ describe("generateText", () => {
 
   it("rejects with INVALID_INPUT without calling the provider for an oversized prompt", async () => {
     await expect(
-      generateText({ prompt: "x".repeat(MAX_PROMPT_CHARS + 1) })
+      generateText({ prompt: "x".repeat(MAX_PROMPT_CHARS + 1) }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
 
     expect(mocks.generateContent).not.toHaveBeenCalled();
@@ -64,7 +64,7 @@ describe("generateText", () => {
       generateText({
         prompt: "hi",
         system: "x".repeat(MAX_SYSTEM_CHARS + 1),
-      })
+      }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
 
     expect(mocks.generateContent).not.toHaveBeenCalled();
@@ -74,7 +74,7 @@ describe("generateText", () => {
     mocks.generateContent.mockReturnValue(new Promise(() => {}));
 
     await expect(
-      generateText({ prompt: "hi", timeoutMs: 5 })
+      generateText({ prompt: "hi", timeoutMs: 5 }),
     ).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
   });
 });
@@ -102,7 +102,7 @@ describe("generateJson", () => {
 
   it("rejects with INVALID_INPUT for an oversized prompt", async () => {
     await expect(
-      generateJson({ prompt: "x".repeat(MAX_PROMPT_CHARS + 1) })
+      generateJson({ prompt: "x".repeat(MAX_PROMPT_CHARS + 1) }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
   });
 });
@@ -115,11 +115,11 @@ describe("isTransientProviderError", () => {
   });
 
   it("treats provider RPC overload codes as transient", () => {
+    expect(isTransientProviderError({ error: { code: "UNAVAILABLE" } })).toBe(
+      true,
+    );
     expect(
-      isTransientProviderError({ error: { code: "UNAVAILABLE" } })
-    ).toBe(true);
-    expect(
-      isTransientProviderError({ error: { code: "RESOURCE_EXHAUSTED" } })
+      isTransientProviderError({ error: { code: "RESOURCE_EXHAUSTED" } }),
     ).toBe(true);
   });
 
@@ -169,7 +169,7 @@ describe("transient retry", () => {
       code: "PROVIDER_ERROR",
     });
     expect(mocks.generateContent).toHaveBeenCalledTimes(
-      GENERATION_RETRY_ATTEMPTS
+      GENERATION_RETRY_ATTEMPTS,
     );
   });
 
@@ -191,7 +191,7 @@ describe("transient retry", () => {
     mocks.generateContent.mockReturnValue(new Promise(() => {}));
 
     await expect(
-      generateText({ prompt: "hi", timeoutMs: 5 })
+      generateText({ prompt: "hi", timeoutMs: 5 }),
     ).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
     expect(mocks.generateContent).toHaveBeenCalledTimes(1);
   });

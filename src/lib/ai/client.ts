@@ -30,7 +30,7 @@ export function getAiClient(): GoogleGenAI {
     if (!apiKey) {
       throw aiError(
         "NOT_CONFIGURED",
-        "GEMINI_API_KEY is not set. Add it to .env.local to enable AI features."
+        "GEMINI_API_KEY is not set. Add it to .env.local to enable AI features.",
       );
     }
     client = new GoogleGenAI({ apiKey });

@@ -1,10 +1,6 @@
 export function DocumentsSectionSkeleton() {
   return (
-    <section
-      className="mt-12"
-      aria-busy="true"
-      aria-label="Loading documents"
-    >
+    <section className="mt-12" aria-busy="true" aria-label="Loading documents">
       <div className="mb-4 h-3 w-32 animate-pulse rounded bg-rule" />
       <div className="space-y-0">
         {Array.from({ length: 3 }).map((_, i) => (

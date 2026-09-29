@@ -23,9 +23,10 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const [profile, setProfile] = useState<{ userId: string; name: string } | null>(
-    null
-  );
+  const [profile, setProfile] = useState<{
+    userId: string;
+    name: string;
+  } | null>(null);
   const lastUserId = useRef<string | null>(null);
   const userId = user?.id ?? null;
   const userRef = useRef(user);
@@ -93,8 +94,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loading, userId]);
 
-  const name = profile && user && profile.userId === user.id ? profile.name : "";
-  const email = user ? user.email ?? "" : "";
+  const name =
+    profile && user && profile.userId === user.id ? profile.name : "";
+  const email = user ? (user.email ?? "") : "";
 
   const setName = useCallback(
     async (next: string): Promise<boolean> => {
@@ -118,14 +120,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         setProfile((current) =>
           current && current.userId === user.id && previous !== null
             ? { userId: user.id, name: previous }
-            : current
+            : current,
         );
         return false;
       }
 
       return true;
     },
-    [user, profile?.name]
+    [user, profile?.name],
   );
 
   return (

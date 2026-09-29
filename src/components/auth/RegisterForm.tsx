@@ -34,7 +34,9 @@ export function RegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "submitting" | "success">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success">(
+    "idle",
+  );
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
@@ -116,7 +118,9 @@ export function RegisterForm() {
   if (status === "success") {
     return (
       <div className="mt-8">
-        <h2 className="font-reading text-2xl leading-tight text-ink">Check your email</h2>
+        <h2 className="font-reading text-2xl leading-tight text-ink">
+          Check your email
+        </h2>
 
         <p className="mt-3 font-ui text-sm leading-relaxed text-muted">
           Your account has been created. Confirm your email address to continue.
@@ -141,7 +145,10 @@ export function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-8 grid gap-6">
       <div>
-        <label htmlFor={FIELD_IDS.displayName} className="font-ui text-sm font-medium text-ink">
+        <label
+          htmlFor={FIELD_IDS.displayName}
+          className="font-ui text-sm font-medium text-ink"
+        >
           Display name
         </label>
         <input
@@ -167,7 +174,10 @@ export function RegisterForm() {
       </div>
 
       <div>
-        <label htmlFor={FIELD_IDS.email} className="font-ui text-sm font-medium text-ink">
+        <label
+          htmlFor={FIELD_IDS.email}
+          className="font-ui text-sm font-medium text-ink"
+        >
           Email
         </label>
         <input
@@ -177,18 +187,26 @@ export function RegisterForm() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={Boolean(errors.email)}
-          aria-describedby={errors.email ? `${FIELD_IDS.email}-error` : undefined}
+          aria-describedby={
+            errors.email ? `${FIELD_IDS.email}-error` : undefined
+          }
           className={inputClass(Boolean(errors.email))}
         />
         {errors.email ? (
-          <p id={`${FIELD_IDS.email}-error`} className="mt-2 font-ui text-xs text-error">
+          <p
+            id={`${FIELD_IDS.email}-error`}
+            className="mt-2 font-ui text-xs text-error"
+          >
             {errors.email}
           </p>
         ) : null}
       </div>
 
       <div>
-        <label htmlFor={FIELD_IDS.password} className="font-ui text-sm font-medium text-ink">
+        <label
+          htmlFor={FIELD_IDS.password}
+          className="font-ui text-sm font-medium text-ink"
+        >
           Password
         </label>
         <input
@@ -198,11 +216,16 @@ export function RegisterForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           aria-invalid={Boolean(errors.password)}
-          aria-describedby={errors.password ? `${FIELD_IDS.password}-error` : undefined}
+          aria-describedby={
+            errors.password ? `${FIELD_IDS.password}-error` : undefined
+          }
           className={inputClass(Boolean(errors.password))}
         />
         {errors.password ? (
-          <p id={`${FIELD_IDS.password}-error`} className="mt-2 font-ui text-xs text-error">
+          <p
+            id={`${FIELD_IDS.password}-error`}
+            className="mt-2 font-ui text-xs text-error"
+          >
             {errors.password}
           </p>
         ) : null}
@@ -223,7 +246,9 @@ export function RegisterForm() {
           onChange={(event) => setConfirmPassword(event.target.value)}
           aria-invalid={Boolean(errors.confirmPassword)}
           aria-describedby={
-            errors.confirmPassword ? `${FIELD_IDS.confirmPassword}-error` : undefined
+            errors.confirmPassword
+              ? `${FIELD_IDS.confirmPassword}-error`
+              : undefined
           }
           className={inputClass(Boolean(errors.confirmPassword))}
         />

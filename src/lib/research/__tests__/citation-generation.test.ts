@@ -8,10 +8,7 @@ import {
 } from "@/lib/research/citation-generation";
 import type { ResearchContext } from "@/lib/research/context";
 
-function documentContext(
-  id: string,
-  content: string
-): ResearchContext {
+function documentContext(id: string, content: string): ResearchContext {
   return {
     items: [
       {
@@ -43,7 +40,10 @@ describe("parseGeneratedAnswerOutput", () => {
   });
 
   it("accepts an empty citations array", () => {
-    const result = parseGeneratedAnswerOutput({ answer: "Plain answer.", citations: [] });
+    const result = parseGeneratedAnswerOutput({
+      answer: "Plain answer.",
+      citations: [],
+    });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -106,7 +106,10 @@ describe("resolveCitations", () => {
       citations: [{ citation_number: 1, evidence: 1 }],
     };
 
-    const result = resolveCitations(output, documentContext("doc-1", "body text"));
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "body text"),
+    );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
     ]);
@@ -119,7 +122,10 @@ describe("resolveCitations", () => {
       citations: [{ citation_number: 1, evidence: 9 }],
     };
 
-    const result = resolveCitations(output, documentContext("doc-1", "body text"));
+    const result = resolveCitations(
+      output,
+      documentContext("doc-1", "body text"),
+    );
     expect(result.citations).toEqual([]);
     expect(result.rejectedCount).toBe(1);
   });
@@ -216,7 +222,10 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "alpha of 0.05 was used for every trend analysis.")
+      documentContext(
+        "doc-1",
+        "alpha of 0.05 was used for every trend analysis.",
+      ),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
@@ -233,7 +242,10 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "alpha of 0.05 was used for every trend analysis.")
+      documentContext(
+        "doc-1",
+        "alpha of 0.05 was used for every trend analysis.",
+      ),
     );
     expect(result.citations).toEqual([]);
     expect(result.rejectedCount).toBe(1);
@@ -285,7 +297,7 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "body text")
+      documentContext("doc-1", "body text"),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
@@ -305,13 +317,18 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "alpha of 0.05 was used for every trend analysis.")
+      documentContext(
+        "doc-1",
+        "alpha of 0.05 was used for every trend analysis.",
+      ),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
     ]);
     expect(result.rejectedCount).toBe(1);
-    expect(result.answer).toBe("The level was 0.05 [1] for the trend analysis.");
+    expect(result.answer).toBe(
+      "The level was 0.05 [1] for the trend analysis.",
+    );
   });
 
   it("strips a marker that has no corresponding citation entry", () => {
@@ -322,7 +339,7 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "body text")
+      documentContext("doc-1", "body text"),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
@@ -332,20 +349,24 @@ describe("resolveCitations", () => {
 
   it("converts a bare sentence-final integer into a clickable marker when it resolves", () => {
     const output: GeneratedAnswerOutput = {
-      answer: "These changes were driven by atmospheric circulation anomalies 1.",
+      answer:
+        "These changes were driven by atmospheric circulation anomalies 1.",
       citations: [{ citation_number: 1, evidence: 1 }],
     };
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "atmospheric circulation anomalies were linked to these changes.")
+      documentContext(
+        "doc-1",
+        "atmospheric circulation anomalies were linked to these changes.",
+      ),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
     ]);
     expect(result.rejectedCount).toBe(0);
     expect(result.answer).toBe(
-      "These changes were driven by atmospheric circulation anomalies [1]."
+      "These changes were driven by atmospheric circulation anomalies [1].",
     );
   });
 
@@ -357,7 +378,7 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "body text")
+      documentContext("doc-1", "body text"),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
@@ -375,14 +396,14 @@ describe("resolveCitations", () => {
 
     const result = resolveCitations(
       output,
-      documentContext("doc-1", "body text")
+      documentContext("doc-1", "body text"),
     );
     expect(result.citations).toEqual([
       { citation_number: 1, document_id: "doc-1" },
     ]);
     expect(result.rejectedCount).toBe(0);
     expect(result.answer).toBe(
-      "Trends were evaluated at a significance level of 0.05. Recurrence intervals of 1, 5 and 10 years and durations of 1, 5, 10 and 30 days were used [1]. The record covers the period from 1961 to 2018."
+      "Trends were evaluated at a significance level of 0.05. Recurrence intervals of 1, 5 and 10 years and durations of 1, 5, 10 and 30 days were used [1]. The record covers the period from 1961 to 2018.",
     );
   });
 
@@ -512,7 +533,8 @@ describe("resolveCitations", () => {
           kind: "document",
           id: "doc-1",
           title: "Extreme precipitation paper",
-          content: "In this study, we used daily rainfall data from 52 stations.",
+          content:
+            "In this study, we used daily rainfall data from 52 stations.",
           metadata: {},
         },
         {
@@ -528,7 +550,8 @@ describe("resolveCitations", () => {
     };
 
     const output: GeneratedAnswerOutput = {
-      answer: "The authors used 52 stations [1] and found increasing trends [2].",
+      answer:
+        "The authors used 52 stations [1] and found increasing trends [2].",
       citations: [
         { citation_number: 1, evidence: 1 },
         { citation_number: 2, evidence: 2 },
@@ -542,7 +565,7 @@ describe("resolveCitations", () => {
     ]);
     expect(result.rejectedCount).toBe(0);
     expect(result.answer).toBe(
-      "The authors used 52 stations [1] and found increasing trends [2]."
+      "The authors used 52 stations [1] and found increasing trends [2].",
     );
   });
 });
@@ -555,7 +578,8 @@ describe("toAnswerCitations", () => {
           kind: "document",
           id: "doc-1",
           title: "Extreme precipitation paper",
-          content: "A significance level of 0.05 was used for every trend analysis.",
+          content:
+            "A significance level of 0.05 was used for every trend analysis.",
           metadata: { file_name: "paper.pdf", mime_type: "application/pdf" },
         },
       ],
@@ -585,7 +609,7 @@ describe("toAnswerCitations", () => {
   it("produces a stable chunk id for identical passages", () => {
     const context = documentContext(
       "doc-1",
-      "The results showed increasing trends across most stations."
+      "The results showed increasing trends across most stations.",
     );
     const output: GeneratedAnswerOutput = {
       answer: "text",
@@ -648,8 +672,7 @@ describe("toAnswerCitations", () => {
           kind: "document",
           id: "doc-1",
           title: "Extreme precipitation paper",
-          content:
-            "The results showed increasing trends across most stations.",
+          content: "The results showed increasing trends across most stations.",
           metadata: {},
         },
       ],
@@ -680,8 +703,7 @@ describe("toAnswerCitations", () => {
         documentId: "doc-1",
         documentTitle: "Extreme precipitation paper",
         chunkId: expect.stringMatching(/^passage-doc-1-/),
-        snippet:
-          "The results showed increasing trends across most stations.",
+        snippet: "The results showed increasing trends across most stations.",
       }),
     ]);
     expect(result.rejectedCount).toBe(0);
@@ -798,16 +820,18 @@ describe("sanitizeAnswerMarkers", () => {
     expect(
       sanitizeAnswerMarkers(
         "These changes were driven by atmospheric circulation anomalies 1.",
-        [{ citation_number: 1 }]
-      )
-    ).toBe("These changes were driven by atmospheric circulation anomalies [1].");
+        [{ citation_number: 1 }],
+      ),
+    ).toBe(
+      "These changes were driven by atmospheric circulation anomalies [1].",
+    );
   });
 
   it("strips the marker of a citation that was dropped", () => {
     expect(
       sanitizeAnswerMarkers("A claim with no source [2] here.", [
         { citation_number: 1 },
-      ])
+      ]),
     ).toBe("A claim with no source here.");
   });
 
@@ -816,7 +840,7 @@ describe("sanitizeAnswerMarkers", () => {
       sanitizeAnswerMarkers("First [1] and second [2].", [
         { citation_number: 1 },
         { citation_number: 2 },
-      ])
+      ]),
     ).toBe("First [1] and second [2].");
   });
 
@@ -824,10 +848,8 @@ describe("sanitizeAnswerMarkers", () => {
     expect(
       sanitizeAnswerMarkers(
         "Wet days grew in frequency 1. Seasonal totals were stable [3].",
-        [{ citation_number: 1 }]
-      )
-    ).toBe(
-      "Wet days grew in frequency [1]. Seasonal totals were stable."
-    );
+        [{ citation_number: 1 }],
+      ),
+    ).toBe("Wet days grew in frequency [1]. Seasonal totals were stable.");
   });
 });

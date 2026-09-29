@@ -30,7 +30,7 @@ export function QuestionComposer({
   const [value, setValue] = useState("");
   const [state, formAction, pending] = useActionState(
     askQuestionAction.bind(null, researchId),
-    initialState
+    initialState,
   );
 
   const canSubmit = value.trim().length > 0;
@@ -68,9 +68,7 @@ export function QuestionComposer({
         onChange={(event) => setValue(event.target.value)}
         aria-invalid={Boolean(state.fieldErrors.question)}
         aria-describedby={
-          state.fieldErrors.question
-            ? `${QUESTION_FIELD_ID}-error`
-            : undefined
+          state.fieldErrors.question ? `${QUESTION_FIELD_ID}-error` : undefined
         }
       />
 
@@ -102,9 +100,8 @@ export function QuestionComposer({
         <p className="mt-2 font-ui text-xs text-muted">
           Leave this unchecked and Marginalia checks your document first,
           searching the web only when the document doesn&rsquo;t cover the
-          question. You can also say &ldquo;use the document&rdquo;,
-          &ldquo;use the web&rdquo;, or &ldquo;use both&rdquo; in your
-          question.
+          question. You can also say &ldquo;use the document&rdquo;, &ldquo;use
+          the web&rdquo;, or &ldquo;use both&rdquo; in your question.
         </p>
       ) : (
         <p className="mt-2 font-ui text-xs text-muted">

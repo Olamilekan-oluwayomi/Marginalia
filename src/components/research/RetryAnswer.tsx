@@ -18,7 +18,7 @@ export function RetryAnswer({
 }) {
   const [state, formAction, pending] = useActionState(
     retryAnswerAction.bind(null, researchId),
-    initialState
+    initialState,
   );
 
   return (

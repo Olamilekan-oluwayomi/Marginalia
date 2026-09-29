@@ -20,7 +20,7 @@ function validateCreateInput(input: CreateCitationInput): string | null {
   const citationError = requireNumber(
     input.citation_number,
     "Citation number",
-    { min: 1 }
+    { min: 1 },
   );
   if (citationError) {
     return citationError.message;
@@ -47,7 +47,11 @@ function validateCreateInput(input: CreateCitationInput): string | null {
     }
   }
 
-  const excerptError = optionalText(input.excerpt, "Excerpt", EXCERPT_MAX_LENGTH);
+  const excerptError = optionalText(
+    input.excerpt,
+    "Excerpt",
+    EXCERPT_MAX_LENGTH,
+  );
   if (excerptError) {
     return excerptError.message;
   }
@@ -57,7 +61,7 @@ function validateCreateInput(input: CreateCitationInput): string | null {
 
 export async function getCitations(
   supabase: Supabase,
-  answerId: string
+  answerId: string,
 ): Promise<AppResult<CitationRow[]>> {
   const idError = requireUuid(answerId, "Answer id");
   if (idError) {
@@ -85,7 +89,7 @@ export async function getCitations(
 export async function createCitation(
   supabase: Supabase,
   answerId: string,
-  input: CreateCitationInput
+  input: CreateCitationInput,
 ): Promise<AppResult<CitationRow | null>> {
   const answerIdError = requireUuid(answerId, "Answer id");
   if (answerIdError) {

@@ -46,7 +46,7 @@ const QUESTION_WINDOW_LIMIT = 20;
 function scheduleGeneration(
   supabase: Supabase,
   researchId: string,
-  questionId: string
+  questionId: string,
 ): void {
   runAfterResponse(async () => {
     try {
@@ -54,7 +54,7 @@ function scheduleGeneration(
     } catch (error) {
       console.error(
         "[research-data] background generation threw unexpectedly:",
-        describeError(error)
+        describeError(error),
       );
     } finally {
       revalidatePath(`/research/${researchId}`);
@@ -71,16 +71,12 @@ export type AskQuestionState = {
 export async function askQuestionAction(
   researchId: string,
   _prevState: AskQuestionState,
-  formData: FormData
+  formData: FormData,
 ): Promise<AskQuestionState> {
   const question = (formData.get("question") as string | null)?.trim() ?? "";
   const includeWeb = formData.get("includeWeb") === "on";
 
-  const questionError = requireText(
-    question,
-    "Question",
-    QUESTION_MAX_LENGTH
-  );
+  const questionError = requireText(question, "Question", QUESTION_MAX_LENGTH);
   if (questionError) {
     return {
       fieldErrors: { question: questionError.message },
@@ -93,7 +89,7 @@ export async function askQuestionAction(
 
   const recentResult = await getRecentUserQuestionCount(
     supabase,
-    QUESTION_WINDOW_MINUTES
+    QUESTION_WINDOW_MINUTES,
   );
   if (recentResult.error) {
     if (recentResult.error.code === "UNAUTHORIZED") {
@@ -151,7 +147,7 @@ export type RetryAnswerState = {
 export async function retryAnswerAction(
   researchId: string,
   _prevState: RetryAnswerState,
-  formData: FormData
+  formData: FormData,
 ): Promise<RetryAnswerState> {
   const questionId =
     (formData.get("questionId") as string | null)?.trim() ?? "";
@@ -182,7 +178,7 @@ export async function retryAnswerAction(
     supabase,
     questionId,
     ["failed"],
-    "pending"
+    "pending",
   );
 
   if (result.error) {
@@ -228,7 +224,7 @@ export type RecoverAnswerState = {
 export async function recoverStuckAnswerAction(
   researchId: string,
   _prevState: RecoverAnswerState,
-  formData: FormData
+  formData: FormData,
 ): Promise<RecoverAnswerState> {
   const questionId =
     (formData.get("questionId") as string | null)?.trim() ?? "";
@@ -238,7 +234,7 @@ export async function recoverStuckAnswerAction(
     supabase,
     questionId,
     ["pending", "generating"],
-    "failed"
+    "failed",
   );
 
   if (result.error) {
@@ -278,7 +274,7 @@ export type AddSourceState = {
 export async function addSourceAction(
   researchId: string,
   _prevState: AddSourceState,
-  formData: FormData
+  formData: FormData,
 ): Promise<AddSourceState> {
   const title = (formData.get("title") as string | null)?.trim() ?? "";
   const url = (formData.get("url") as string | null)?.trim() || undefined;
@@ -302,7 +298,7 @@ export async function addSourceAction(
   const publisherError = optionalText(
     publisher,
     "Publisher",
-    PUBLISHER_MAX_LENGTH
+    PUBLISHER_MAX_LENGTH,
   );
   if (publisherError) {
     fieldErrors.publisher = publisherError.message;
@@ -368,7 +364,7 @@ export type DeleteSourceState = {
  */
 export async function deleteSourceAction(
   _prevState: DeleteSourceState,
-  formData: FormData
+  formData: FormData,
 ): Promise<DeleteSourceState> {
   const sourceId = (formData.get("sourceId") as string | null)?.trim() ?? "";
 

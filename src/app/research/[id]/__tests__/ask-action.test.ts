@@ -32,10 +32,7 @@ import { askQuestionAction } from "@/app/research/[id]/actions";
 
 const RESEARCH_ID = "research-1";
 
-function formDataWith(
-  question: string,
-  includeWeb = false
-): FormData {
+function formDataWith(question: string, includeWeb = false): FormData {
   const formData = new FormData();
   formData.set("question", question);
   if (includeWeb) formData.set("includeWeb", "on");
@@ -62,7 +59,10 @@ beforeEach(() => {
   mocks.requireText.mockReturnValue(null);
   mocks.createSupabaseClient.mockResolvedValue({});
   mocks.getRecentUserQuestionCount.mockResolvedValue({ error: null, data: 0 });
-  mocks.createQuestion.mockResolvedValue({ error: null, data: createdQuestion });
+  mocks.createQuestion.mockResolvedValue({
+    error: null,
+    data: createdQuestion,
+  });
   mocks.generateAnswer.mockResolvedValue({ error: null, data: {} });
   mocks.runAfterResponse.mockImplementation(() => undefined);
 });
@@ -72,7 +72,7 @@ describe("askQuestionAction", () => {
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("What is the capital of France?", true)
+      formDataWith("What is the capital of France?", true),
     );
 
     expect(state.success).toBe(true);
@@ -83,7 +83,7 @@ describe("askQuestionAction", () => {
       {
         question: "What is the capital of France?",
         includeWeb: true,
-      }
+      },
     );
 
     // The action returns immediately; generation runs after the response.
@@ -98,7 +98,7 @@ describe("askQuestionAction", () => {
       researchId: RESEARCH_ID,
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -106,7 +106,7 @@ describe("askQuestionAction", () => {
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("What is the capital of France?")
+      formDataWith("What is the capital of France?"),
     );
 
     expect(state.success).toBe(true);
@@ -120,7 +120,7 @@ describe("askQuestionAction", () => {
       researchId: RESEARCH_ID,
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -128,14 +128,14 @@ describe("askQuestionAction", () => {
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("What is the capital of France?")
+      formDataWith("What is the capital of France?"),
     );
 
     expect(state.success).toBe(true);
     expect(mocks.createQuestion).toHaveBeenCalledWith(
       expect.anything(),
       RESEARCH_ID,
-      { question: "What is the capital of France?", includeWeb: false }
+      { question: "What is the capital of France?", includeWeb: false },
     );
   });
 
@@ -147,7 +147,7 @@ describe("askQuestionAction", () => {
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("  ")
+      formDataWith("  "),
     );
 
     expect(state.success).toBe(false);
@@ -165,7 +165,7 @@ describe("askQuestionAction", () => {
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("What is the capital of France?")
+      formDataWith("What is the capital of France?"),
     );
 
     expect(state.success).toBe(false);
@@ -174,12 +174,15 @@ describe("askQuestionAction", () => {
   });
 
   it("rejects when the recent-question rate limit is reached", async () => {
-    mocks.getRecentUserQuestionCount.mockResolvedValue({ error: null, data: 20 });
+    mocks.getRecentUserQuestionCount.mockResolvedValue({
+      error: null,
+      data: 20,
+    });
 
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("What is the capital of France?")
+      formDataWith("What is the capital of France?"),
     );
 
     expect(state.success).toBe(false);
@@ -197,7 +200,7 @@ describe("askQuestionAction", () => {
     const state = await askQuestionAction(
       RESEARCH_ID,
       initialState,
-      formDataWith("What is the capital of France?")
+      formDataWith("What is the capital of France?"),
     );
 
     expect(state.success).toBe(false);

@@ -61,8 +61,8 @@ sources.
     web"), that intent wins.
   - Otherwise a relevance classifier checks whether your document actually
     answers the question. If it does, the answer comes from your document; if
-    not, the app falls back to the web and tells you so: *"This wasn't found in
-    your document, so I searched the web instead."*
+    not, the app falls back to the web and tells you so: _"This wasn't found in
+    your document, so I searched the web instead."_
 - **Evidence-first answers with margin citations.** Answers are short prose
   paragraphs with inline `[n]` markers. Each marker resolves to the exact
   document passage or web source that supports it. The model cannot fabricate
@@ -80,18 +80,18 @@ sources.
 
 ## Tech stack
 
-| Layer | Technology |
-| --- | --- |
-| Framework | Next.js 16 (App Router, Server Actions, React Compiler, `after()`) |
-| UI | React 19, Tailwind CSS, lucide-react |
-| Language | TypeScript (strict) |
-| Database & auth | Supabase (Postgres, Auth, Storage) + `@supabase/ssr` |
-| Answer generation | Google Gemini (`@google/genai`) — default `gemini-3.5-flash-lite` |
-| Generation fallback | Groq (OpenAI-compatible API) — default `openai/gpt-oss-120b` |
-| Web search | Tavily API |
-| PDF text extraction | `unpdf` (server-side) |
-| Testing | Vitest + React Testing Library (478 unit tests across 33 files) |
-| Lint / types | ESLint, `tsc --noEmit` |
+| Layer               | Technology                                                         |
+| ------------------- | ------------------------------------------------------------------ |
+| Framework           | Next.js 16 (App Router, Server Actions, React Compiler, `after()`) |
+| UI                  | React 19, Tailwind CSS, lucide-react                               |
+| Language            | TypeScript (strict)                                                |
+| Database & auth     | Supabase (Postgres, Auth, Storage) + `@supabase/ssr`               |
+| Answer generation   | Google Gemini (`@google/genai`) — default `gemini-3.5-flash-lite`  |
+| Generation fallback | Groq (OpenAI-compatible API) — default `openai/gpt-oss-120b`       |
+| Web search          | Tavily API                                                         |
+| PDF text extraction | `unpdf` (server-side)                                              |
+| Testing             | Vitest + React Testing Library (478 unit tests across 33 files)    |
+| Lint / types        | ESLint, `tsc --noEmit`                                             |
 
 ---
 
@@ -126,8 +126,8 @@ UI polls status → renders the answer with its margin citations
 
 `SourceMode` is `"document" | "web" | "both"`, selected per question:
 
-- **Explicit intent.** Phrase cues like *"check the document"* or *"search the
-  web"* set the mode directly.
+- **Explicit intent.** Phrase cues like _"check the document"_ or _"search the
+  web"_ set the mode directly.
 - **Smart mode.** With no explicit cue, the app checks whether the workspace's
   document would actually answer the question:
   1. It builds a compact, relevance-focused summary of the document (bounded to
@@ -164,7 +164,7 @@ retrieval layer (`src/lib/research/context.ts`) is what makes answers precise:
 - **Document-level scoring.** Each document is ranked by how well it covers the
   question's concepts.
 - **Passage selection.** For the top documents, the pipeline finds the single
-  most relevant stretch (the *best cluster*), then looks for additional
+  most relevant stretch (the _best cluster_), then looks for additional
   **value-bearing passages** that cover question concepts the primary passage
   missed — even when the primary cluster already touches every concept, other
   strong passages still surface so a multi-section document contributes
@@ -250,7 +250,7 @@ on every table:
 - **sources** — manually added web sources; `url` is unique per workspace.
 - **questions** — asked questions with `source_mode` and a status machine.
 - **answers** — generated answers, with the resolved citations (`type:
-  document | web`), the fallback reason when smart mode went to the web, and
+document | web`), the fallback reason when smart mode went to the web, and
   the source mode that produced them.
 
 All tables scoped by workspace and filtered by `auth.uid()` via RLS policies;
@@ -270,14 +270,14 @@ storage access to the private `documents` bucket is similarly locked down.
 
 Copy `.env.example` to `.env.local` and fill it in:
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Supabase publishable (anon) key |
-| `GEMINI_API_KEY` | Yes | Primary answer-generation provider |
-| `TAVILY_API_KEY` | Yes | Web search provider |
-| `GROQ_API_KEY` | No | Enables the Groq fallback for transient failures |
-| `GROQ_MODEL` | No | Groq model; defaults to `openai/gpt-oss-120b` |
+| Variable                               | Required | Description                                      |
+| -------------------------------------- | -------- | ------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Yes      | Supabase project URL                             |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes      | Supabase publishable (anon) key                  |
+| `GEMINI_API_KEY`                       | Yes      | Primary answer-generation provider               |
+| `TAVILY_API_KEY`                       | Yes      | Web search provider                              |
+| `GROQ_API_KEY`                         | No       | Enables the Groq fallback for transient failures |
+| `GROQ_MODEL`                           | No       | Groq model; defaults to `openai/gpt-oss-120b`    |
 
 The app works with only Supabase + Gemini; add the Tavily key to enable web
 research, and the Groq key to enable the resilience fallback. Keys are read
@@ -300,13 +300,13 @@ PDF or add a source to start asking questions.
 
 ## Scripts
 
-| Script | Description |
-| --- | --- |
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm run start` | Run the production build |
-| `npm run lint` | ESLint |
-| `npm test` / `npx vitest run` | Run the test suite |
+| Script                        | Description              |
+| ----------------------------- | ------------------------ |
+| `npm run dev`                 | Start the dev server     |
+| `npm run build`               | Production build         |
+| `npm run start`               | Run the production build |
+| `npm run lint`                | ESLint                   |
+| `npm test` / `npx vitest run` | Run the test suite       |
 
 ---
 
@@ -344,8 +344,8 @@ npx tsc --noEmit
 - **No secrets in the client.** Provider keys live in server-only modules
   (`import "server-only"`) and are never bundled or logged; error paths redact
   key material.
-- **Trust boundaries for the LLM.** Research context is treated as *data, never
-  instructions*; untrusted content can never override the system prompt, and
+- **Trust boundaries for the LLM.** Research context is treated as _data, never
+  instructions_; untrusted content can never override the system prompt, and
   the model is told plainly when evidence is missing or metadata-only.
 - **Validation on both sides.** Upload rules (type, size) are enforced
   identically in the browser and on the server from a single source of truth.
@@ -356,13 +356,13 @@ npx tsc --noEmit
 
 ## Documentation
 
-| File | Purpose |
-| --- | --- |
-| `AGENTS.md` | Contributor and agent guardrails for this codebase |
-| `SMOKE-TEST.md` | Manual pass/fail checklist for a deployed environment |
-| `PHASE-*.md` | Phase completion reports (design rationale and decisions) |
-| `design-system.md` | UI design system reference |
+| File               | Purpose                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `AGENTS.md`        | Contributor and agent guardrails for this codebase        |
+| `SMOKE-TEST.md`    | Manual pass/fail checklist for a deployed environment     |
+| `PHASE-*.md`       | Phase completion reports (design rationale and decisions) |
+| `design-system.md` | UI design system reference                                |
 
 ---
 
-*Built with Next.js, Supabase, and the Gemini / Groq / Tavily APIs.*
+_Built with Next.js, Supabase, and the Gemini / Groq / Tavily APIs._

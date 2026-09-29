@@ -6,7 +6,14 @@ import type {
   SourceSummary,
   Supabase,
 } from "./types";
-import { fail, notFound, ok, toAppError, validationError, type AppResult } from "./errors";
+import {
+  fail,
+  notFound,
+  ok,
+  toAppError,
+  validationError,
+  type AppResult,
+} from "./errors";
 import { requireUser } from "./session";
 import { requireUuid } from "./validation";
 
@@ -32,7 +39,7 @@ const SOURCE_METADATA_COLUMNS =
  */
 export async function getResearchWorkspace(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<ResearchWorkspace | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -44,39 +51,41 @@ export async function getResearchWorkspace(
     return fail(session.error, null);
   }
 
-  const [researchRes, questionsRes, answersRes, documentsRes, sourcesRes, citableSourcesRes] =
-    await Promise.all([
-      supabase
-        .from("research")
-        .select("*")
-        .eq("id", researchId)
-        .maybeSingle(),
-      supabase
-        .from("research_questions")
-        .select("*")
-        .eq("research_id", researchId)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("answers")
-        .select("*, citations(*)")
-        .eq("research_id", researchId)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("documents")
-        .select(DOCUMENT_METADATA_COLUMNS)
-        .eq("research_id", researchId)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("sources")
-        .select(SOURCE_METADATA_COLUMNS)
-        .eq("research_id", researchId)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("sources")
-        .select("id")
-        .eq("research_id", researchId)
-        .not("content", "is", null),
-    ]);
+  const [
+    researchRes,
+    questionsRes,
+    answersRes,
+    documentsRes,
+    sourcesRes,
+    citableSourcesRes,
+  ] = await Promise.all([
+    supabase.from("research").select("*").eq("id", researchId).maybeSingle(),
+    supabase
+      .from("research_questions")
+      .select("*")
+      .eq("research_id", researchId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("answers")
+      .select("*, citations(*)")
+      .eq("research_id", researchId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("documents")
+      .select(DOCUMENT_METADATA_COLUMNS)
+      .eq("research_id", researchId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("sources")
+      .select(SOURCE_METADATA_COLUMNS)
+      .eq("research_id", researchId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("sources")
+      .select("id")
+      .eq("research_id", researchId)
+      .not("content", "is", null),
+  ]);
 
   if (researchRes.error) {
     return fail(toAppError(researchRes.error), null);
@@ -85,7 +94,13 @@ export async function getResearchWorkspace(
     return fail(notFound("Research not found."), null);
   }
 
-  for (const result of [questionsRes, answersRes, documentsRes, sourcesRes, citableSourcesRes]) {
+  for (const result of [
+    questionsRes,
+    answersRes,
+    documentsRes,
+    sourcesRes,
+    citableSourcesRes,
+  ]) {
     if (result.error) {
       return fail(toAppError(result.error), null);
     }
@@ -102,18 +117,17 @@ export async function getResearchWorkspace(
     (question) => ({
       ...question,
       answers: answersByQuestion.get(question.id) ?? [],
-    })
+    }),
   );
 
   const citableSourceIds = new Set(
-    (citableSourcesRes.data ?? []).map((source) => source.id)
+    (citableSourcesRes.data ?? []).map((source) => source.id),
   );
 
   const documents = (documentsRes.data ?? []) as DocumentSummary[];
-  const sources: SourceSummary[] = ((sourcesRes.data ?? []) as Omit<
-    SourceSummary,
-    "has_content"
-  >[]).map((source) => ({
+  const sources: SourceSummary[] = (
+    (sourcesRes.data ?? []) as Omit<SourceSummary, "has_content">[]
+  ).map((source) => ({
     ...source,
     has_content: citableSourceIds.has(source.id),
   }));

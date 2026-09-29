@@ -49,10 +49,10 @@ describe("GeminiAnswerProvider", () => {
       citations: [],
     });
     expect(console.log).toHaveBeenCalledWith(
-      "[research] generation:gemini_start"
+      "[research] generation:gemini_start",
     );
     expect(console.log).toHaveBeenCalledWith(
-      "[research] generation:gemini_success"
+      "[research] generation:gemini_success",
     );
   });
 
@@ -67,7 +67,7 @@ describe("GeminiAnswerProvider", () => {
 
     await expect(provider.generate(input)).rejects.toMatchObject(failure);
     expect(console.error).toHaveBeenCalledWith(
-      "[research] generation:gemini_failure status=429"
+      "[research] generation:gemini_failure status=429",
     );
   });
 
@@ -77,7 +77,7 @@ describe("GeminiAnswerProvider", () => {
 
     await expect(provider.generate(input)).rejects.toThrow("boom");
     expect(console.error).toHaveBeenCalledWith(
-      "[research] generation:gemini_failure status=unknown"
+      "[research] generation:gemini_failure status=unknown",
     );
   });
 });

@@ -55,7 +55,7 @@ describe("mimeTypeFromName", () => {
 describe("extractDocumentText", () => {
   it("throws for an unsupported document type", async () => {
     await expect(
-      extractDocumentText(PDF_BUFFER, "application/zip", "archive.zip")
+      extractDocumentText(PDF_BUFFER, "application/zip", "archive.zip"),
     ).rejects.toThrow(/Unsupported document type/);
   });
 
@@ -65,15 +65,14 @@ describe("extractDocumentText", () => {
     const text = await extractDocumentText(
       PDF_BUFFER,
       "application/pdf",
-      "paper.pdf"
+      "paper.pdf",
     );
 
     expect(text).toBe("hello world");
     expect(mocks.getDocumentProxy).toHaveBeenCalledWith(PDF_BUFFER);
-    expect(mocks.extractText).toHaveBeenCalledWith(
-      expect.any(Object),
-      { mergePages: true }
-    );
+    expect(mocks.extractText).toHaveBeenCalledWith(expect.any(Object), {
+      mergePages: true,
+    });
   });
 
   it("falls back to the file name when the PDF mime is unknown", async () => {
@@ -82,7 +81,7 @@ describe("extractDocumentText", () => {
     const text = await extractDocumentText(
       PDF_BUFFER,
       "application/octet-stream",
-      "paper.pdf"
+      "paper.pdf",
     );
 
     expect(text).toBe("paper");
@@ -103,7 +102,7 @@ describe("extractDocumentText", () => {
     mockPdfText("", { throws: true });
 
     await expect(
-      extractDocumentText(PDF_BUFFER, "application/pdf", "paper.pdf")
+      extractDocumentText(PDF_BUFFER, "application/pdf", "paper.pdf"),
     ).rejects.toThrow("This PDF couldn't be read.");
   });
 
@@ -111,7 +110,7 @@ describe("extractDocumentText", () => {
     mockPdfText("   ");
 
     await expect(
-      extractDocumentText(PDF_BUFFER, "application/pdf", "paper.pdf")
+      extractDocumentText(PDF_BUFFER, "application/pdf", "paper.pdf"),
     ).rejects.toThrow("No extractable text found in this document.");
   });
 
@@ -121,7 +120,7 @@ describe("extractDocumentText", () => {
     const text = await extractDocumentText(
       PDF_BUFFER,
       "application/pdf",
-      "paper.pdf"
+      "paper.pdf",
     );
 
     expect(text).toHaveLength(200_000);

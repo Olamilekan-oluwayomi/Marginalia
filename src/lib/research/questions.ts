@@ -4,9 +4,7 @@ import type {
   ResearchQuestionRow,
   Supabase,
 } from "./types";
-import {
-  ANSWER_STATUSES,
-} from "./types";
+import { ANSWER_STATUSES } from "./types";
 import {
   fail,
   notFound,
@@ -22,7 +20,7 @@ const QUESTION_MAX_LENGTH = 1000;
 
 export async function getQuestions(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<ResearchQuestionRow[]>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -58,7 +56,7 @@ export async function getQuestions(
  */
 export async function getRecentUserQuestionCount(
   supabase: Supabase,
-  windowMinutes: number
+  windowMinutes: number,
 ): Promise<AppResult<number>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
@@ -82,8 +80,9 @@ export async function getRecentUserQuestionCount(
 
 export async function getQuestionById(
   supabase: Supabase,
-  questionId: string
-): Promise<AppResult<ResearchQuestionRow | null>> {  const idError = requireUuid(questionId, "Question id");
+  questionId: string,
+): Promise<AppResult<ResearchQuestionRow | null>> {
+  const idError = requireUuid(questionId, "Question id");
   if (idError) {
     return fail(validationError(idError.message), null);
   }
@@ -112,7 +111,7 @@ export async function getQuestionById(
 export async function createQuestion(
   supabase: Supabase,
   researchId: string,
-  input: CreateQuestionInput
+  input: CreateQuestionInput,
 ): Promise<AppResult<ResearchQuestionRow | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -122,7 +121,7 @@ export async function createQuestion(
   const questionError = requireText(
     input.question,
     "Question",
-    QUESTION_MAX_LENGTH
+    QUESTION_MAX_LENGTH,
   );
   if (questionError) {
     return fail(validationError(questionError.message), null);
@@ -154,18 +153,14 @@ export async function createQuestion(
 export async function updateQuestionStatus(
   supabase: Supabase,
   questionId: string,
-  status: AnswerStatus
+  status: AnswerStatus,
 ): Promise<AppResult<ResearchQuestionRow | null>> {
   const idError = requireUuid(questionId, "Question id");
   if (idError) {
     return fail(validationError(idError.message), null);
   }
 
-  const statusError = requireOneOf(
-    status,
-    ANSWER_STATUSES,
-    "Status"
-  );
+  const statusError = requireOneOf(status, ANSWER_STATUSES, "Status");
   if (statusError) {
     return fail(validationError(statusError.message), null);
   }
@@ -204,7 +199,7 @@ export async function tryTransitionQuestionStatus(
   supabase: Supabase,
   questionId: string,
   from: readonly AnswerStatus[],
-  to: AnswerStatus
+  to: AnswerStatus,
 ): Promise<AppResult<{ transitioned: boolean }>> {
   const idError = requireUuid(questionId, "Question id");
   if (idError) {
@@ -244,7 +239,7 @@ export async function tryTransitionQuestionStatus(
 
 export async function deleteQuestion(
   supabase: Supabase,
-  questionId: string
+  questionId: string,
 ): Promise<AppResult<null>> {
   const idError = requireUuid(questionId, "Question id");
   if (idError) {

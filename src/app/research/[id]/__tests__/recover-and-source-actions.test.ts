@@ -100,7 +100,7 @@ describe("recoverStuckAnswerAction", () => {
     const state = await recoverStuckAnswerAction(
       RESEARCH_ID,
       recoverInitialState,
-      questionFormData(QUESTION_ID)
+      questionFormData(QUESTION_ID),
     );
 
     expect(state.formError).toBeNull();
@@ -108,10 +108,10 @@ describe("recoverStuckAnswerAction", () => {
       expect.anything(),
       QUESTION_ID,
       ["pending", "generating"],
-      "failed"
+      "failed",
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -124,7 +124,7 @@ describe("recoverStuckAnswerAction", () => {
     const state = await recoverStuckAnswerAction(
       RESEARCH_ID,
       recoverInitialState,
-      questionFormData(QUESTION_ID)
+      questionFormData(QUESTION_ID),
     );
 
     expect(state.formError).toContain("signed in");
@@ -140,7 +140,7 @@ describe("recoverStuckAnswerAction", () => {
     const state = await recoverStuckAnswerAction(
       RESEARCH_ID,
       recoverInitialState,
-      questionFormData(QUESTION_ID)
+      questionFormData(QUESTION_ID),
     );
 
     expect(state.formError).toContain("couldn't reset this question");
@@ -155,7 +155,7 @@ describe("recoverStuckAnswerAction", () => {
     const state = await recoverStuckAnswerAction(
       RESEARCH_ID,
       recoverInitialState,
-      questionFormData(QUESTION_ID)
+      questionFormData(QUESTION_ID),
     );
 
     expect(state.formError).toContain("isn't waiting anymore");
@@ -168,20 +168,24 @@ describe("addSourceAction", () => {
     const state = await addSourceAction(
       RESEARCH_ID,
       addSourceInitialState,
-      sourceFormData()
+      sourceFormData(),
     );
 
     expect(state.success).toBe(true);
     expect(state.formError).toBeNull();
-    expect(mocks.createSource).toHaveBeenCalledWith(expect.anything(), RESEARCH_ID, {
-      title: "Some page",
-      url: "https://example.com/page",
-      publisher: "Example",
-      retrieved_at: undefined,
-      content: undefined,
-    });
+    expect(mocks.createSource).toHaveBeenCalledWith(
+      expect.anything(),
+      RESEARCH_ID,
+      {
+        title: "Some page",
+        url: "https://example.com/page",
+        publisher: "Example",
+        retrieved_at: undefined,
+        content: undefined,
+      },
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -193,7 +197,7 @@ describe("addSourceAction", () => {
     const state = await addSourceAction(
       RESEARCH_ID,
       addSourceInitialState,
-      sourceFormData()
+      sourceFormData(),
     );
 
     expect(state.success).toBe(false);
@@ -210,7 +214,7 @@ describe("addSourceAction", () => {
     const state = await addSourceAction(
       RESEARCH_ID,
       addSourceInitialState,
-      sourceFormData()
+      sourceFormData(),
     );
 
     expect(state.success).toBe(false);
@@ -229,7 +233,7 @@ describe("addSourceAction", () => {
     const state = await addSourceAction(
       RESEARCH_ID,
       addSourceInitialState,
-      sourceFormData()
+      sourceFormData(),
     );
 
     expect(state.success).toBe(false);
@@ -245,7 +249,7 @@ describe("addSourceAction", () => {
     const state = await addSourceAction(
       RESEARCH_ID,
       addSourceInitialState,
-      sourceFormData()
+      sourceFormData(),
     );
 
     expect(state.success).toBe(false);
@@ -263,12 +267,18 @@ describe("deleteSourceAction", () => {
   }
 
   it("deletes the source and revalidates its research workspace", async () => {
-    const state = await deleteSourceAction(deleteState, deleteFormData(SOURCE_ID));
+    const state = await deleteSourceAction(
+      deleteState,
+      deleteFormData(SOURCE_ID),
+    );
 
     expect(state.error).toBeNull();
-    expect(mocks.deleteSource).toHaveBeenCalledWith(expect.anything(), SOURCE_ID);
+    expect(mocks.deleteSource).toHaveBeenCalledWith(
+      expect.anything(),
+      SOURCE_ID,
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -278,7 +288,10 @@ describe("deleteSourceAction", () => {
       data: null,
     });
 
-    const state = await deleteSourceAction(deleteState, deleteFormData(SOURCE_ID));
+    const state = await deleteSourceAction(
+      deleteState,
+      deleteFormData(SOURCE_ID),
+    );
 
     expect(state.error).toContain("no longer exists");
     expect(mocks.deleteSource).not.toHaveBeenCalled();
@@ -290,7 +303,10 @@ describe("deleteSourceAction", () => {
       data: null,
     });
 
-    const state = await deleteSourceAction(deleteState, deleteFormData(SOURCE_ID));
+    const state = await deleteSourceAction(
+      deleteState,
+      deleteFormData(SOURCE_ID),
+    );
 
     expect(state.error).toContain("signed in");
     expect(mocks.deleteSource).not.toHaveBeenCalled();
@@ -302,7 +318,10 @@ describe("deleteSourceAction", () => {
       data: null,
     });
 
-    const state = await deleteSourceAction(deleteState, deleteFormData(SOURCE_ID));
+    const state = await deleteSourceAction(
+      deleteState,
+      deleteFormData(SOURCE_ID),
+    );
 
     expect(state.error).toContain("couldn't delete this source");
     expect(mocks.revalidatePath).not.toHaveBeenCalled();

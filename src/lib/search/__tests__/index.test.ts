@@ -15,7 +15,7 @@ import { searchError } from "@/lib/search/errors";
 import { searchWeb } from "@/lib/search";
 
 function groundResult(
-  overrides: Partial<{ title: string; url: string; content: string }> = {}
+  overrides: Partial<{ title: string; url: string; content: string }> = {},
 ) {
   return {
     title: "A page",
@@ -66,7 +66,7 @@ describe("searchWeb", () => {
 
   it("preserves a NOT_CONFIGURED provider error", async () => {
     mocks.tavilySearch.mockRejectedValue(
-      searchError("NOT_CONFIGURED", "TAVILY_API_KEY is not set.")
+      searchError("NOT_CONFIGURED", "TAVILY_API_KEY is not set."),
     );
 
     await expect(searchWeb("a question")).rejects.toMatchObject({
@@ -76,7 +76,7 @@ describe("searchWeb", () => {
 
   it("passes a provider PROVIDER_ERROR through with its cause", async () => {
     mocks.tavilySearch.mockRejectedValue(
-      searchError("PROVIDER_ERROR", "Insufficient credits.")
+      searchError("PROVIDER_ERROR", "Insufficient credits."),
     );
 
     await expect(searchWeb("a question")).rejects.toMatchObject({
@@ -146,7 +146,10 @@ describe("searchWeb", () => {
   it("deduplicates by canonical URL", async () => {
     mocks.tavilySearch.mockResolvedValue([
       groundResult({ url: "https://example.com/page" }),
-      groundResult({ title: "Second", url: "https://example.com/page?utm_source=news" }),
+      groundResult({
+        title: "Second",
+        url: "https://example.com/page?utm_source=news",
+      }),
       groundResult({ title: "Third", url: "https://EXAMPLE.com/page/" }),
     ]);
 
@@ -158,7 +161,10 @@ describe("searchWeb", () => {
 
   it("sanitizes control characters in titles and caps results at five", async () => {
     const raw = Array.from({ length: 10 }, (_, i) =>
-      groundResult({ title: `Title\u0000${i}`, url: `https://example.com/${i}` })
+      groundResult({
+        title: `Title\u0000${i}`,
+        url: `https://example.com/${i}`,
+      }),
     );
     mocks.tavilySearch.mockResolvedValue(raw);
 

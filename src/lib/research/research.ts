@@ -17,9 +17,7 @@ import { optionalText, requireText, requireUuid } from "./validation";
 
 const TITLE_MAX_LENGTH = 200;
 
-function validateCreateInput(
-  input: CreateResearchInput
-): string | null {
+function validateCreateInput(input: CreateResearchInput): string | null {
   const titleError = requireText(input.title, "Title", TITLE_MAX_LENGTH);
   if (titleError) {
     return titleError.message;
@@ -32,7 +30,7 @@ function validateCreateInput(
 }
 
 export async function getResearchList(
-  supabase: Supabase
+  supabase: Supabase,
 ): Promise<AppResult<ResearchRow[]>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
@@ -61,7 +59,7 @@ export type ResearchListWithCounts = ResearchRow & {
  * (RLS-scoped) and are tallied in memory — never an N+1 query from the page.
  */
 export async function getResearchListWithCounts(
-  supabase: Supabase
+  supabase: Supabase,
 ): Promise<AppResult<ResearchListWithCounts[]>> {
   const list = await getResearchList(supabase);
   if (list.error) {
@@ -91,13 +89,13 @@ export async function getResearchListWithCounts(
     list.data.map((item) => ({
       ...item,
       document_count: counts.get(item.id) ?? 0,
-    }))
+    })),
   );
 }
 
 export async function getResearchById(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<ResearchRow | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -127,7 +125,7 @@ export async function getResearchById(
 
 export async function createResearch(
   supabase: Supabase,
-  input: CreateResearchInput
+  input: CreateResearchInput,
 ): Promise<AppResult<ResearchRow | null>> {
   const validationMessage = validateCreateInput(input);
   if (validationMessage) {
@@ -159,7 +157,7 @@ export async function createResearch(
 export async function updateResearch(
   supabase: Supabase,
   researchId: string,
-  input: UpdateResearchInput
+  input: UpdateResearchInput,
 ): Promise<AppResult<ResearchRow | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -182,17 +180,12 @@ export async function updateResearch(
   }
 
   if (input.description !== undefined) {
-    const descriptionError = optionalText(
-      input.description,
-      "Description"
-    );
+    const descriptionError = optionalText(input.description, "Description");
     if (descriptionError) {
       return fail(validationError(descriptionError.message), null);
     }
     patch.description =
-      input.description === null
-        ? null
-        : input.description.trim() || null;
+      input.description === null ? null : input.description.trim() || null;
   }
 
   if (Object.keys(patch).length === 0) {
@@ -218,7 +211,7 @@ export async function updateResearch(
 
 export async function deleteResearch(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {

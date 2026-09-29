@@ -69,7 +69,11 @@ function makeSupabase(options: {
     return {
       select: vi.fn().mockReturnValue({
         order: vi.fn().mockResolvedValue(listResult),
-        eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue(maybeSingleResult) }),
+        eq: vi
+          .fn()
+          .mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue(maybeSingleResult),
+          }),
       }),
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
@@ -143,7 +147,9 @@ describe("getResearchList", () => {
 
 describe("getResearchListWithCounts", () => {
   it("returns an empty list when there is no research", async () => {
-    const { supabase, from } = makeSupabase({ listResult: { data: [], error: null } });
+    const { supabase, from } = makeSupabase({
+      listResult: { data: [], error: null },
+    });
 
     const result = await getResearchListWithCounts(supabase);
 
@@ -168,7 +174,9 @@ describe("getResearchListWithCounts", () => {
     const result = await getResearchListWithCounts(supabase);
 
     expect(result.error).toBeNull();
-    const byId = new Map(result.data!.map((item) => [item.id, item.document_count]));
+    const byId = new Map(
+      result.data!.map((item) => [item.id, item.document_count]),
+    );
     expect(byId.get(RESEARCH_ID)).toBe(2);
     expect(byId.get(OTHER_RESEARCH_ID)).toBe(1);
   });
@@ -183,13 +191,17 @@ describe("getResearchListWithCounts", () => {
       if (table === "documents") {
         return {
           select: vi.fn().mockReturnValue({
-            in: vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } }),
+            in: vi
+              .fn()
+              .mockResolvedValue({ data: null, error: { message: "boom" } }),
           }),
         };
       }
       return {
         select: vi.fn().mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [makeResearch()], error: null }),
+          order: vi
+            .fn()
+            .mockResolvedValue({ data: [makeResearch()], error: null }),
         }),
       };
     });
@@ -293,7 +305,9 @@ describe("updateResearch", () => {
 
   it("requires authentication", async () => {
     mocks.requireUser.mockResolvedValue(UNAUTHORIZED_SESSION);
-    const result = await updateResearch({} as Supabase, RESEARCH_ID, { title: "New" });
+    const result = await updateResearch({} as Supabase, RESEARCH_ID, {
+      title: "New",
+    });
     expect(result.error?.code).toBe("UNAUTHORIZED");
   });
 
@@ -329,7 +343,9 @@ describe("updateResearch", () => {
       updateResult: { data: null, error: null },
     });
 
-    const result = await updateResearch(supabase, RESEARCH_ID, { title: "New" });
+    const result = await updateResearch(supabase, RESEARCH_ID, {
+      title: "New",
+    });
 
     expect(result.error?.code).toBe("NOT_FOUND");
   });
@@ -359,7 +375,9 @@ describe("deleteResearch", () => {
   });
 
   it("maps a missing research to NOT_FOUND", async () => {
-    const { supabase } = makeSupabase({ deleteResult: { data: null, error: null } });
+    const { supabase } = makeSupabase({
+      deleteResult: { data: null, error: null },
+    });
 
     const result = await deleteResearch(supabase, RESEARCH_ID);
 

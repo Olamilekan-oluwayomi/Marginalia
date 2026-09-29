@@ -26,7 +26,7 @@ function inputClass(invalid: boolean) {
 export function CreateResearchForm() {
   const [state, formAction, pending] = useActionState(
     createResearchAction,
-    initialState
+    initialState,
   );
 
   return (

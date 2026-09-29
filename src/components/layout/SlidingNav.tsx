@@ -56,12 +56,7 @@ type RailProps = {
   children: React.ReactNode;
 };
 
-function Rails({
-  barRef,
-  className,
-  position,
-  children,
-}: RailProps) {
+function Rails({ barRef, className, position, children }: RailProps) {
   return (
     <div ref={barRef} className={`relative ${className}`}>
       {position && (
@@ -91,9 +86,7 @@ function useActivePosition(
     update();
 
     const bar = barRef.current;
-    const observer = bar
-      ? new ResizeObserver(update)
-      : null;
+    const observer = bar ? new ResizeObserver(update) : null;
     if (bar) observer?.observe(bar);
     window.addEventListener("resize", update);
     return () => {

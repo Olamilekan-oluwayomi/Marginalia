@@ -67,10 +67,7 @@ export default async function ResearchPage() {
 
         <section className="mt-10">
           {error ? (
-            <div
-              role="alert"
-              className="border-b border-rule px-4 py-10"
-            >
+            <div role="alert" className="border-b border-rule px-4 py-10">
               <h2 className="font-reading text-xl text-error">
                 Research couldn&rsquo;t be loaded.
               </h2>

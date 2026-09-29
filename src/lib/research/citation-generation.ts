@@ -56,8 +56,7 @@ export const ANSWER_OUTPUT_SCHEMA: Record<string, unknown> = {
 };
 
 export type GeneratedOutputParseResult =
-  | { ok: true; output: GeneratedAnswerOutput }
-  | { ok: false; reason: string };
+  { ok: true; output: GeneratedAnswerOutput } | { ok: false; reason: string };
 
 /**
  * Validates the model's JSON output against the citation protocol. Returns a
@@ -65,7 +64,7 @@ export type GeneratedOutputParseResult =
  * surface it.
  */
 export function parseGeneratedAnswerOutput(
-  value: unknown
+  value: unknown,
 ): GeneratedOutputParseResult {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return { ok: false, reason: "Expected a JSON object." };
@@ -99,7 +98,11 @@ export function parseGeneratedAnswerOutput(
         reason: "Citation numbers must be positive integers.",
       };
     }
-    if (typeof evidence !== "number" || !Number.isInteger(evidence) || evidence < 1) {
+    if (
+      typeof evidence !== "number" ||
+      !Number.isInteger(evidence) ||
+      evidence < 1
+    ) {
       return {
         ok: false,
         reason: "Evidence indexes must be positive integers.",
@@ -153,10 +156,10 @@ export type ResolveCitationsResult = {
  */
 function normalizeMalformedMarkers(
   answer: string,
-  resolved: { citation_number: number }[]
+  resolved: { citation_number: number }[],
 ): string {
   const validNumbers = new Set(
-    resolved.map((citation) => citation.citation_number)
+    resolved.map((citation) => citation.citation_number),
   );
   let changed = false;
   let cleaned = answer.replace(
@@ -171,7 +174,7 @@ function normalizeMalformedMarkers(
         return prefix;
       }
       return match;
-    }
+    },
   );
   if (changed) {
     cleaned = cleaned.replace(/[ ]{2,}/g, " ").replace(/[ ]+([.,;:!?])/g, "$1");
@@ -188,13 +191,13 @@ function normalizeMalformedMarkers(
  */
 function stripUnresolvedCitationMarkers(
   answer: string,
-  resolved: { citation_number: number }[]
+  resolved: { citation_number: number }[],
 ): string {
   const validNumbers = new Set(
-    resolved.map((citation) => citation.citation_number)
+    resolved.map((citation) => citation.citation_number),
   );
   let cleaned = answer.replace(/\[\d+\]/g, (marker) =>
-    validNumbers.has(Number(marker.slice(1, -1))) ? marker : ""
+    validNumbers.has(Number(marker.slice(1, -1))) ? marker : "",
   );
   if (cleaned !== answer) {
     cleaned = cleaned.replace(/[ ]{2,}/g, " ").replace(/[ ]+([.,;:!?])/g, "$1");
@@ -215,7 +218,7 @@ function stripUnresolvedCitationMarkers(
  */
 export function resolveCitations(
   output: GeneratedAnswerOutput,
-  context: ResearchContext
+  context: ResearchContext,
 ): ResolveCitationsResult {
   const resolved: ResolvedCitation[] = [];
   let rejectedCount = 0;
@@ -253,11 +256,11 @@ export function resolveCitations(
  */
 export function sanitizeAnswerMarkers(
   answer: string,
-  resolved: { citation_number: number }[]
+  resolved: { citation_number: number }[],
 ): string {
   return stripUnresolvedCitationMarkers(
     normalizeMalformedMarkers(answer, resolved),
-    resolved
+    resolved,
   );
 }
 
@@ -339,7 +342,7 @@ function answerSentenceForMarker(answer: string, number: number): string {
  */
 export function toAnswerCitations(
   output: GeneratedAnswerOutput,
-  context: ResearchContext
+  context: ResearchContext,
 ): ToAnswerCitationsResult {
   const citations: ResolvedAnswerCitation[] = [];
   let rejectedCount = 0;
@@ -382,7 +385,7 @@ export function toAnswerCitations(
       snippet: snippetOf(
         pastedContent.length > 0
           ? pastedContent
-          : answerSentenceForMarker(output.answer, citation.citation_number)
+          : answerSentenceForMarker(output.answer, citation.citation_number),
       ),
     });
   }

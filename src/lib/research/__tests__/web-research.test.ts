@@ -41,10 +41,12 @@ function makeSource(overrides: Partial<Record<string, unknown>> = {}) {
 
 type ChainResult = { data: unknown; error: unknown };
 
-function makeSupabase(options: {
-  listResult?: ChainResult;
-  insertResults?: ChainResult[];
-} = {}): {
+function makeSupabase(
+  options: {
+    listResult?: ChainResult;
+    insertResults?: ChainResult[];
+  } = {},
+): {
   supabase: Supabase;
   insertCalls: ReturnType<typeof vi.fn>;
 } {
@@ -116,8 +118,8 @@ describe("runWebResearch", () => {
       expect(mocks.searchWeb).toHaveBeenCalledWith("q");
       expect(
         logSpy.mock.calls.some((call) =>
-          call.join(" ").includes("[research] webSearch:provider_empty")
-        )
+          call.join(" ").includes("[research] webSearch:provider_empty"),
+        ),
       ).toBe(true);
     } finally {
       logSpy.mockRestore();
@@ -168,7 +170,11 @@ describe("runWebResearch", () => {
 
   it("skips results whose URL already exists in the research", async () => {
     const existing: WebSearchResult[] = [
-      { title: "New page", url: "https://example.com/page", content: "A snippet." },
+      {
+        title: "New page",
+        url: "https://example.com/page",
+        content: "A snippet.",
+      },
     ];
     mocks.searchWeb.mockResolvedValue(existing);
     const { supabase, insertCalls } = makeSupabase({
@@ -241,8 +247,12 @@ describe("runWebResearch", () => {
         url: "https://example.com/one",
       });
       const joined = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
-      expect(joined).toContain("[research] webSearch:provider_success results=2");
-      expect(joined).toContain("[research] webSearch:source_insert_success count=2");
+      expect(joined).toContain(
+        "[research] webSearch:provider_success results=2",
+      );
+      expect(joined).toContain(
+        "[research] webSearch:source_insert_success count=2",
+      );
     } finally {
       logSpy.mockRestore();
     }
@@ -278,11 +288,21 @@ describe("runWebResearch", () => {
 
   it("truncates titles to the cap", async () => {
     mocks.searchWeb.mockResolvedValue([
-      { title: "x".repeat(400), url: "https://example.com/long", content: "S." },
+      {
+        title: "x".repeat(400),
+        url: "https://example.com/long",
+        content: "S.",
+      },
     ]);
     const { supabase, insertCalls } = makeSupabase({
       insertResults: [
-        { data: makeSource({ title: "x".repeat(300), url: "https://example.com/long" }), error: null },
+        {
+          data: makeSource({
+            title: "x".repeat(300),
+            url: "https://example.com/long",
+          }),
+          error: null,
+        },
       ],
     });
 
@@ -301,8 +321,14 @@ describe("runWebResearch", () => {
     const { supabase } = makeSupabase({
       listResult: { data: [], error: null },
       insertResults: [
-        { data: null, error: { code: "DATABASE_ERROR", message: "insert failed" } },
-        { data: makeSource({ title: "Ok", url: "https://example.com/ok" }), error: null },
+        {
+          data: null,
+          error: { code: "DATABASE_ERROR", message: "insert failed" },
+        },
+        {
+          data: makeSource({ title: "Ok", url: "https://example.com/ok" }),
+          error: null,
+        },
       ],
     });
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -315,8 +341,8 @@ describe("runWebResearch", () => {
       expect(result.data.items).toHaveLength(1);
       expect(
         errorSpy.mock.calls.some((call) =>
-          call.join(" ").includes("webSearch:source_insert_failure")
-        )
+          call.join(" ").includes("webSearch:source_insert_failure"),
+        ),
       ).toBe(true);
     } finally {
       errorSpy.mockRestore();
@@ -333,7 +359,10 @@ describe("runWebResearch", () => {
     const { supabase, insertCalls } = makeSupabase({
       listResult: { data: [], error: null },
       insertResults: Array.from({ length: 8 }, (_, i) => ({
-        data: makeSource({ title: `Result ${i}`, url: `https://example.com/${i}` }),
+        data: makeSource({
+          title: `Result ${i}`,
+          url: `https://example.com/${i}`,
+        }),
         error: null,
       })),
     });

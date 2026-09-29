@@ -9,19 +9,15 @@ describe("splitAnswerParagraphs", () => {
   it("splits on blank lines and trims each paragraph", () => {
     expect(
       splitAnswerParagraphs(
-        "  First paragraph.\n\n   Second paragraph with [1].  \n\nThird [2]."
-      )
-    ).toEqual([
-      "First paragraph.",
-      "Second paragraph with [1].",
-      "Third [2].",
-    ]);
+        "  First paragraph.\n\n   Second paragraph with [1].  \n\nThird [2].",
+      ),
+    ).toEqual(["First paragraph.", "Second paragraph with [1].", "Third [2]."]);
   });
 
   it("ignores whitespace-only separators and drops empty paragraphs", () => {
-    expect(
-      splitAnswerParagraphs("\n\n   \nParagraph only.\n\n\n\n")
-    ).toEqual(["Paragraph only."]);
+    expect(splitAnswerParagraphs("\n\n   \nParagraph only.\n\n\n\n")).toEqual([
+      "Paragraph only.",
+    ]);
   });
 
   it("returns an empty array for empty or whitespace-only content", () => {
@@ -50,7 +46,7 @@ describe("splitAnswerMarkers", () => {
 
   it("keeps non-numeric brackets as plain text", () => {
     expect(
-      splitAnswerMarkers("The file [draft].pdf is in the attachments.")
+      splitAnswerMarkers("The file [draft].pdf is in the attachments."),
     ).toEqual([
       { kind: "text", text: "The file [draft].pdf is in the attachments." },
     ]);
@@ -74,20 +70,20 @@ describe("stripCitationMarkers", () => {
   it("removes inline [n] markers and collapses the leftover whitespace", () => {
     expect(
       stripCitationMarkers(
-        "Annual maxima are increasing across the region [1]."
-      )
+        "Annual maxima are increasing across the region [1].",
+      ),
     ).toBe("Annual maxima are increasing across the region.");
   });
 
   it("leaves text without markers untouched", () => {
-    expect(
-      stripCitationMarkers("The body text of a source citation.")
-    ).toBe("The body text of a source citation.");
+    expect(stripCitationMarkers("The body text of a source citation.")).toBe(
+      "The body text of a source citation.",
+    );
   });
 
   it("keeps non-marker bracketed text", () => {
     expect(stripCitationMarkers("The file [draft].pdf is attached.")).toBe(
-      "The file [draft].pdf is attached."
+      "The file [draft].pdf is attached.",
     );
   });
 });

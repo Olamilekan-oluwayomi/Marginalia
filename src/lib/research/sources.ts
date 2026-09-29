@@ -33,7 +33,7 @@ function validateCreateInput(input: CreateSourceInput): string | null {
   const publisherError = optionalText(
     input.publisher,
     "Publisher",
-    PUBLISHER_MAX_LENGTH
+    PUBLISHER_MAX_LENGTH,
   );
   if (publisherError) {
     return publisherError.message;
@@ -42,7 +42,11 @@ function validateCreateInput(input: CreateSourceInput): string | null {
   if (dateError) {
     return dateError.message;
   }
-  const contentError = optionalText(input.content, "Content", CONTENT_MAX_LENGTH);
+  const contentError = optionalText(
+    input.content,
+    "Content",
+    CONTENT_MAX_LENGTH,
+  );
   if (contentError) {
     return contentError.message;
   }
@@ -67,7 +71,7 @@ function isWebUrl(value: string): boolean {
  */
 function findDuplicateUrl(
   existing: Pick<SourceRow, "url">[],
-  url: string
+  url: string,
 ): boolean {
   if (!isWebUrl(url)) {
     return false;
@@ -83,7 +87,7 @@ function findDuplicateUrl(
 
 export async function getSources(
   supabase: Supabase,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<SourceRow[]>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -111,7 +115,7 @@ export async function getSources(
 export async function createSource(
   supabase: Supabase,
   researchId: string,
-  input: CreateSourceInput
+  input: CreateSourceInput,
 ): Promise<AppResult<SourceRow | null>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -140,7 +144,7 @@ export async function createSource(
     if (findDuplicateUrl(existingResult.data, input.url.trim())) {
       return fail(
         validationError("A source with this URL is already in this research."),
-        null
+        null,
       );
     }
   }
@@ -173,7 +177,7 @@ export async function createSource(
  */
 export async function getSourceById(
   supabase: Supabase,
-  sourceId: string
+  sourceId: string,
 ): Promise<AppResult<SourceRow | null>> {
   const idError = requireUuid(sourceId, "Source id");
   if (idError) {
@@ -203,7 +207,7 @@ export async function getSourceById(
 
 export async function deleteSource(
   supabase: Supabase,
-  sourceId: string
+  sourceId: string,
 ): Promise<AppResult<null>> {
   const idError = requireUuid(sourceId, "Source id");
   if (idError) {

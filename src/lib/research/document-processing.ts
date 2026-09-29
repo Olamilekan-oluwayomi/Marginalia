@@ -71,7 +71,7 @@ function userFacingExtractionMessage(error: unknown): string {
 export async function processDocument(
   supabase: Supabase,
   documentId: string,
-  researchId: string
+  researchId: string,
 ): Promise<AppResult<null>> {
   const session = await requireUser(supabase);
   if ("error" in session) {
@@ -101,7 +101,7 @@ export async function processDocument(
   if (document.research_id !== researchId) {
     return fail(
       validationError("That document doesn't belong to that research."),
-      null
+      null,
     );
   }
 
@@ -114,7 +114,7 @@ export async function processDocument(
   if (document.status !== "pending") {
     return fail(
       validationError("That document isn't waiting to be processed."),
-      null
+      null,
     );
   }
 
@@ -134,12 +134,14 @@ export async function processDocument(
   if (downloadError) {
     console.error(
       "[document-processing] storage download failed:",
-      downloadError.message
+      downloadError.message,
     );
     await setDocumentFailed(supabase, document.id);
     return fail(
-      databaseError("We couldn't read your uploaded document. Please try again."),
-      null
+      databaseError(
+        "We couldn't read your uploaded document. Please try again.",
+      ),
+      null,
     );
   }
 
@@ -148,17 +150,17 @@ export async function processDocument(
     content = await extractDocumentText(
       new Uint8Array(await blob.arrayBuffer()),
       document.mime_type ?? "",
-      document.file_name
+      document.file_name,
     );
   } catch (error) {
     console.error(
       "[document-processing] text extraction failed:",
-      error instanceof Error ? error.message : String(error)
+      error instanceof Error ? error.message : String(error),
     );
     if (error instanceof Error && error.cause instanceof Error) {
       console.error(
         "[document-processing] text extraction cause:",
-        error.cause.message
+        error.cause.message,
       );
     }
     await setDocumentFailed(supabase, document.id);
@@ -168,7 +170,7 @@ export async function processDocument(
   const contentResult = await setDocumentContent(
     supabase,
     document.id,
-    content
+    content,
   );
   if (contentResult.error) {
     await setDocumentFailed(supabase, document.id);

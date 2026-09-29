@@ -82,10 +82,7 @@ export function Modal({
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-md border border-rule bg-paper-raised p-6 text-ink shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop:bg-black/40"
       onClose={onClose}
     >
-      <h2
-        id={titleId}
-        className="font-reading text-xl leading-snug text-ink"
-      >
+      <h2 id={titleId} className="font-reading text-xl leading-snug text-ink">
         {title}
       </h2>
 

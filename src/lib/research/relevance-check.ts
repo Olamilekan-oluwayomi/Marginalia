@@ -83,7 +83,7 @@ const BOTH_INTENT_PHRASES = [
  * decide.
  */
 export function detectExplicitSearchIntent(
-  question: string
+  question: string,
 ): ExplicitSearchIntent {
   const text = question.toLowerCase();
   if (BOTH_INTENT_PHRASES.some((phrase) => text.includes(phrase))) {
@@ -116,7 +116,7 @@ function extractJsonPayload(text: string): string {
   if (start === -1 || end === -1 || end <= start) {
     throw aiError(
       "INVALID_RESPONSE",
-      "The relevance classifier returned no parseable JSON object."
+      "The relevance classifier returned no parseable JSON object.",
     );
   }
   return candidate.slice(start, end + 1);
@@ -126,14 +126,14 @@ function requireResultShape(parsed: unknown): RelevanceResult {
   if (typeof parsed !== "object" || parsed === null) {
     throw aiError(
       "INVALID_RESPONSE",
-      "The relevance classifier returned a non-object response."
+      "The relevance classifier returned a non-object response.",
     );
   }
   const candidate = parsed as Record<string, unknown>;
   if (typeof candidate.relevant !== "boolean") {
     throw aiError(
       "INVALID_RESPONSE",
-      "The relevance classifier response is missing a boolean \"relevant\" field."
+      'The relevance classifier response is missing a boolean "relevant" field.',
     );
   }
   if (
@@ -144,7 +144,7 @@ function requireResultShape(parsed: unknown): RelevanceResult {
   ) {
     throw aiError(
       "INVALID_RESPONSE",
-      "The relevance classifier response is missing a confidence between 0 and 1."
+      "The relevance classifier response is missing a confidence between 0 and 1.",
     );
   }
   if (
@@ -153,7 +153,7 @@ function requireResultShape(parsed: unknown): RelevanceResult {
   ) {
     throw aiError(
       "INVALID_RESPONSE",
-      "The relevance classifier response is missing a reason string."
+      "The relevance classifier response is missing a reason string.",
     );
   }
   return {
@@ -171,7 +171,7 @@ function parseRelevanceResult(text: string): RelevanceResult {
   } catch {
     throw aiError(
       "INVALID_RESPONSE",
-      "The relevance classifier returned malformed JSON."
+      "The relevance classifier returned malformed JSON.",
     );
   }
   return requireResultShape(parsed);
@@ -187,7 +187,7 @@ function parseRelevanceResult(text: string): RelevanceResult {
  */
 export async function checkDocumentRelevance(
   question: string,
-  documentSummaryOrChunks: string
+  documentSummaryOrChunks: string,
 ): Promise<RelevanceResult> {
   const raw = await generateText({
     prompt: buildPrompt(question, documentSummaryOrChunks),

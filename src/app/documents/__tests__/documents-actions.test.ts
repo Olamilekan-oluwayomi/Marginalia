@@ -61,23 +61,29 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.createSupabaseClient.mockResolvedValue({});
   mocks.getDocumentById.mockResolvedValue({ error: null, data: document });
-  mocks.deleteDocumentWithStorage.mockResolvedValue({ error: null, data: null });
+  mocks.deleteDocumentWithStorage.mockResolvedValue({
+    error: null,
+    data: null,
+  });
   mocks.resetDocumentToPending.mockResolvedValue({ error: null, data: true });
   mocks.processDocument.mockResolvedValue({ error: null, data: {} });
 });
 
 describe("deleteDocumentAction", () => {
   it("deletes the document and revalidates its research workspace", async () => {
-    const state = await deleteDocumentAction(initialState, deleteFormData(DOCUMENT_ID));
+    const state = await deleteDocumentAction(
+      initialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toBeNull();
     expect(mocks.deleteDocumentWithStorage).toHaveBeenCalledWith(
       expect.anything(),
-      DOCUMENT_ID
+      DOCUMENT_ID,
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/documents");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -87,7 +93,10 @@ describe("deleteDocumentAction", () => {
       data: null,
     });
 
-    const state = await deleteDocumentAction(initialState, deleteFormData(DOCUMENT_ID));
+    const state = await deleteDocumentAction(
+      initialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toContain("no longer exists");
     expect(mocks.deleteDocumentWithStorage).not.toHaveBeenCalled();
@@ -100,7 +109,10 @@ describe("deleteDocumentAction", () => {
       data: null,
     });
 
-    const state = await deleteDocumentAction(initialState, deleteFormData(DOCUMENT_ID));
+    const state = await deleteDocumentAction(
+      initialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toContain("signed in");
     expect(mocks.deleteDocumentWithStorage).not.toHaveBeenCalled();
@@ -112,7 +124,10 @@ describe("deleteDocumentAction", () => {
       data: null,
     });
 
-    const state = await deleteDocumentAction(initialState, deleteFormData(DOCUMENT_ID));
+    const state = await deleteDocumentAction(
+      initialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toContain("couldn't delete");
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
@@ -121,22 +136,25 @@ describe("deleteDocumentAction", () => {
 
 describe("retryDocumentAction", () => {
   it("resets a failed document and reprocesses it", async () => {
-    const state = await retryDocumentAction(retryInitialState, deleteFormData(DOCUMENT_ID));
+    const state = await retryDocumentAction(
+      retryInitialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toBeNull();
     expect(state.success).toBe(true);
     expect(mocks.resetDocumentToPending).toHaveBeenCalledWith(
       expect.anything(),
-      DOCUMENT_ID
+      DOCUMENT_ID,
     );
     expect(mocks.processDocument).toHaveBeenCalledWith(
       expect.anything(),
       DOCUMENT_ID,
-      RESEARCH_ID
+      RESEARCH_ID,
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/documents");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -146,7 +164,10 @@ describe("retryDocumentAction", () => {
       data: null,
     });
 
-    const state = await retryDocumentAction(retryInitialState, deleteFormData(DOCUMENT_ID));
+    const state = await retryDocumentAction(
+      retryInitialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toContain("no longer exists");
     expect(state.success).toBe(false);
@@ -155,9 +176,15 @@ describe("retryDocumentAction", () => {
   });
 
   it("does not reprocess when the reset does not win (already claimed)", async () => {
-    mocks.resetDocumentToPending.mockResolvedValue({ error: null, data: false });
+    mocks.resetDocumentToPending.mockResolvedValue({
+      error: null,
+      data: false,
+    });
 
-    const state = await retryDocumentAction(retryInitialState, deleteFormData(DOCUMENT_ID));
+    const state = await retryDocumentAction(
+      retryInitialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toContain("isn't ready to retry");
     expect(state.success).toBe(false);
@@ -170,7 +197,10 @@ describe("retryDocumentAction", () => {
       data: null,
     });
 
-    const state = await retryDocumentAction(retryInitialState, deleteFormData(DOCUMENT_ID));
+    const state = await retryDocumentAction(
+      retryInitialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toContain("signed in");
     expect(mocks.resetDocumentToPending).not.toHaveBeenCalled();
@@ -183,7 +213,10 @@ describe("retryDocumentAction", () => {
       data: null,
     });
 
-    const state = await retryDocumentAction(retryInitialState, deleteFormData(DOCUMENT_ID));
+    const state = await retryDocumentAction(
+      retryInitialState,
+      deleteFormData(DOCUMENT_ID),
+    );
 
     expect(state.error).toBe("Extraction failed.");
     expect(state.success).toBe(false);

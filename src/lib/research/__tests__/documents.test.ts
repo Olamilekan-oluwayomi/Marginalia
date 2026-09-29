@@ -119,10 +119,7 @@ describe("resetDocumentToPending", () => {
   });
 
   it("rejects an invalid document id", async () => {
-    const result = await resetDocumentToPending(
-      {} as Supabase,
-      "not-a-uuid"
-    );
+    const result = await resetDocumentToPending({} as Supabase, "not-a-uuid");
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
   });
@@ -167,7 +164,7 @@ describe("deleteDocumentWithStorage", () => {
   it("rejects an invalid document id", async () => {
     const result = await deleteDocumentWithStorage(
       {} as Supabase,
-      "not-a-uuid"
+      "not-a-uuid",
     );
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
@@ -231,13 +228,15 @@ describe("deleteDocumentWithStorage", () => {
   });
 });
 
-function makeQuerySupabase(options: {
-  listResult?: { data: unknown; error: unknown };
-  maybeSingleResult?: { data: unknown; error: unknown };
-  insertResult?: { data: unknown; error: unknown };
-  updateResult?: { data: unknown; error: unknown };
-  plainUpdateResult?: { data: unknown; error: unknown };
-} = {}): {
+function makeQuerySupabase(
+  options: {
+    listResult?: { data: unknown; error: unknown };
+    maybeSingleResult?: { data: unknown; error: unknown };
+    insertResult?: { data: unknown; error: unknown };
+    updateResult?: { data: unknown; error: unknown };
+    plainUpdateResult?: { data: unknown; error: unknown };
+  } = {},
+): {
   supabase: Supabase;
   from: ReturnType<typeof vi.fn>;
   selectSpy: ReturnType<typeof vi.fn>;
@@ -246,10 +245,16 @@ function makeQuerySupabase(options: {
   deleteSpy: ReturnType<typeof vi.fn>;
 } {
   const listResult = options.listResult ?? { data: [], error: null };
-  const maybeSingleResult = options.maybeSingleResult ?? { data: null, error: null };
+  const maybeSingleResult = options.maybeSingleResult ?? {
+    data: null,
+    error: null,
+  };
   const insertResult = options.insertResult ?? { data: null, error: null };
   const updateResult = options.updateResult ?? { data: null, error: null };
-  const plainUpdateResult = options.plainUpdateResult ?? { data: null, error: null };
+  const plainUpdateResult = options.plainUpdateResult ?? {
+    data: null,
+    error: null,
+  };
 
   const selectSpy = vi.fn().mockReturnValue({
     order: vi.fn().mockResolvedValue(listResult),
@@ -272,7 +277,9 @@ function makeQuerySupabase(options: {
     then: (resolve: (value: { data: unknown; error: unknown }) => void) =>
       resolve(plainUpdateResult),
   };
-  const updateSpy = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue(updateChain) });
+  const updateSpy = vi
+    .fn()
+    .mockReturnValue({ eq: vi.fn().mockReturnValue(updateChain) });
   const deleteSpy = vi.fn().mockReturnValue({
     eq: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -353,7 +360,7 @@ describe("getAllDocuments", () => {
     expect(result.error).toBeNull();
     expect(result.data).toHaveLength(1);
     expect(selectSpy).toHaveBeenCalledWith(
-      "id, research_id, user_id, title, file_name, mime_type, file_size, status, created_at, updated_at"
+      "id, research_id, user_id, title, file_name, mime_type, file_size, status, created_at, updated_at",
     );
   });
 });
@@ -382,7 +389,9 @@ describe("getDocumentById", () => {
   });
 
   it("maps a missing document to NOT_FOUND", async () => {
-    const { supabase } = makeQuerySupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
     const result = await getDocumentById(supabase, DOCUMENT_ID);
 
@@ -457,7 +466,9 @@ describe("setDocumentProcessing", () => {
   });
 
   it("returns false when another worker already claimed the document", async () => {
-    const { supabase } = makeQuerySupabase({ updateResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      updateResult: { data: null, error: null },
+    });
 
     const result = await setDocumentProcessing(supabase, DOCUMENT_ID);
 
@@ -515,7 +526,9 @@ describe("setDocumentContent", () => {
   });
 
   it("maps a zero-row update to NOT_FOUND", async () => {
-    const { supabase } = makeQuerySupabase({ updateResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      updateResult: { data: null, error: null },
+    });
 
     const result = await setDocumentContent(supabase, DOCUMENT_ID, "body");
 
@@ -532,7 +545,11 @@ describe("setDocumentFilePath", () => {
   it("updates the file path", async () => {
     const { supabase, updateSpy } = makeQuerySupabase();
 
-    const result = await setDocumentFilePath(supabase, DOCUMENT_ID, STORAGE_PATH);
+    const result = await setDocumentFilePath(
+      supabase,
+      DOCUMENT_ID,
+      STORAGE_PATH,
+    );
 
     expect(result.error).toBeNull();
     expect(updateSpy).toHaveBeenCalledWith({ file_path: STORAGE_PATH });
@@ -557,7 +574,9 @@ describe("deleteDocument", () => {
   });
 
   it("maps a missing document to NOT_FOUND", async () => {
-    const { supabase } = makeQuerySupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
     const result = await deleteDocument(supabase, DOCUMENT_ID);
 

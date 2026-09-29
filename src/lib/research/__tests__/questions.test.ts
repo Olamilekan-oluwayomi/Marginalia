@@ -27,10 +27,7 @@ const QUESTION_ID = "22222222-2222-4222-8222-222222222222";
 const UNAUTHORIZED_SESSION = { error: { code: "UNAUTHORIZED" } };
 const AUTH_SESSION = { user: { id: USER_ID } };
 
-function makeSupabase(options: {
-  count: number | null;
-  error: unknown;
-}): {
+function makeSupabase(options: { count: number | null; error: unknown }): {
   supabase: Supabase;
   eq: ReturnType<typeof vi.fn>;
   gte: ReturnType<typeof vi.fn>;
@@ -113,16 +110,21 @@ function makeQuestionRow(overrides: Partial<Record<string, unknown>> = {}) {
 
 type ChainResult = { data: unknown; error: unknown };
 
-function makeQuerySupabase(options: {
-  listResult?: ChainResult;
-  maybeSingleResult?: ChainResult;
-  insertResult?: ChainResult;
-} = {}): {
+function makeQuerySupabase(
+  options: {
+    listResult?: ChainResult;
+    maybeSingleResult?: ChainResult;
+    insertResult?: ChainResult;
+  } = {},
+): {
   supabase: Supabase;
   from: ReturnType<typeof vi.fn>;
 } {
   const listResult = options.listResult ?? { data: [], error: null };
-  const maybeSingleResult = options.maybeSingleResult ?? { data: null, error: null };
+  const maybeSingleResult = options.maybeSingleResult ?? {
+    data: null,
+    error: null,
+  };
   const insertResult = options.insertResult ?? { data: null, error: null };
 
   const from = vi.fn().mockReturnValue({
@@ -228,7 +230,9 @@ describe("getQuestionById", () => {
   });
 
   it("maps a missing question to NOT_FOUND", async () => {
-    const { supabase } = makeQuerySupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
     const result = await getQuestionById(supabase, QUESTION_ID);
 
@@ -246,7 +250,9 @@ describe("createQuestion", () => {
   });
 
   it("rejects a blank or oversized question", async () => {
-    const blank = await createQuestion({} as Supabase, RESEARCH_ID, { question: "  " });
+    const blank = await createQuestion({} as Supabase, RESEARCH_ID, {
+      question: "  ",
+    });
     expect(blank.error?.code).toBe("VALIDATION_ERROR");
 
     const oversized = await createQuestion({} as Supabase, RESEARCH_ID, {
@@ -294,7 +300,7 @@ describe("createQuestion", () => {
 
     const insert = from.mock.results[0].value.insert;
     expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ include_web: false })
+      expect.objectContaining({ include_web: false }),
     );
   });
 
@@ -303,7 +309,9 @@ describe("createQuestion", () => {
       insertResult: { data: null, error: { message: "insert failed" } },
     });
 
-    const result = await createQuestion(supabase, RESEARCH_ID, { question: "Hi" });
+    const result = await createQuestion(supabase, RESEARCH_ID, {
+      question: "Hi",
+    });
 
     expect(result.error?.code).toBe("DATABASE_ERROR");
   });
@@ -314,7 +322,7 @@ describe("updateQuestionStatus", () => {
     const result = await updateQuestionStatus(
       {} as Supabase,
       QUESTION_ID,
-      "not-a-status" as never
+      "not-a-status" as never,
     );
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
@@ -323,26 +331,43 @@ describe("updateQuestionStatus", () => {
   it("requires authentication", async () => {
     mocks.requireUser.mockResolvedValue(UNAUTHORIZED_SESSION);
 
-    const result = await updateQuestionStatus({} as Supabase, QUESTION_ID, "generating");
+    const result = await updateQuestionStatus(
+      {} as Supabase,
+      QUESTION_ID,
+      "generating",
+    );
 
     expect(result.error?.code).toBe("UNAUTHORIZED");
   });
 
   it("updates the answer status", async () => {
     const { supabase } = makeQuerySupabase({
-      maybeSingleResult: { data: makeQuestionRow({ answer_status: "generating" }), error: null },
+      maybeSingleResult: {
+        data: makeQuestionRow({ answer_status: "generating" }),
+        error: null,
+      },
     });
 
-    const result = await updateQuestionStatus(supabase, QUESTION_ID, "generating");
+    const result = await updateQuestionStatus(
+      supabase,
+      QUESTION_ID,
+      "generating",
+    );
 
     expect(result.error).toBeNull();
     expect(result.data?.answer_status).toBe("generating");
   });
 
   it("maps a missing question to NOT_FOUND", async () => {
-    const { supabase } = makeQuerySupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
-    const result = await updateQuestionStatus(supabase, QUESTION_ID, "generating");
+    const result = await updateQuestionStatus(
+      supabase,
+      QUESTION_ID,
+      "generating",
+    );
 
     expect(result.error?.code).toBe("NOT_FOUND");
   });
@@ -350,7 +375,12 @@ describe("updateQuestionStatus", () => {
 
 describe("tryTransitionQuestionStatus", () => {
   it("rejects an empty from list", async () => {
-    const result = await tryTransitionQuestionStatus({} as Supabase, QUESTION_ID, [], "generating");
+    const result = await tryTransitionQuestionStatus(
+      {} as Supabase,
+      QUESTION_ID,
+      [],
+      "generating",
+    );
 
     expect(result.error?.code).toBe("VALIDATION_ERROR");
     expect(result.data.transitioned).toBe(false);
@@ -361,7 +391,7 @@ describe("tryTransitionQuestionStatus", () => {
       {} as Supabase,
       QUESTION_ID,
       ["pending", "bogus" as never],
-      "generating"
+      "generating",
     );
     expect(badFrom.error?.code).toBe("VALIDATION_ERROR");
 
@@ -369,7 +399,7 @@ describe("tryTransitionQuestionStatus", () => {
       {} as Supabase,
       QUESTION_ID,
       ["pending"],
-      "bogus" as never
+      "bogus" as never,
     );
     expect(badTo.error?.code).toBe("VALIDATION_ERROR");
   });
@@ -381,7 +411,7 @@ describe("tryTransitionQuestionStatus", () => {
       {} as Supabase,
       QUESTION_ID,
       ["pending"],
-      "generating"
+      "generating",
     );
 
     expect(result.error?.code).toBe("UNAUTHORIZED");
@@ -396,7 +426,7 @@ describe("tryTransitionQuestionStatus", () => {
       supabase,
       QUESTION_ID,
       ["pending", "failed"],
-      "generating"
+      "generating",
     );
 
     expect(result.error).toBeNull();
@@ -404,13 +434,15 @@ describe("tryTransitionQuestionStatus", () => {
   });
 
   it("reports a lost transition race", async () => {
-    const { supabase } = makeQuerySupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
     const result = await tryTransitionQuestionStatus(
       supabase,
       QUESTION_ID,
       ["pending"],
-      "generating"
+      "generating",
     );
 
     expect(result.error).toBeNull();
@@ -445,7 +477,9 @@ describe("deleteQuestion", () => {
   });
 
   it("maps a missing question to NOT_FOUND", async () => {
-    const { supabase } = makeQuerySupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeQuerySupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
     const result = await deleteQuestion(supabase, QUESTION_ID);
 

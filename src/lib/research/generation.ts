@@ -126,8 +126,8 @@ const ANSWER_BASE_PROMPT = [
 const CITATION_PROTOCOL_PROMPT = [
   "Respond with a single JSON object containing exactly two keys.",
   "The RESEARCH CONTEXT list below the question numbers every item 1, 2, 3, ... (the number shown before [Document] or [Source]).",
-  "The \"answer\" value is your prose reply. After any sentence or clause that draws on specific provided evidence, append an inline citation marker [n] where n is a positive integer; that marker's number is the citation_number.",
-  "The \"citations\" value is an array of objects, each with \"citation_number\" (the marker number n used in the answer) and \"evidence\" (the exact position of the supporting item in the numbered RESEARCH CONTEXT list, as shown before [Document] or [Source]).",
+  'The "answer" value is your prose reply. After any sentence or clause that draws on specific provided evidence, append an inline citation marker [n] where n is a positive integer; that marker\'s number is the citation_number.',
+  'The "citations" value is an array of objects, each with "citation_number" (the marker number n used in the answer) and "evidence" (the exact position of the supporting item in the numbered RESEARCH CONTEXT list, as shown before [Document] or [Source]).',
   "citation_number and evidence are distinct values and may differ. citation_number is only the marker you wrote in the answer. evidence must equal the position of a real item on the numbered RESEARCH CONTEXT list: it must be at least 1 and no greater than the total number of context items shown. If the context contains a single item, the only valid evidence value is 1.",
   "Return an empty citations array when nothing is citable.",
   "Every citation_number in the citations array must match a marker in the answer, and no citation_number may be repeated.",
@@ -225,7 +225,7 @@ function systemPromptFor(mode: SourceMode): string {
 async function runWebResearchItems(
   supabase: Supabase,
   researchId: string,
-  question: string
+  question: string,
 ): Promise<ResearchContextItem[]> {
   const result = await runWebResearch(supabase, researchId, question);
   if (result.error) {
@@ -253,7 +253,7 @@ function toGenerationError(error: unknown): AppError {
   }
   console.error(
     "[research-data] answer generation failed:",
-    describeError(error)
+    describeError(error),
   );
   return appError("DATABASE_ERROR", GENERATION_ERROR_MESSAGE);
 }
@@ -265,13 +265,13 @@ function toGenerationError(error: unknown): AppError {
  */
 async function markFailed(
   supabase: Supabase,
-  questionId: string
+  questionId: string,
 ): Promise<void> {
   const result = await updateQuestionStatus(supabase, questionId, "failed");
   if (result.error) {
     console.error(
       "[research-data] could not mark question failed:",
-      result.error.message
+      result.error.message,
     );
   }
 }
@@ -300,13 +300,13 @@ const MAX_RELEVANCE_SUMMARY_CHARS = 12_000;
 export async function readyDocumentsSummary(
   supabase: Supabase,
   researchId: string,
-  question: string
+  question: string,
 ): Promise<string | null> {
   const documentsResult = await getDocuments(supabase, researchId);
   if (documentsResult.error) {
     console.error(
       "[research-data] ready documents could not be retrieved:",
-      documentsResult.error.message
+      documentsResult.error.message,
     );
     return null;
   }
@@ -314,7 +314,7 @@ export async function readyDocumentsSummary(
     (document) =>
       document.status === "ready" &&
       document.content !== null &&
-      document.content.trim().length > 0
+      document.content.trim().length > 0,
   );
   if (ready.length === 0) {
     return null;
@@ -334,17 +334,18 @@ export async function readyDocumentsSummary(
     const excerpt = truncated
       ? body.slice(0, MAX_RELEVANCE_DOCUMENT_CHARS)
       : body;
-    const part = excerpt.length > remaining ? excerpt.slice(0, remaining) : excerpt;
+    const part =
+      excerpt.length > remaining ? excerpt.slice(0, remaining) : excerpt;
     parts.push(part);
     remaining -= part.length;
     if (truncated) {
       console.warn(
-        `[research-data] relevance check capped document "${document.title}" (${document.id}) at ${MAX_RELEVANCE_DOCUMENT_CHARS} characters`
+        `[research-data] relevance check capped document "${document.title}" (${document.id}) at ${MAX_RELEVANCE_DOCUMENT_CHARS} characters`,
       );
     }
     if (part.length < excerpt.length) {
       console.warn(
-        `[research-data] relevance check capped the combined summary at ${MAX_RELEVANCE_SUMMARY_CHARS} characters`
+        `[research-data] relevance check capped the combined summary at ${MAX_RELEVANCE_SUMMARY_CHARS} characters`,
       );
     }
   }
@@ -393,7 +394,7 @@ export type GenerateAnswerInput = {
  */
 export async function generateAnswer(
   supabase: Supabase,
-  input: GenerateAnswerInput
+  input: GenerateAnswerInput,
 ): Promise<AppResult<AnswerRow | null>> {
   const { questionId, researchId } = input;
 
@@ -423,7 +424,7 @@ export async function generateAnswer(
   if (question.research_id !== researchId) {
     return fail(
       validationError("Question does not belong to this research."),
-      null
+      null,
     );
   }
 
@@ -431,7 +432,7 @@ export async function generateAnswer(
     supabase,
     questionId,
     ["pending", "failed"],
-    "generating"
+    "generating",
   );
   if (generatingResult.error) {
     return fail(generatingResult.error, null);
@@ -443,14 +444,14 @@ export async function generateAnswer(
       question.answer_status === "complete"
         ? validationError("This answer is already complete.")
         : validationError("This answer is already being generated."),
-      null
+      null,
     );
   }
 
   const contextResult = await retrieveResearchContext(
     supabase,
     researchId,
-    question.question
+    question.question,
   );
   if (contextResult.error) {
     // A context retrieval failure must not look like an answer-generation
@@ -458,7 +459,7 @@ export async function generateAnswer(
     // distinguishable in logs, then fail the question.
     console.error(
       "[research-data] research context could not be retrieved:",
-      contextResult.error.message
+      contextResult.error.message,
     );
     await markFailed(supabase, questionId);
     return fail(contextResult.error, null);
@@ -475,7 +476,7 @@ export async function generateAnswer(
     const items = await runWebResearchItems(
       supabase,
       researchId,
-      question.question
+      question.question,
     );
     context = {
       items: [
@@ -493,7 +494,7 @@ export async function generateAnswer(
     const summary = await readyDocumentsSummary(
       supabase,
       researchId,
-      question.question
+      question.question,
     );
     if (summary === null) {
       // No ready document: there is nothing to gate on, so the web is the
@@ -502,7 +503,7 @@ export async function generateAnswer(
       const items = await runWebResearchItems(
         supabase,
         researchId,
-        question.question
+        question.question,
       );
       context = {
         items: [...context.items, ...items],
@@ -511,7 +512,7 @@ export async function generateAnswer(
     } else {
       const intent = detectExplicitSearchIntent(question.question);
       console.log(
-        `[research] routing=smart hasDocument=true explicitIntent=${intent ?? "none"}`
+        `[research] routing=smart hasDocument=true explicitIntent=${intent ?? "none"}`,
       );
       if (intent === "web") {
         // Explicit "use the web" / "search the web": web-only. The document
@@ -519,7 +520,7 @@ export async function generateAnswer(
         const items = await runWebResearchItems(
           supabase,
           researchId,
-          question.question
+          question.question,
         );
         context = {
           items: [
@@ -540,7 +541,7 @@ export async function generateAnswer(
         const items = await runWebResearchItems(
           supabase,
           researchId,
-          question.question
+          question.question,
         );
         context = {
           items: [...context.items, ...items],
@@ -552,7 +553,7 @@ export async function generateAnswer(
         try {
           const decision = await checkDocumentRelevance(
             question.question,
-            summary
+            summary,
           );
           relevant = decision.relevant;
           relevanceConfidence = decision.confidence;
@@ -563,13 +564,13 @@ export async function generateAnswer(
           // objects so it never logs a useless "[object Object]".
           console.error(
             "[research] relevance check failed:",
-            describeError(error)
+            describeError(error),
           );
         }
         console.log(
           `[research] relevance={relevant:${relevant}, confidence:${
             relevanceConfidence ?? "unknown"
-          }}`
+          }}`,
         );
         if (!relevant) {
           // The document was judged not relevant to this question, so it must
@@ -579,12 +580,12 @@ export async function generateAnswer(
           // sources (kind "source") are unrelated to that verdict and stay.
           console.log("[research] selectedSource=web (document not relevant)");
           const offeredItems = context.items.filter(
-            (item) => item.kind !== "document"
+            (item) => item.kind !== "document",
           );
           const items = await runWebResearchItems(
             supabase,
             researchId,
-            question.question
+            question.question,
           );
           context = {
             items: [...offeredItems, ...items],
@@ -611,13 +612,13 @@ export async function generateAnswer(
     // emitting a misleading empty answer (pre-fix this generated a
     // document-flavored non-answer while claiming a web search was performed).
     console.error(
-      "[research] generation aborted: sourceMode=web but no web evidence was available"
+      "[research] generation aborted: sourceMode=web but no web evidence was available",
     );
     await markFailed(supabase, questionId);
     return fail(appError("DATABASE_ERROR", NO_WEB_SOURCES_MESSAGE), null);
   }
   console.log(
-    `[research] generation sourceMode=${sourceMode} contextItems=${context.items.length}`
+    `[research] generation sourceMode=${sourceMode} contextItems=${context.items.length}`,
   );
 
   let output: GeneratedAnswerOutput;
@@ -649,13 +650,10 @@ export async function generateAnswer(
       // malformed output: fail the question with a safe error.
       console.error(
         "[research-data] model output failed validation:",
-        parsed.reason
+        parsed.reason,
       );
       await markFailed(supabase, questionId);
-      return fail(
-        appError("DATABASE_ERROR", GENERATION_ERROR_MESSAGE),
-        null
-      );
+      return fail(appError("DATABASE_ERROR", GENERATION_ERROR_MESSAGE), null);
     }
     output = parsed.output;
   } catch (error) {
@@ -664,14 +662,16 @@ export async function generateAnswer(
   }
 
   const { citations, rejectedCount } = toAnswerCitations(output, context);
-  console.log(`[research] citations=${citations.length} dropped=${rejectedCount}`);
+  console.log(
+    `[research] citations=${citations.length} dropped=${rejectedCount}`,
+  );
   if (rejectedCount > 0) {
     // Never persisted: citations that could not be verified against the
     // provided context (wrong index, an item with no body content, or a web
     // item with neither body content nor a URL). Their markers are stripped
     // from the answer below so no dangling [n] is shown.
     console.warn(
-      `[research-data] dropped ${rejectedCount} citation(s) that did not resolve to provided evidence`
+      `[research-data] dropped ${rejectedCount} citation(s) that did not resolve to provided evidence`,
     );
   }
   const sanitizedAnswer = sanitizeAnswerMarkers(output.answer, citations);
@@ -695,17 +695,13 @@ export async function generateAnswer(
   const answer = answerResult.data;
 
   for (const citation of citations) {
-    const citationResult = await createCitation(
-      supabase,
-      answer.id,
-      {
-        citation_number: citation.citation_number,
-        document_id:
-          citation.type === "document" ? citation.documentId : undefined,
-        source_id: citation.type === "web" ? citation.sourceId : undefined,
-        excerpt: citation.snippet,
-      }
-    );
+    const citationResult = await createCitation(supabase, answer.id, {
+      citation_number: citation.citation_number,
+      document_id:
+        citation.type === "document" ? citation.documentId : undefined,
+      source_id: citation.type === "web" ? citation.sourceId : undefined,
+      excerpt: citation.snippet,
+    });
     if (citationResult.error) {
       // The answer is already persisted and is the primary artifact; a
       // citation row failing to insert should not fail the question, which
@@ -713,7 +709,7 @@ export async function generateAnswer(
       // on retry. Log and keep the citations that did persist.
       console.error(
         "[research-data] citation could not be persisted:",
-        citationResult.error.message
+        citationResult.error.message,
       );
     }
   }
@@ -721,12 +717,12 @@ export async function generateAnswer(
   const completeResult = await updateQuestionStatus(
     supabase,
     questionId,
-    "complete"
+    "complete",
   );
   if (completeResult.error) {
     console.error(
       "[research-data] answer persisted but could not mark question complete:",
-      completeResult.error.message
+      completeResult.error.message,
     );
     return fail(completeResult.error, answer);
   }

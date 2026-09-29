@@ -18,11 +18,7 @@ const STATUS_CLASSES: Record<AnswerStatus, string> = {
  * Small status badge for a research question's answer. `aria-live` is left to
  * the surrounding status region; this is a pure label.
  */
-export function QuestionStatusBadge({
-  status,
-}: {
-  status: AnswerStatus;
-}) {
+export function QuestionStatusBadge({ status }: { status: AnswerStatus }) {
   return (
     <span
       className={`font-mono text-xs ${STATUS_CLASSES[status] ?? "text-muted"}`}

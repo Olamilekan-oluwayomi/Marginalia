@@ -87,11 +87,11 @@ const SOURCE_MODE_LABELS: Record<string, string> = {
 
 function toCitationNote(
   citation: CitationRow,
-  workspace: Pick<ResearchWorkspace, "documents" | "sources">
+  workspace: Pick<ResearchWorkspace, "documents" | "sources">,
 ): CitationNote {
   if (citation.document_id) {
     const document = workspace.documents.find(
-      (item) => item.id === citation.document_id
+      (item) => item.id === citation.document_id,
     );
     return {
       id: citation.id,
@@ -106,7 +106,7 @@ function toCitationNote(
   }
 
   const source = workspace.sources.find(
-    (item) => item.id === citation.source_id
+    (item) => item.id === citation.source_id,
   );
   return {
     id: citation.id,
@@ -130,7 +130,7 @@ function toCitationNote(
 function renderParagraph(
   paragraph: string,
   paragraphIndex: number,
-  notesByNumber: Map<number, CitationNote>
+  notesByNumber: Map<number, CitationNote>,
 ) {
   const segments = splitAnswerMarkers(paragraph);
   const children: React.ReactNode[] = [];
@@ -150,11 +150,11 @@ function renderParagraph(
             excerpt={note.excerpt}
             url={note.url}
             targetId={note.id}
-          />
+          />,
         );
       } else {
         children.push(
-          <Fragment key={`text-${index}`}>{`[${segment.number}]`}</Fragment>
+          <Fragment key={`text-${index}`}>{`[${segment.number}]`}</Fragment>,
         );
       }
     } else {
@@ -222,7 +222,7 @@ export default async function ResearchWorkspacePage({
   const hasWaitingQuestions = questions.some(
     (question) =>
       question.answer_status === "pending" ||
-      question.answer_status === "generating"
+      question.answer_status === "generating",
   );
 
   return (
@@ -280,14 +280,12 @@ export default async function ResearchWorkspacePage({
                   const answerNotes = latest
                     ? latest.citations
                         .slice()
-                        .sort(
-                          (a, b) => a.citation_number - b.citation_number
-                        )
+                        .sort((a, b) => a.citation_number - b.citation_number)
                         .map((citation) => toCitationNote(citation, workspace))
                     : [];
 
                   const notesByNumber = new Map(
-                    answerNotes.map((note) => [note.number, note] as const)
+                    answerNotes.map((note) => [note.number, note] as const),
                   );
 
                   const isWaiting =
@@ -305,14 +303,11 @@ export default async function ResearchWorkspacePage({
 
                         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                           <QuestionStatusBadge
-                            status={
-                              question.answer_status as AnswerStatus
-                            }
+                            status={question.answer_status as AnswerStatus}
                           />
 
                           <span className="font-mono text-xs text-muted">
-                            Asked{" "}
-                            {formatDisplayDate(question.created_at)}
+                            Asked {formatDisplayDate(question.created_at)}
                           </span>
 
                           {latest?.source_mode ? (
@@ -343,7 +338,7 @@ export default async function ResearchWorkspacePage({
                       {paragraphs.length > 0 ? (
                         <Answer>
                           {paragraphs.map((paragraph, index) =>
-                            renderParagraph(paragraph, index, notesByNumber)
+                            renderParagraph(paragraph, index, notesByNumber),
                           )}
 
                           {latest!.fallback_reason ? (
@@ -382,11 +377,7 @@ export default async function ResearchWorkspacePage({
                           </p>
                         </div>
                       ) : isWaiting ? (
-                        <div
-                          className="mt-3"
-                          role="status"
-                          aria-live="polite"
-                        >
+                        <div className="mt-3" role="status" aria-live="polite">
                           <p className="font-ui text-xs text-muted">
                             {question.answer_status === "generating"
                               ? "Reading your research and writing an answer…"
@@ -415,7 +406,7 @@ export default async function ResearchWorkspacePage({
               <QuestionComposer
                 researchId={research.id}
                 hasDocument={documents.some(
-                  (document) => document.status === "ready"
+                  (document) => document.status === "ready",
                 )}
               />
             </div>
@@ -479,7 +470,7 @@ export default async function ResearchWorkspacePage({
 
                       <span
                         className={`font-mono text-xs sm:whitespace-nowrap ${documentStatusClass(
-                          document.status
+                          document.status,
                         )}`}
                       >
                         {documentStatusLabel(document.status)}
@@ -534,13 +525,11 @@ export default async function ResearchWorkspacePage({
 
           {sources.length === 0 ? (
             <div className="mt-4 rounded-md border border-rule px-4 py-10">
-              <h2 className="font-reading text-xl text-ink">
-                No sources yet.
-              </h2>
+              <h2 className="font-reading text-xl text-ink">No sources yet.</h2>
 
               <p className="mt-3 font-ui text-sm text-muted">
-                Sources are added automatically when you search the web, or
-                from the form below.
+                Sources are added automatically when you search the web, or from
+                the form below.
               </p>
             </div>
           ) : (
@@ -572,9 +561,7 @@ export default async function ResearchWorkspacePage({
                             source.has_content ? "text-pine" : "text-muted"
                           }`}
                         >
-                          {source.has_content
-                            ? "Citable"
-                            : "Metadata only"}
+                          {source.has_content ? "Citable" : "Metadata only"}
                         </span>
                       </div>
 
@@ -618,8 +605,8 @@ export default async function ResearchWorkspacePage({
           <Label>Add a source</Label>
 
           <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-muted">
-            Link a website or paper, and paste its body text so it can be
-            cited in generated answers.
+            Link a website or paper, and paste its body text so it can be cited
+            in generated answers.
           </p>
 
           <div className="mt-4 max-w-3xl">

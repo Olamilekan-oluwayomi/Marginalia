@@ -28,7 +28,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="flex min-h-screen flex-col bg-paper px-6 py-12 text-ink sm:py-16">
       <div className="mx-auto flex w-full max-w-md flex-col">
         <p className="font-ui text-sm font-medium text-ink">Marginalia</p>
-        <p className="mt-0.5 font-ui text-xs text-muted">Research, read, connect.</p>
+        <p className="mt-0.5 font-ui text-xs text-muted">
+          Research, read, connect.
+        </p>
 
         <div className="mt-10 rounded-md border border-rule bg-paper-raised px-6 py-8 sm:px-8 sm:py-10">
           <Label>Sign in</Label>
@@ -41,7 +43,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             Return to your research workspace.
           </p>
 
-          <GoogleSignIn source="login" error={params.error} redirectTo={redirectTo} />
+          <GoogleSignIn
+            source="login"
+            error={params.error}
+            redirectTo={redirectTo}
+          />
 
           <LoginForm redirectTo={redirectTo} />
         </div>

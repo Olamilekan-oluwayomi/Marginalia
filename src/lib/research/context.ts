@@ -1,10 +1,5 @@
 import type { DocumentRow, SourceRow, Supabase } from "./types";
-import {
-  fail,
-  ok,
-  validationError,
-  type AppResult,
-} from "./errors";
+import { fail, ok, validationError, type AppResult } from "./errors";
 import { getDocuments } from "./documents";
 import { getSources } from "./sources";
 import { requireText, requireUuid } from "./validation";
@@ -138,7 +133,7 @@ const VALUE_CONCEPTS: readonly (readonly string[])[] = [
  */
 function activeValueConcepts(
   question: string,
-  base: Set<string>
+  base: Set<string>,
 ): readonly (readonly string[])[] {
   const text = question.toLowerCase();
   return VALUE_CONCEPTS.filter((words) =>
@@ -146,8 +141,8 @@ function activeValueConcepts(
       (word) =>
         base.has(word) ||
         base.has(`${word}s`) ||
-        new RegExp(`\\b${word}s?\\b`).test(text)
-    )
+        new RegExp(`\\b${word}s?\\b`).test(text),
+    ),
   );
 }
 
@@ -253,14 +248,7 @@ const CONCEPT_TERMS: Record<string, readonly string[]> = {
    * "this study") must outrank a literature review that merely cites other
    * work. Scored as its own evidence class, apart from concept expansion.
    */
-  study: [
-    "authors",
-    "author",
-    "we",
-    "our",
-    "study",
-    "herein",
-  ],
+  study: ["authors", "author", "we", "our", "study", "herein"],
 };
 
 /**
@@ -293,13 +281,7 @@ const WORD_FORMS: Record<string, readonly string[]> = {
     "analyzing",
   ],
   assess: ["assess", "assesses", "assessed", "assessing", "assessment"],
-  evaluate: [
-    "evaluate",
-    "evaluates",
-    "evaluated",
-    "evaluating",
-    "evaluation",
-  ],
+  evaluate: ["evaluate", "evaluates", "evaluated", "evaluating", "evaluation"],
   method: [
     "method",
     "methods",
@@ -410,7 +392,7 @@ function keywordsOf(text: string): Set<string> {
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
-      .filter((word) => word.length > 2 && !STOPWORDS.has(word))
+      .filter((word) => word.length > 2 && !STOPWORDS.has(word)),
   );
 }
 
@@ -447,9 +429,7 @@ function toSourceItem(source: SourceRow): ResearchContextItem {
  * "the authors") rather than a topic synonym, so they are scored as their own
  * evidence class.
  */
-function matchSetsOf(
-  base: Set<string>
-): {
+function matchSetsOf(base: Set<string>): {
   expansion: Set<string>;
   study: Set<string>;
   concepts: Set<string>;
@@ -500,7 +480,10 @@ function dedupeSources(items: ResearchContextItem[]): ResearchContextItem[] {
       byKey.set(key, item);
       continue;
     }
-    if (existing.content.trim().length === 0 && item.content.trim().length > 0) {
+    if (
+      existing.content.trim().length === 0 &&
+      item.content.trim().length > 0
+    ) {
       byKey.set(key, item);
     }
   }
@@ -568,7 +551,7 @@ function keywordHits(
   content: string,
   base: Set<string>,
   study: Set<string>,
-  expansion: Set<string>
+  expansion: Set<string>,
 ): KeywordHit[] {
   const haystack = content.toLowerCase();
   const hits: KeywordHit[] = [];
@@ -643,7 +626,7 @@ const VALUE_NOTATION_PATTERN =
 function sentenceHasValueNotation(content: string, position: number): boolean {
   const sentence = content.slice(
     sentenceStartIndex(content, position),
-    sentenceEndIndex(content, position)
+    sentenceEndIndex(content, position),
   );
   return VALUE_NOTATION_PATTERN.test(sentence);
 }
@@ -657,7 +640,7 @@ function conceptTermIndexes(
   content: string,
   conceptWords: readonly string[],
   from: number,
-  to: number
+  to: number,
 ): number[] {
   const start = Math.max(0, from);
   const end = Math.min(content.length, to);
@@ -685,7 +668,7 @@ function valueStatementSpan(
   content: string,
   valueConcepts: readonly (readonly string[])[],
   from: number,
-  to: number
+  to: number,
 ): { start: number; end: number } | null {
   for (const concept of valueConcepts) {
     for (const position of conceptTermIndexes(content, concept, from, to)) {
@@ -723,7 +706,7 @@ function bestCluster(
   phrases: string[][],
   content: string,
   valueSeeking: boolean,
-  valueConcepts: readonly (readonly string[])[]
+  valueConcepts: readonly (readonly string[])[],
 ): { cluster: Cluster; valueCandidates: Cluster[] } {
   let bestStart = hits[0].index;
   let bestEnd = hits[0].index;
@@ -747,7 +730,7 @@ function bestCluster(
     const windowEnd = hits[right].index;
     const span = content.slice(
       windowStart,
-      Math.min(content.length, windowEnd + VALUE_WINDOW)
+      Math.min(content.length, windowEnd + VALUE_WINDOW),
     );
 
     let distinctBase = 0;
@@ -819,7 +802,7 @@ function bestCluster(
           const nextChar = content.charAt(tokenIndex + token.length);
           if (/\d/.test(prevChar) || /\d/.test(nextChar)) continue;
           const nearHit = windowHits.some(
-            (hit) => Math.abs(hit.index - tokenIndex) <= VALUE_WINDOW
+            (hit) => Math.abs(hit.index - tokenIndex) <= VALUE_WINDOW,
           );
           if (nearHit) valueSeen.add(token);
         }
@@ -833,13 +816,13 @@ function bestCluster(
             content,
             concept,
             scanStart,
-            scanEnd
+            scanEnd,
           )) {
             if (!sentenceHasValueNotation(content, position)) continue;
             nearNumber = true;
             const sentence = content.slice(
               sentenceStartIndex(content, position),
-              sentenceEndIndex(content, position)
+              sentenceEndIndex(content, position),
             );
             valuePattern.lastIndex = 0;
             let valueMatch: RegExpExecArray | null;
@@ -919,7 +902,7 @@ function bestCluster(
  */
 function collectValueCandidates(
   candidates: Cluster[],
-  primary: Cluster
+  primary: Cluster,
 ): Cluster[] {
   const sorted = [...candidates].sort((a, b) => b.score - a.score);
   const kept: Cluster[] = [];
@@ -952,7 +935,7 @@ function selectRelevantPassage(
   expansion: Set<string>,
   phrases: string[][],
   valueSeeking: boolean,
-  valueConcepts: readonly (readonly string[])[]
+  valueConcepts: readonly (readonly string[])[],
 ): string {
   if (content.length <= MAX_CONTENT_CHARS) {
     return content;
@@ -968,7 +951,7 @@ function selectRelevantPassage(
     phrases,
     content,
     valueSeeking,
-    valueConcepts
+    valueConcepts,
   );
   return passageFromCluster(content, cluster, valueSeeking, valueConcepts);
 }
@@ -984,7 +967,7 @@ function passageFromCluster(
   content: string,
   cluster: Cluster,
   valueSeeking: boolean,
-  valueConcepts: readonly (readonly string[])[]
+  valueConcepts: readonly (readonly string[])[],
 ): string {
   const budget = MAX_CONTENT_CHARS;
   const clusterStart = cluster.start;
@@ -1004,7 +987,7 @@ function passageFromCluster(
     requiredEnd,
     anchorStart,
     anchorEnd,
-    budget
+    budget,
   );
   let from = window.from;
   let to = window.to;
@@ -1026,7 +1009,7 @@ function passageFromCluster(
       content,
       valueConcepts,
       0,
-      content.length
+      content.length,
     );
     if (statement !== null) {
       const stmtStart = sentenceStartIndex(content, statement.start);
@@ -1037,7 +1020,7 @@ function passageFromCluster(
         statement.end,
         stmtStart,
         stmtEnd,
-        budget
+        budget,
       );
       from = anchored.from;
       to = anchored.to;
@@ -1061,7 +1044,7 @@ function buildPassageWindow(
   requiredEnd: number,
   fallbackStart: number,
   fallbackEnd: number,
-  budget: number
+  budget: number,
 ): { from: number; to: number } {
   let from: number;
   let to: number;
@@ -1173,7 +1156,7 @@ function rankCandidate(
   phrases: string[][],
   concepts: Set<string>,
   valueSeeking: boolean,
-  valueConcepts: readonly (readonly string[])[]
+  valueConcepts: readonly (readonly string[])[],
 ): Candidate {
   const body = item.content;
   let bodyScore = 0;
@@ -1191,7 +1174,7 @@ function rankCandidate(
           expansion,
           phrases,
           valueSeeking,
-          valueConcepts
+          valueConcepts,
         );
       }
     } else if (body.length > MAX_CONTENT_CHARS) {
@@ -1234,7 +1217,7 @@ function rankCandidate(
  */
 function greedyDiverse(
   candidates: Candidate[],
-  concepts: Set<string>
+  concepts: Set<string>,
 ): Candidate[] {
   const selected: Candidate[] = [];
   const remaining = [...candidates];
@@ -1278,7 +1261,7 @@ function greedyDiverse(
 function addSecondaryPassages(
   selected: Candidate[],
   candidates: Candidate[],
-  concepts: Set<string>
+  concepts: Set<string>,
 ): Candidate[] {
   if (concepts.size === 0 || selected.length >= MAX_CONTEXT_ITEMS) {
     return selected;
@@ -1306,13 +1289,13 @@ function addSecondaryPassages(
       const focused = focusedConceptPassage(
         { title: candidate.item.title, content: candidate.item.content },
         concept,
-        alreadyIncluded
+        alreadyIncluded,
       );
       if (focused === null) continue;
 
       const covered = coveredBy(
         `${candidate.item.title} ${focused}`,
-        uncovered
+        uncovered,
       );
       result.push({
         ...candidate,
@@ -1382,7 +1365,7 @@ export function analyzeQuestion(question: string): QuestionAnalysis {
 function focusedConceptPassage(
   document: { title: string; content: string },
   concept: string,
-  alreadyIncluded: string[]
+  alreadyIncluded: string[],
 ): string | null {
   const { title, content } = document;
   if (content.trim().length === 0 || content.length <= MAX_CONTENT_CHARS) {
@@ -1402,7 +1385,7 @@ function focusedConceptPassage(
     new Set<string>(),
     [],
     false,
-    []
+    [],
   );
   if (focused.length === 0) return null;
   if (!coveredBy(`${title} ${focused}`, new Set([concept])).has(concept)) {
@@ -1426,7 +1409,7 @@ function focusedConceptPassage(
  */
 export function selectRelevantPassages(
   question: string,
-  document: { title: string; content: string }
+  document: { title: string; content: string },
 ): string[] {
   const { content } = document;
   if (content.trim().length === 0) {
@@ -1457,7 +1440,7 @@ export function selectRelevantPassages(
     phrases,
     content,
     valueSeeking,
-    valueConcepts
+    valueConcepts,
   );
   const passages: string[] = [];
   const addPassage = (passage: string): boolean => {
@@ -1465,7 +1448,7 @@ export function selectRelevantPassages(
       passage.length === 0 ||
       passages.length >= MAX_CONTEXT_ITEMS ||
       passages.some(
-        (existing) => existing.includes(passage) || passage.includes(existing)
+        (existing) => existing.includes(passage) || passage.includes(existing),
       )
     ) {
       return false;
@@ -1489,14 +1472,14 @@ export function selectRelevantPassages(
         continue;
       }
       addPassage(
-        passageFromCluster(content, candidate, valueSeeking, valueConcepts)
+        passageFromCluster(content, candidate, valueSeeking, valueConcepts),
       );
     }
   }
 
   const covered = coveredBy(
     `${document.title} ${passages.join(" ")}`,
-    concepts
+    concepts,
   );
   const uncovered = new Set(concepts);
   for (const concept of covered) uncovered.delete(concept);
@@ -1535,7 +1518,7 @@ export function selectRelevantPassages(
 export async function retrieveResearchContext(
   supabase: Supabase,
   researchId: string,
-  question: string
+  question: string,
 ): Promise<AppResult<ResearchContext>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
@@ -1544,11 +1527,7 @@ export async function retrieveResearchContext(
       hasBodyContent: false,
     });
   }
-  const questionError = requireText(
-    question,
-    "Question",
-    QUESTION_MAX_LENGTH
-  );
+  const questionError = requireText(question, "Question", QUESTION_MAX_LENGTH);
   if (questionError) {
     return fail(validationError(questionError.message), {
       items: [],
@@ -1592,8 +1571,8 @@ export async function retrieveResearchContext(
         phrases,
         concepts,
         valueSeeking,
-        valueConcepts
-      )
+        valueConcepts,
+      ),
     )
     .filter((candidate) => candidate.score > 0)
     .sort((a, b) => {
@@ -1647,7 +1626,7 @@ export function buildContextSection(context: ResearchContext): string | null {
   });
 
   return `RESEARCH CONTEXT (untrusted evidence supplied to you)\n${lines.join(
-    "\n\n"
+    "\n\n",
   )}`;
 }
 
@@ -1658,7 +1637,7 @@ export function buildContextSection(context: ResearchContext): string | null {
  */
 export function buildResearchPrompt(
   question: string,
-  context: ResearchContext
+  context: ResearchContext,
 ): string {
   const contextSection = buildContextSection(context);
   const questionBlock = `Research question:\n${question}`;

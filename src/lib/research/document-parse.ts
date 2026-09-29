@@ -50,7 +50,10 @@ function detectKind(mimeType: string, fileName: string): DocumentKind | null {
 }
 
 function normalizeText(raw: string): string {
-  const text = raw.replace(/\u0000/g, "").replace(/\r\n?/g, "\n").trim();
+  const text = raw
+    .replace(/\u0000/g, "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
   return text.length > MAX_CONTENT_CHARS
     ? text.slice(0, MAX_CONTENT_CHARS)
     : text;
@@ -78,12 +81,12 @@ async function extractPdfText(buffer: Uint8Array): Promise<string> {
 export async function extractDocumentText(
   buffer: Uint8Array,
   mimeType: string,
-  fileName: string
+  fileName: string,
 ): Promise<string> {
   const kind = detectKind(mimeType, fileName);
   if (!kind) {
     throw new Error(
-      `Unsupported document type (${mimeType || "unknown"}). Only PDF, TXT, and Markdown files are supported.`
+      `Unsupported document type (${mimeType || "unknown"}). Only PDF, TXT, and Markdown files are supported.`,
     );
   }
 

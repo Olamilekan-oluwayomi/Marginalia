@@ -117,14 +117,19 @@ describe("getResearchWorkspace", () => {
   });
 
   it("maps a missing research to NOT_FOUND", async () => {
-    const { supabase } = makeSupabase({ researchResult: { data: null, error: null } });
+    const { supabase } = makeSupabase({
+      researchResult: { data: null, error: null },
+    });
     const result = await getResearchWorkspace(supabase, RESEARCH_ID);
     expect(result.error?.code).toBe("NOT_FOUND");
   });
 
   it("assembles questions with their answers", async () => {
     const { supabase } = makeSupabase({
-      researchResult: { data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" }, error: null },
+      researchResult: {
+        data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" },
+        error: null,
+      },
       questionsResult: {
         data: [{ id: "q1", research_id: RESEARCH_ID, question: "Q?" }],
         error: null,
@@ -153,7 +158,10 @@ describe("getResearchWorkspace", () => {
 
   it("labels sources with has_content from the citable lookup", async () => {
     const { supabase } = makeSupabase({
-      researchResult: { data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" }, error: null },
+      researchResult: {
+        data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" },
+        error: null,
+      },
       sourcesResult: {
         data: [
           { id: "s1", research_id: RESEARCH_ID, title: "Src", content: null },
@@ -171,7 +179,10 @@ describe("getResearchWorkspace", () => {
 
   it("marks a source without content as not citable", async () => {
     const { supabase } = makeSupabase({
-      researchResult: { data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" }, error: null },
+      researchResult: {
+        data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" },
+        error: null,
+      },
       sourcesResult: {
         data: [{ id: "s2", research_id: RESEARCH_ID, title: "Src" }],
         error: null,
@@ -187,7 +198,10 @@ describe("getResearchWorkspace", () => {
 
   it("maps a documents query failure to DATABASE_ERROR", async () => {
     const { supabase } = makeSupabase({
-      researchResult: { data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" }, error: null },
+      researchResult: {
+        data: { id: RESEARCH_ID, user_id: USER_ID, title: "R" },
+        error: null,
+      },
       documentsResult: { data: null, error: { message: "boom" } },
     });
 

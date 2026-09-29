@@ -50,14 +50,14 @@ function mockSupabaseClient() {
 function callbackRequest(code: string, origin = "login") {
   return new NextRequest(
     `https://example.com/auth/callback?code=${encodeURIComponent(code)}`,
-    { headers: { cookie: `oauth_origin=${origin}` } }
+    { headers: { cookie: `oauth_origin=${origin}` } },
   );
 }
 
 function expectRedirectTo(
   response: Response,
   pathname: string,
-  search: string
+  search: string,
 ) {
   const location = new URL(response.headers.get("location")!);
   expect(response.status).toBe(307);
@@ -121,7 +121,7 @@ describe("GET /auth/callback", () => {
     expect(mocks.cookiesSet).toHaveBeenCalledWith(
       `sb-${PROJECT_HOST.split(".")[0]}-auth-token`,
       "",
-      expect.objectContaining({ maxAge: 0 })
+      expect.objectContaining({ maxAge: 0 }),
     );
   });
 
@@ -161,10 +161,9 @@ describe("GET /auth/callback", () => {
       "https://example.com/auth/callback?code=valid-code",
       {
         headers: {
-          cookie:
-            "oauth_origin=login; auth_destination=%2Fresearch",
+          cookie: "oauth_origin=login; auth_destination=%2Fresearch",
         },
-      }
+      },
     );
 
     const response = await GET(request);

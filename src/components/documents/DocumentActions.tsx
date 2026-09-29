@@ -16,7 +16,7 @@ const retryInitialState: RetryDocumentState = { error: null, success: false };
 
 function actionButtonClass(
   tone: "default" | "danger",
-  pending: boolean
+  pending: boolean,
 ): string {
   const base =
     "inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 py-2 font-ui text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60";
@@ -48,7 +48,7 @@ export function DocumentActions({
 }) {
   const [retryState, retryFormAction, retryPending] = useActionState(
     retryDocumentAction,
-    retryInitialState
+    retryInitialState,
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteState, setDeleteState] = useState(deleteInitialState);

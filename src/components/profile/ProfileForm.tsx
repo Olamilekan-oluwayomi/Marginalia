@@ -79,7 +79,11 @@ export function ProfileForm({ email }: ProfileFormProps) {
   }
 
   const buttonLabel =
-    status === "saving" ? "Saving..." : status === "saved" ? "Saved" : "Save changes";
+    status === "saving"
+      ? "Saving..."
+      : status === "saved"
+        ? "Saved"
+        : "Save changes";
 
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-6">

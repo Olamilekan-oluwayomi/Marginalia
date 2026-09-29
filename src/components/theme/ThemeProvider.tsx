@@ -56,13 +56,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useSyncExternalStore(
     subscribeStorage,
     getStoredTheme,
-    () => "system" as Theme
+    () => "system" as Theme,
   );
 
   const systemDark = useSyncExternalStore(
     subscribeSystemTheme,
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
-    () => false
+    () => false,
   );
 
   const resolvedTheme: "light" | "dark" =

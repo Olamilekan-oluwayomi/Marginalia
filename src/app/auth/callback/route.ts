@@ -36,7 +36,7 @@ function sessionCookieName(): string {
 async function rejectUnknownLogin(
   request: NextRequest,
   supabase: SupabaseClient,
-  errorParam = "account_not_found"
+  errorParam = "account_not_found",
 ) {
   try {
     await supabase.auth.signOut();
@@ -53,11 +53,9 @@ async function rejectUnknownLogin(
   names.forEach((name) => cookieStore.set(name, "", { maxAge: 0, path: "/" }));
 
   const response = NextResponse.redirect(
-    new URL(`/login?error=${errorParam}`, request.url)
+    new URL(`/login?error=${errorParam}`, request.url),
   );
-  request.cookies.getAll().forEach(({ name }) =>
-    response.cookies.delete(name)
-  );
+  request.cookies.getAll().forEach(({ name }) => response.cookies.delete(name));
   return response;
 }
 
@@ -66,7 +64,9 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const error = requestUrl.searchParams.get("error");
   const source =
-    request.cookies.get("oauth_origin")?.value === "login" ? "login" : "register";
+    request.cookies.get("oauth_origin")?.value === "login"
+      ? "login"
+      : "register";
 
   if (error) {
     return buildRedirect(request, `/${source}`);

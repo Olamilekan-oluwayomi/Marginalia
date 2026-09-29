@@ -35,7 +35,7 @@ function tavilyResult(overrides: Partial<Record<string, unknown>> = {}) {
 
 function jsonResponse(
   body: unknown,
-  status = 200
+  status = 200,
 ): Pick<Response, "ok" | "status" | "json"> {
   return {
     ok: status >= 200 && status < 300,
@@ -53,7 +53,7 @@ describe("TavilyWebSearchProvider", () => {
           tavilyResult({ url: "https://example.com/one" }),
           tavilyResult({ title: "Second", url: "https://example.com/two" }),
         ],
-      })
+      }),
     );
 
     const provider = new TavilyWebSearchProvider();
@@ -79,13 +79,16 @@ describe("TavilyWebSearchProvider", () => {
       max_results: 5,
     });
     expect((init.headers as Record<string, string>).Authorization).toBe(
-      "Bearer tvly-test-key"
+      "Bearer tvly-test-key",
     );
   });
 
   it("normalizes Tavily results into the app's canonical shape", async () => {
     const raw = Array.from({ length: 8 }, (_, i) =>
-      tavilyResult({ title: `Title\u0000${i}`, url: `https://example.com/${i}` })
+      tavilyResult({
+        title: `Title\u0000${i}`,
+        url: `https://example.com/${i}`,
+      }),
     );
     raw.push(tavilyResult({ url: "ftp://bad.example" }));
     raw.push(tavilyResult({ url: "not a url" }));
@@ -111,14 +114,17 @@ describe("TavilyWebSearchProvider", () => {
     mocks.fetch.mockResolvedValue(
       jsonResponse({
         results: [
-          tavilyResult({ title: "Has text", content: "  Snippet with text.\u0000" }),
+          tavilyResult({
+            title: "Has text",
+            content: "  Snippet with text.\u0000",
+          }),
           tavilyResult({
             title: "No text",
             url: "https://example.com/other",
             content: undefined,
           }),
         ],
-      })
+      }),
     );
 
     const results = await new TavilyWebSearchProvider().search("q");
@@ -142,9 +148,13 @@ describe("TavilyWebSearchProvider", () => {
   });
 
   it("surfaces a provider failure without fabricating a success", async () => {
-    mocks.fetch.mockResolvedValue(jsonResponse({ detail: "Insufficient credits." }, 429));
+    mocks.fetch.mockResolvedValue(
+      jsonResponse({ detail: "Insufficient credits." }, 429),
+    );
 
-    await expect(new TavilyWebSearchProvider().search("q")).rejects.toMatchObject({
+    await expect(
+      new TavilyWebSearchProvider().search("q"),
+    ).rejects.toMatchObject({
       code: "PROVIDER_ERROR",
       message: "Insufficient credits.",
     });
@@ -160,7 +170,9 @@ describe("TavilyWebSearchProvider", () => {
         code: "PROVIDER_ERROR",
       });
 
-      const logged = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+      const logged = errorSpy.mock.calls
+        .map((call) => call.join(" "))
+        .join("\n");
       expect(logged).toContain("[tavily] search failed:");
       expect(logged).not.toContain("tvly-test-key");
     } finally {
@@ -172,7 +184,7 @@ describe("TavilyWebSearchProvider", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       mocks.fetch.mockRejectedValue(
-        new Error("bad credential tvly-test-key rejected")
+        new Error("bad credential tvly-test-key rejected"),
       );
       const provider = new TavilyWebSearchProvider();
 
@@ -180,7 +192,9 @@ describe("TavilyWebSearchProvider", () => {
         code: "PROVIDER_ERROR",
       });
 
-      const logged = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+      const logged = errorSpy.mock.calls
+        .map((call) => call.join(" "))
+        .join("\n");
       expect(logged).not.toContain("tvly-test-key");
       expect(logged).toContain("[redacted]");
     } finally {
@@ -194,9 +208,9 @@ describe("TavilyWebSearchProvider", () => {
       (_url: unknown, init: RequestInit) =>
         new Promise((_resolve, reject) => {
           init.signal?.addEventListener("abort", () =>
-            reject(Object.assign(new Error("aborted"), { name: "AbortError" }))
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
           );
-        })
+        }),
     );
 
     const provider = new TavilyWebSearchProvider();
@@ -233,7 +247,9 @@ describe("TavilyWebSearchProvider", () => {
   });
 
   it("throws a PROVIDER_ERROR for a blank query", async () => {
-    await expect(new TavilyWebSearchProvider().search("   ")).rejects.toMatchObject({
+    await expect(
+      new TavilyWebSearchProvider().search("   "),
+    ).rejects.toMatchObject({
       code: "PROVIDER_ERROR",
     });
   });

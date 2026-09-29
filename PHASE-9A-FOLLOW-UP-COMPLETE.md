@@ -29,6 +29,7 @@ Running the app with `DEBUG_RETRIEVAL=1` and asking exactly
 ```
 
 Decisive facts:
+
 - The document IS `ready`, its extracted content is 60,797 chars, and
   `hasActiveValuePhrase=true` — the phrase "significance level" IS present in
   `documents.content`.
@@ -141,13 +142,13 @@ final cause above.)
   semantics, one regex pass per concept).
 - **New helpers** `valuePhraseAnchors(content, valueConcepts, from, to)` (all
   phrase occurrences as absolute offsets) and `valueStatementSpan(content,
-  valueConcepts, from, to)` (first phrase with a number next to it).
+valueConcepts, from, to)` (first phrase with a number next to it).
 - **Value-statement invariant in `selectRelevantPassage`.** When
   `valueSeeking && valueConcepts.length > 0 && cluster.conceptValue > 0` and the
   snapped passage no longer contains a value statement, re-anchor the window on
   the statement using the same centering/snapping pipeline.
 - **Refactor** `buildPassageWindow(content, requiredStart, requiredEnd,
-  fallbackStart, fallbackEnd, budget)` extracts the previous centring +
+fallbackStart, fallbackEnd, budget)` extracts the previous centring +
   redistribution + sentence/word snapping so both the cluster-anchored and the
   re-anchored paths share identical behaviour.
 - `Cluster` now carries its score components (`distinctBase`, `distinctStudy`,
@@ -159,10 +160,10 @@ final cause above.)
 
 ## 3. Files changed (all uncommitted)
 
-| File | Change |
-|---|---|
-| `src/lib/research/context.ts` | `valueCount` concept gating, `valuePhraseAnchors`/`valueStatementSpan`, `buildPassageWindow` refactor, value-statement re-anchor invariant, `Cluster` components |
-| `src/lib/research/__tests__/context.test.ts` | +1 regression test (number-saturated thresholds region, live shape) |
+| File                                         | Change                                                                                                                                                           |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/research/context.ts`                | `valueCount` concept gating, `valuePhraseAnchors`/`valueStatementSpan`, `buildPassageWindow` refactor, value-statement re-anchor invariant, `Cluster` components |
+| `src/lib/research/__tests__/context.test.ts` | +1 regression test (number-saturated thresholds region, live shape)                                                                                              |
 
 Earlier Phase 9A follow-up changes remain in the working tree (`citation-generation.ts`,
 `web-research.ts`, `src/lib/search/*`, prior tests, this report). No database,
@@ -201,12 +202,12 @@ re-verification in §0.6.
 ## 8. Manual browser verification
 
 1. **"At what statistical significance level were trends evaluated?"**
-   Expected answer: *The statistical significance level was α = 0.05.* — and the
+   Expected answer: _The statistical significance level was α = 0.05._ — and the
    cited passage must be the methodology sentence, not the thresholds/results
    region.
 2. **"What were the three recurrence intervals and four durations used to define
    extreme precipitation events?"**
-   Expected: *1, 5, 10 years and 1, 5, 10, 30 days.*
+   Expected: _1, 5, 10 years and 1, 5, 10, 30 days._
 3. **"What methodology did the authors use and what were the main findings
    regarding temporal variation?"**
    Expected: the authors' own methodology + findings, not prior-study literature.

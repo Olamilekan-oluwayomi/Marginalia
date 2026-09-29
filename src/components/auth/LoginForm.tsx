@@ -86,7 +86,10 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-8 grid gap-6">
       <div>
-        <label htmlFor={FIELD_IDS.email} className="font-ui text-sm font-medium text-ink">
+        <label
+          htmlFor={FIELD_IDS.email}
+          className="font-ui text-sm font-medium text-ink"
+        >
           Email
         </label>
         <input
@@ -96,18 +99,26 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={Boolean(errors.email)}
-          aria-describedby={errors.email ? `${FIELD_IDS.email}-error` : undefined}
+          aria-describedby={
+            errors.email ? `${FIELD_IDS.email}-error` : undefined
+          }
           className={inputClass(Boolean(errors.email))}
         />
         {errors.email ? (
-          <p id={`${FIELD_IDS.email}-error`} className="mt-2 font-ui text-xs text-error">
+          <p
+            id={`${FIELD_IDS.email}-error`}
+            className="mt-2 font-ui text-xs text-error"
+          >
             {errors.email}
           </p>
         ) : null}
       </div>
 
       <div>
-        <label htmlFor={FIELD_IDS.password} className="font-ui text-sm font-medium text-ink">
+        <label
+          htmlFor={FIELD_IDS.password}
+          className="font-ui text-sm font-medium text-ink"
+        >
           Password
         </label>
         <input
@@ -117,11 +128,16 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           aria-invalid={Boolean(errors.password)}
-          aria-describedby={errors.password ? `${FIELD_IDS.password}-error` : undefined}
+          aria-describedby={
+            errors.password ? `${FIELD_IDS.password}-error` : undefined
+          }
           className={inputClass(Boolean(errors.password))}
         />
         {errors.password ? (
-          <p id={`${FIELD_IDS.password}-error`} className="mt-2 font-ui text-xs text-error">
+          <p
+            id={`${FIELD_IDS.password}-error`}
+            className="mt-2 font-ui text-xs text-error"
+          >
             {errors.password}
           </p>
         ) : null}

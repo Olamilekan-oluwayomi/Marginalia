@@ -63,10 +63,7 @@ export function isTransientProviderError(error: unknown): boolean {
 
   if (typeof candidate.error === "object" && candidate.error !== null) {
     const rpc = candidate.error as { code?: unknown };
-    if (
-      typeof rpc.code === "string" &&
-      TRANSIENT_RPC_CODES.has(rpc.code)
-    ) {
+    if (typeof rpc.code === "string" && TRANSIENT_RPC_CODES.has(rpc.code)) {
       return true;
     }
   }
@@ -95,7 +92,10 @@ async function withRetry<T>(task: () => Promise<T>): Promise<T> {
     try {
       return await task();
     } catch (error) {
-      if (attempt >= GENERATION_RETRY_ATTEMPTS || !isTransientProviderError(error)) {
+      if (
+        attempt >= GENERATION_RETRY_ATTEMPTS ||
+        !isTransientProviderError(error)
+      ) {
         throw error;
       }
       await delay(GENERATION_RETRY_BACKOFF_MS * attempt);
@@ -143,7 +143,7 @@ export type GenerateJsonInput = Omit<GenerateTextInput, "prompt"> & {
 function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  label: string
+  label: string,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -152,10 +152,10 @@ function withTimeout<T>(
         reject(
           aiError(
             "PROVIDER_ERROR",
-            `The AI provider timed out while ${label}.`
-          )
+            `The AI provider timed out while ${label}.`,
+          ),
         ),
-      timeoutMs
+      timeoutMs,
     );
   });
 
@@ -190,9 +190,7 @@ function assertPromptBounds(prompt: string, system?: string): void {
  * hides the provider SDK so switching providers later does not change callers.
  * A transient provider failure is retried once before the error surfaces.
  */
-export async function generateText(
-  input: GenerateTextInput
-): Promise<string> {
+export async function generateText(input: GenerateTextInput): Promise<string> {
   try {
     return await withRetry(() => attemptGenerateText(input));
   } catch (error) {
@@ -216,14 +214,14 @@ async function attemptGenerateText(input: GenerateTextInput): Promise<string> {
       },
     }),
     input.timeoutMs ?? GENERATION_TIMEOUT_MS,
-    "text generation"
+    "text generation",
   );
 
   const text = response.text ?? "";
   if (text.trim().length === 0) {
     throw aiError(
       "PROVIDER_ERROR",
-      "The AI provider returned an empty response."
+      "The AI provider returned an empty response.",
     );
   }
 
@@ -267,14 +265,14 @@ async function attemptGenerateJson(input: GenerateJsonInput): Promise<unknown> {
       },
     }),
     input.timeoutMs ?? GENERATION_TIMEOUT_MS,
-    "JSON generation"
+    "JSON generation",
   );
 
   const text = response.text ?? "";
   if (text.trim().length === 0) {
     throw aiError(
       "PROVIDER_ERROR",
-      "The AI provider returned an empty response."
+      "The AI provider returned an empty response.",
     );
   }
 
@@ -283,7 +281,7 @@ async function attemptGenerateJson(input: GenerateJsonInput): Promise<unknown> {
   } catch {
     throw aiError(
       "INVALID_RESPONSE",
-      "The AI provider returned malformed JSON."
+      "The AI provider returned malformed JSON.",
     );
   }
 }
@@ -310,7 +308,7 @@ export type GroundedWebResult = {
  * surfaces.
  */
 export async function searchWebWithGrounding(
-  query: string
+  query: string,
 ): Promise<GroundedWebResult[]> {
   try {
     return await withRetry(() => attemptWebSearch(query));
@@ -331,7 +329,7 @@ async function attemptWebSearch(query: string): Promise<GroundedWebResult[]> {
       },
     }),
     GENERATION_TIMEOUT_MS,
-    "web search"
+    "web search",
   );
 
   const chunks =

@@ -60,30 +60,30 @@ describe("isLlmFallbackEligible", () => {
 
   it("returns false for permanent AiError codes", () => {
     expect(
-      isLlmFallbackEligible({ code: "INVALID_INPUT", message: "too long" })
+      isLlmFallbackEligible({ code: "INVALID_INPUT", message: "too long" }),
     ).toBe(false);
     expect(
       isLlmFallbackEligible({
         code: "INVALID_RESPONSE",
         message: "malformed JSON",
-      })
+      }),
     ).toBe(false);
     expect(
-      isLlmFallbackEligible({ code: "NOT_CONFIGURED", message: "no key" })
+      isLlmFallbackEligible({ code: "NOT_CONFIGURED", message: "no key" }),
     ).toBe(false);
   });
 
   it("returns false for AppErrors", () => {
     expect(isLlmFallbackEligible(appError("DATABASE_ERROR", "nope"))).toBe(
-      false
+      false,
     );
   });
 
   it("classifies raw provider failures that were never normalized", () => {
     expect(isLlmFallbackEligible({ status: 429 })).toBe(true);
-    expect(isLlmFallbackEligible({ error: { code: "RESOURCE_EXHAUSTED" } })).toBe(
-      true
-    );
+    expect(
+      isLlmFallbackEligible({ error: { code: "RESOURCE_EXHAUSTED" } }),
+    ).toBe(true);
     expect(isLlmFallbackEligible({ code: "UNAVAILABLE" })).toBe(true);
     expect(isLlmFallbackEligible({ error: { code: "NOT_FOUND" } })).toBe(false);
     expect(isLlmFallbackEligible({ status: "429" })).toBe(false);

@@ -15,7 +15,7 @@ const UUID_PATTERN =
 export function requireText(
   value: unknown,
   label: string,
-  maxLength?: number
+  maxLength?: number,
 ): FieldError | null {
   if (typeof value !== "string" || value.trim().length === 0) {
     return { field: label, message: `${label} is required.` };
@@ -32,7 +32,7 @@ export function requireText(
 export function optionalText(
   value: unknown,
   label: string,
-  maxLength?: number
+  maxLength?: number,
 ): FieldError | null {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -52,7 +52,7 @@ export function optionalText(
 export function requireNumber(
   value: unknown,
   label: string,
-  options?: { min?: number }
+  options?: { min?: number },
 ): FieldError | null {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return { field: label, message: `${label} must be a number.` };
@@ -69,9 +69,12 @@ export function requireNumber(
 export function requireOneOf<T extends string>(
   value: unknown,
   allowed: readonly T[],
-  label: string
+  label: string,
 ): FieldError | null {
-  if (typeof value !== "string" || !(allowed as readonly string[]).includes(value)) {
+  if (
+    typeof value !== "string" ||
+    !(allowed as readonly string[]).includes(value)
+  ) {
     return { field: label, message: `${label} is invalid.` };
   }
   return null;
@@ -84,10 +87,7 @@ export function requireUuid(value: unknown, label: string): FieldError | null {
   return null;
 }
 
-export function optionalDate(
-  value: unknown,
-  label: string
-): FieldError | null {
+export function optionalDate(value: unknown, label: string): FieldError | null {
   if (value === undefined || value === null || value === "") {
     return null;
   }
@@ -98,10 +98,10 @@ export function optionalDate(
 }
 
 export function exactlyOneProvided(
-  values: Array<{ name: string; value: unknown }>
+  values: Array<{ name: string; value: unknown }>,
 ): FieldError | null {
   const provided = values.filter(
-    ({ value }) => value !== undefined && value !== null
+    ({ value }) => value !== undefined && value !== null,
   );
   if (provided.length !== 1) {
     return {

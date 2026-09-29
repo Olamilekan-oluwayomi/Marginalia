@@ -1,10 +1,7 @@
 import "server-only";
 
 import { aiError, isAiError, type AiError } from "@/lib/ai";
-import type {
-  AnswerGenerationInput,
-  AnswerGenerationProvider,
-} from "./types";
+import type { AnswerGenerationInput, AnswerGenerationProvider } from "./types";
 
 /**
  * Environment variables backing the Groq fallback provider. Read on the
@@ -57,11 +54,12 @@ function redact(value: string, apiKey: string): string {
 function extractErrorMessage(
   body: unknown,
   status: number,
-  apiKey: string
+  apiKey: string,
 ): string {
   if (typeof body === "object" && body !== null) {
-    const candidate = (body as { error?: { message?: unknown } }).error
-      ?.message ?? (body as { message?: unknown }).message;
+    const candidate =
+      (body as { error?: { message?: unknown } }).error?.message ??
+      (body as { message?: unknown }).message;
     if (typeof candidate === "string" && candidate.trim().length > 0) {
       return redact(candidate.trim(), apiKey);
     }
@@ -73,7 +71,7 @@ async function requestGroq(
   apiKey: string,
   model: string,
   messages: GroqMessage[],
-  maxOutputTokens: number
+  maxOutputTokens: number,
 ): Promise<unknown> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
@@ -114,7 +112,7 @@ async function requestGroq(
     if (typeof content !== "string" || content.trim().length === 0) {
       throw aiError(
         "PROVIDER_ERROR",
-        "The AI provider returned an empty response."
+        "The AI provider returned an empty response.",
       );
     }
 
@@ -123,7 +121,7 @@ async function requestGroq(
     } catch {
       throw aiError(
         "INVALID_RESPONSE",
-        "The AI provider returned malformed JSON."
+        "The AI provider returned malformed JSON.",
       );
     }
   } finally {
@@ -137,16 +135,27 @@ async function requestGroq(
  */
 function toProviderError(error: unknown, apiKey: string): AiError {
   if (isAiError(error)) {
-    console.error("[research] generation:groq_failure error=", redact(error.message, apiKey));
+    console.error(
+      "[research] generation:groq_failure error=",
+      redact(error.message, apiKey),
+    );
     return error;
   }
   if (error instanceof Error && error.name === "AbortError") {
-    console.error("[research] generation:groq_failure error=The AI provider timed out.");
+    console.error(
+      "[research] generation:groq_failure error=The AI provider timed out.",
+    );
     return aiError("PROVIDER_ERROR", "The AI provider timed out.");
   }
   const message = error instanceof Error ? error.message : String(error);
-  console.error("[research] generation:groq_failure error=", redact(message, apiKey));
-  return aiError("PROVIDER_ERROR", "The AI provider could not complete the request.");
+  console.error(
+    "[research] generation:groq_failure error=",
+    redact(message, apiKey),
+  );
+  return aiError(
+    "PROVIDER_ERROR",
+    "The AI provider could not complete the request.",
+  );
 }
 
 /**
@@ -163,15 +172,16 @@ function toProviderError(error: unknown, apiKey: string): AiError {
 export class GroqAnswerProvider implements AnswerGenerationProvider {
   async generate(input: AnswerGenerationInput): Promise<unknown> {
     const apiKey = process.env[GROQ_API_KEY_ENV];
-    const model = (process.env[GROQ_MODEL_ENV] ?? "").trim() || DEFAULT_GROQ_MODEL;
+    const model =
+      (process.env[GROQ_MODEL_ENV] ?? "").trim() || DEFAULT_GROQ_MODEL;
     console.log(
-      `[research] generation:config groqApiKeyConfigured=${Boolean(apiKey)} model=${model}`
+      `[research] generation:config groqApiKeyConfigured=${Boolean(apiKey)} model=${model}`,
     );
 
     if (!apiKey) {
       throw aiError(
         "NOT_CONFIGURED",
-        "GROQ_API_KEY is not set. Add it to .env.local to enable the Groq fallback for answer generation."
+        "GROQ_API_KEY is not set. Add it to .env.local to enable the Groq fallback for answer generation.",
       );
     }
 
@@ -184,7 +194,7 @@ export class GroqAnswerProvider implements AnswerGenerationProvider {
           { role: "system", content: input.system },
           { role: "user", content: input.prompt },
         ],
-        input.maxOutputTokens
+        input.maxOutputTokens,
       );
       console.log("[research] generation:groq_success");
       return raw;

@@ -82,12 +82,15 @@ export default async function DocumentsPage() {
           </div>
         </header>
 
-        <section id="add-document" className="mt-8 rounded-md border border-rule bg-paper-raised p-6">
+        <section
+          id="add-document"
+          className="mt-8 rounded-md border border-rule bg-paper-raised p-6"
+        >
           <Label>Add a document</Label>
 
           <p className="mt-2 max-w-2xl font-ui text-sm leading-relaxed text-muted">
-            Upload a PDF file to add it to your research library. Documents
-            are stored securely and processed automatically after upload.
+            Upload a PDF file to add it to your research library. Documents are
+            stored securely and processed automatically after upload.
           </p>
 
           <div className="mt-5">
@@ -103,10 +106,7 @@ export default async function DocumentsPage() {
           </div>
 
           {error ? (
-            <div
-              role="alert"
-              className="border-b border-rule px-4 py-10"
-            >
+            <div role="alert" className="border-b border-rule px-4 py-10">
               <h2 className="font-reading text-xl text-error">
                 Documents couldn&rsquo;t be loaded.
               </h2>
@@ -153,10 +153,7 @@ export default async function DocumentsPage() {
                           ]
                             .filter(Boolean)
                             .map((part, index) => (
-                              <span
-                                key={index}
-                                className="whitespace-nowrap"
-                              >
+                              <span key={index} className="whitespace-nowrap">
                                 {index > 0 ? " · " : ""}
                                 {part}
                               </span>
@@ -164,7 +161,9 @@ export default async function DocumentsPage() {
                         </p>
 
                         <p className="mt-2 font-mono text-xs sm:hidden">
-                          <span className={documentStatusClass(document.status)}>
+                          <span
+                            className={documentStatusClass(document.status)}
+                          >
                             {documentStatusLabel(document.status)}
                           </span>
                         </p>
@@ -182,7 +181,7 @@ export default async function DocumentsPage() {
 
                   <p
                     className={`hidden font-mono text-xs sm:block ${documentStatusClass(
-                      document.status
+                      document.status,
                     )}`}
                   >
                     {documentStatusLabel(document.status)}

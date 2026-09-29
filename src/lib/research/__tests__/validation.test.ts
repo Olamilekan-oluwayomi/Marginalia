@@ -105,8 +105,12 @@ describe("requireOneOf", () => {
 
 describe("requireUuid", () => {
   it("accepts a well-formed uuid v4-style identifier", () => {
-    expect(requireUuid("11111111-1111-4111-8111-111111111111", "Question id")).toBeNull();
-    expect(requireUuid("11111111-1111-4111-8111-111111111111", "Question id")).toBeNull();
+    expect(
+      requireUuid("11111111-1111-4111-8111-111111111111", "Question id"),
+    ).toBeNull();
+    expect(
+      requireUuid("11111111-1111-4111-8111-111111111111", "Question id"),
+    ).toBeNull();
   });
 
   it("rejects non-strings and malformed identifiers", () => {
@@ -159,7 +163,7 @@ describe("exactlyOneProvided", () => {
       exactlyOneProvided([
         { name: "document_id", value: "doc-1" },
         { name: "source_id", value: undefined },
-      ])
+      ]),
     ).toBeNull();
   });
 

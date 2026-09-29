@@ -28,9 +28,7 @@ export function ThemeToggle() {
             aria-checked={selected}
             onClick={() => setTheme(option.value)}
             className={`rounded-sm px-4 py-2 font-ui text-sm transition-colors ${
-              selected
-                ? "bg-pine text-paper"
-                : "text-muted hover:text-ink"
+              selected ? "bg-pine text-paper" : "text-muted hover:text-ink"
             }`}
           >
             {option.label}

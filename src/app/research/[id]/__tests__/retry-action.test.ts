@@ -63,7 +63,7 @@ describe("retryAnswerAction", () => {
     const state = await retryAnswerAction(
       RESEARCH_ID,
       { formError: null },
-      formDataWith("question-1")
+      formDataWith("question-1"),
     );
 
     expect(state.formError).toBeNull();
@@ -71,7 +71,7 @@ describe("retryAnswerAction", () => {
       expect.anything(),
       "question-1",
       ["failed"],
-      "pending"
+      "pending",
     );
 
     // The action returns immediately; generation runs after the response.
@@ -86,7 +86,7 @@ describe("retryAnswerAction", () => {
       researchId: RESEARCH_ID,
     });
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 
@@ -99,7 +99,7 @@ describe("retryAnswerAction", () => {
     const state = await retryAnswerAction(
       RESEARCH_ID,
       { formError: null },
-      formDataWith("question-1")
+      formDataWith("question-1"),
     );
 
     expect(state.formError).toContain("does not belong");
@@ -116,7 +116,7 @@ describe("retryAnswerAction", () => {
     const state = await retryAnswerAction(
       RESEARCH_ID,
       { formError: null },
-      formDataWith("question-1")
+      formDataWith("question-1"),
     );
 
     expect(state.formError).toContain("no longer exists");
@@ -133,7 +133,7 @@ describe("retryAnswerAction", () => {
     const state = await retryAnswerAction(
       RESEARCH_ID,
       { formError: null },
-      formDataWith("question-1")
+      formDataWith("question-1"),
     );
 
     expect(state.formError).toContain("signed in");
@@ -150,7 +150,7 @@ describe("retryAnswerAction", () => {
     const state = await retryAnswerAction(
       RESEARCH_ID,
       { formError: null },
-      formDataWith("question-1")
+      formDataWith("question-1"),
     );
 
     expect(state.formError).toContain("isn't ready to retry");

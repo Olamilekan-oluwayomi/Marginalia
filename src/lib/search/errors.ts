@@ -5,7 +5,10 @@ export type SearchError = {
   message: string;
 };
 
-export function searchError(code: SearchErrorCode, message: string): SearchError {
+export function searchError(
+  code: SearchErrorCode,
+  message: string,
+): SearchError {
   return { code, message };
 }
 

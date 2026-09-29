@@ -1,10 +1,7 @@
 import "server-only";
 
 import { generateJson, isAiError } from "@/lib/ai";
-import type {
-  AnswerGenerationInput,
-  AnswerGenerationProvider,
-} from "./types";
+import type { AnswerGenerationInput, AnswerGenerationProvider } from "./types";
 
 /**
  * Gemini-backed answer generation provider.

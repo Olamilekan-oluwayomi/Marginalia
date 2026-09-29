@@ -33,7 +33,7 @@ export function AddSourceForm({ researchId }: { researchId: string }) {
   const titleRef = useRef<HTMLInputElement>(null);
   const [state, formAction, pending] = useActionState(
     addSourceAction.bind(null, researchId),
-    initialState
+    initialState,
   );
 
   useEffect(() => {

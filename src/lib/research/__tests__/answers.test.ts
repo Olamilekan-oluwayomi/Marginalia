@@ -153,7 +153,9 @@ describe("getAnswerWithCitations", () => {
   });
 
   it("maps a missing answer to NOT_FOUND", async () => {
-    const { supabase } = makeSupabase({ maybeSingleResult: { data: null, error: null } });
+    const { supabase } = makeSupabase({
+      maybeSingleResult: { data: null, error: null },
+    });
 
     const result = await getAnswerWithCitations(supabase, ANSWER_ID);
 
@@ -171,18 +173,28 @@ describe("createAnswer", () => {
   });
 
   it("rejects empty content", async () => {
-    const result = await createAnswer({} as Supabase, QUESTION_ID, RESEARCH_ID, {
-      content: "   ",
-    });
+    const result = await createAnswer(
+      {} as Supabase,
+      QUESTION_ID,
+      RESEARCH_ID,
+      {
+        content: "   ",
+      },
+    );
     expect(result.error?.code).toBe("VALIDATION_ERROR");
     expect(result.error?.message).toContain("Content is required");
   });
 
   it("requires authentication", async () => {
     mocks.requireUser.mockResolvedValue(UNAUTHORIZED_SESSION);
-    const result = await createAnswer({} as Supabase, QUESTION_ID, RESEARCH_ID, {
-      content: "body",
-    });
+    const result = await createAnswer(
+      {} as Supabase,
+      QUESTION_ID,
+      RESEARCH_ID,
+      {
+        content: "body",
+      },
+    );
     expect(result.error?.code).toBe("UNAUTHORIZED");
   });
 
@@ -245,15 +257,20 @@ describe("createAnswer", () => {
     expect(result.error).toBeNull();
     const insertChain = from.mock.results[0].value.insert;
     expect(insertChain).toHaveBeenCalledWith(
-      expect.objectContaining({ source_mode: "web" })
+      expect.objectContaining({ source_mode: "web" }),
     );
   });
 
   it("rejects an invalid source mode", async () => {
-    const result = await createAnswer({} as Supabase, QUESTION_ID, RESEARCH_ID, {
-      content: "body text",
-      source_mode: "vhs" as never,
-    });
+    const result = await createAnswer(
+      {} as Supabase,
+      QUESTION_ID,
+      RESEARCH_ID,
+      {
+        content: "body text",
+        source_mode: "vhs" as never,
+      },
+    );
     expect(result.error?.code).toBe("VALIDATION_ERROR");
   });
 
@@ -293,7 +310,9 @@ describe("deleteAnswer", () => {
   });
 
   it("maps a missing answer to NOT_FOUND", async () => {
-    const { supabase } = makeSupabase({ deleteResult: { data: null, error: null } });
+    const { supabase } = makeSupabase({
+      deleteResult: { data: null, error: null },
+    });
 
     const result = await deleteAnswer(supabase, ANSWER_ID);
 

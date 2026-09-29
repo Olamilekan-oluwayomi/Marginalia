@@ -9,9 +9,7 @@ export type SessionResult = { user: User } | { error: AppError };
  * operation that touches user-owned data starts here; ownership is derived
  * from `auth.getUser()` and never from caller-supplied values.
  */
-export async function requireUser(
-  supabase: Supabase
-): Promise<SessionResult> {
+export async function requireUser(supabase: Supabase): Promise<SessionResult> {
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data.user) {

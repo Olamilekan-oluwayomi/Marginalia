@@ -27,45 +27,45 @@ source/answer/citation resolution primitives, `askQuestionAction`/
 `retryAnswerAction`/`deleteDocumentAction`/`retryDocumentAction`) against the
 uncovered surface. All of the following gaps were closed this phase:
 
-| Uncovered module | Functions now covered |
-|---|---|
-| `research.ts` | `getResearchList`, `getResearchListWithCounts`, `getResearchById`, `createResearch`, `updateResearch`, `deleteResearch` |
-| `workspace.ts` | `getResearchWorkspace` (assembly, citable labeling, error paths) |
-| `answers.ts` | `getAnswers`, `getAnswerWithCitations`, `createAnswer`, `deleteAnswer` |
-| `citations.ts` | `getCitations`, `createCitation` (exactly-one rule, numbering, excerpt cap) |
-| `documents.ts` | `getDocuments`, `getAllDocuments`, `getDocumentById`, `createDocument`, `setDocumentProcessing`, `setDocumentReady`, `setDocumentFailed`, `setDocumentContent`, `setDocumentFilePath`, `deleteDocument` |
-| `questions.ts` | `getQuestions`, `getQuestionById`, `createQuestion`, `updateQuestionStatus`, `tryTransitionQuestionStatus` (atomic race), `deleteQuestion` |
-| `validation.ts` | all 7 validators (text/optional/number/one-of/uuid/date/exactly-one) |
-| `session.ts` | `requireUser` (user, lookup failure, empty session) |
-| `errors.ts` | result constructors, error factories, `isAppError`, `toAppError` (safe logging) |
-| `web-research.ts` | `runWebResearch` (dedupe, title cap, insert failures, new-source cap, best-effort search failure) |
-| `search/index.ts` | `searchWeb` (validation, timeout, NOT_CONFIGURED preserve, error reduction, URL normalization, dedupe, result cap) |
-| `document-parse.ts` | `mimeTypeFromName`, `extractDocumentText` (PDF mock, text decode, parser failure, empty, char cap) |
-| `createResearchAction` | validation field errors, sign-in, generic failure, redirect + revalidate |
-| `recoverStuckAnswerAction` | stuck→failed transition, sign-in/generic failure, "no longer stuck" |
-| `addSourceAction` | field errors, sign-in, data-layer VALIDATION_ERROR passthrough, generic failure |
-| `deleteSourceAction` | delete + revalidate, missing/sign-in/failure paths |
-| `addDocumentAction` | uuid/file/empty/size/name/mime validation, sign-in, missing research, upload+row+process flow, orphaned-upload cleanup, processing error |
+| Uncovered module           | Functions now covered                                                                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `research.ts`              | `getResearchList`, `getResearchListWithCounts`, `getResearchById`, `createResearch`, `updateResearch`, `deleteResearch`                                                                                 |
+| `workspace.ts`             | `getResearchWorkspace` (assembly, citable labeling, error paths)                                                                                                                                        |
+| `answers.ts`               | `getAnswers`, `getAnswerWithCitations`, `createAnswer`, `deleteAnswer`                                                                                                                                  |
+| `citations.ts`             | `getCitations`, `createCitation` (exactly-one rule, numbering, excerpt cap)                                                                                                                             |
+| `documents.ts`             | `getDocuments`, `getAllDocuments`, `getDocumentById`, `createDocument`, `setDocumentProcessing`, `setDocumentReady`, `setDocumentFailed`, `setDocumentContent`, `setDocumentFilePath`, `deleteDocument` |
+| `questions.ts`             | `getQuestions`, `getQuestionById`, `createQuestion`, `updateQuestionStatus`, `tryTransitionQuestionStatus` (atomic race), `deleteQuestion`                                                              |
+| `validation.ts`            | all 7 validators (text/optional/number/one-of/uuid/date/exactly-one)                                                                                                                                    |
+| `session.ts`               | `requireUser` (user, lookup failure, empty session)                                                                                                                                                     |
+| `errors.ts`                | result constructors, error factories, `isAppError`, `toAppError` (safe logging)                                                                                                                         |
+| `web-research.ts`          | `runWebResearch` (dedupe, title cap, insert failures, new-source cap, best-effort search failure)                                                                                                       |
+| `search/index.ts`          | `searchWeb` (validation, timeout, NOT_CONFIGURED preserve, error reduction, URL normalization, dedupe, result cap)                                                                                      |
+| `document-parse.ts`        | `mimeTypeFromName`, `extractDocumentText` (PDF mock, text decode, parser failure, empty, char cap)                                                                                                      |
+| `createResearchAction`     | validation field errors, sign-in, generic failure, redirect + revalidate                                                                                                                                |
+| `recoverStuckAnswerAction` | stuck→failed transition, sign-in/generic failure, "no longer stuck"                                                                                                                                     |
+| `addSourceAction`          | field errors, sign-in, data-layer VALIDATION_ERROR passthrough, generic failure                                                                                                                         |
+| `deleteSourceAction`       | delete + revalidate, missing/sign-in/failure paths                                                                                                                                                      |
+| `addDocumentAction`        | uuid/file/empty/size/name/mime validation, sign-in, missing research, upload+row+process flow, orphaned-upload cleanup, processing error                                                                |
 
 ## 3. Tests added this phase
 
 **13 new test files** (203 new tests; 14 → 27 files):
 
-| File | Tests | Covers |
-|---|---|---|
-| `src/lib/research/__tests__/validation.test.ts` | 17 | all validators |
-| `src/lib/research/__tests__/errors.test.ts` | 10 | constructors/factories/`isAppError`/`toAppError` |
-| `src/lib/research/__tests__/session.test.ts` | 3 | `requireUser` |
-| `src/lib/research/__tests__/research.test.ts` | 22 | full research CRUD |
-| `src/lib/research/__tests__/workspace.test.ts` | 8 | workspace assembly |
-| `src/lib/research/__tests__/answers.test.ts` | 17 | answers + citation join |
-| `src/lib/research/__tests__/citations.test.ts` | 12 | citation CRUD + rules |
-| `src/lib/research/__tests__/web-research.test.ts` | 10 | `runWebResearch` |
-| `src/lib/research/__tests__/document-parse.test.ts` | 10 | MIME guess + text extraction |
-| `src/lib/search/__tests__/index.test.ts` | 10 | `searchWeb` + error reduction |
-| `src/app/research/new/__tests__/create-research-action.test.ts` | 6 | creation action |
-| `src/app/research/[id]/__tests__/recover-and-source-actions.test.ts` | 14 | recover + add/delete source |
-| `src/app/documents/__tests__/add-document-action.test.ts` | 11 | upload action |
+| File                                                                 | Tests | Covers                                           |
+| -------------------------------------------------------------------- | ----- | ------------------------------------------------ |
+| `src/lib/research/__tests__/validation.test.ts`                      | 17    | all validators                                   |
+| `src/lib/research/__tests__/errors.test.ts`                          | 10    | constructors/factories/`isAppError`/`toAppError` |
+| `src/lib/research/__tests__/session.test.ts`                         | 3     | `requireUser`                                    |
+| `src/lib/research/__tests__/research.test.ts`                        | 22    | full research CRUD                               |
+| `src/lib/research/__tests__/workspace.test.ts`                       | 8     | workspace assembly                               |
+| `src/lib/research/__tests__/answers.test.ts`                         | 17    | answers + citation join                          |
+| `src/lib/research/__tests__/citations.test.ts`                       | 12    | citation CRUD + rules                            |
+| `src/lib/research/__tests__/web-research.test.ts`                    | 10    | `runWebResearch`                                 |
+| `src/lib/research/__tests__/document-parse.test.ts`                  | 10    | MIME guess + text extraction                     |
+| `src/lib/search/__tests__/index.test.ts`                             | 10    | `searchWeb` + error reduction                    |
+| `src/app/research/new/__tests__/create-research-action.test.ts`      | 6     | creation action                                  |
+| `src/app/research/[id]/__tests__/recover-and-source-actions.test.ts` | 14    | recover + add/delete source                      |
+| `src/app/documents/__tests__/add-document-action.test.ts`            | 11    | upload action                                    |
 
 **2 extended files:** `documents.test.ts` (8 → 37) and `questions.test.ts`
 (4 → 31).
@@ -164,14 +164,14 @@ Manual browser checklist (requires `.env.local` with a Supabase project and
 
 ## 9. Files changed (all uncommitted)
 
-| File | Change |
-|---|---|
-| `src/lib/research/errors.ts` | `isAppError` tightened to `APP_ERROR_CODES` |
-| `src/lib/search/errors.ts` | `isSearchError` tightened to `SEARCH_ERROR_CODES` |
-| `src/lib/research/__tests__/documents.test.ts` | extended 8 → 37 tests |
-| `src/lib/research/__tests__/questions.test.ts` | extended 4 → 31 tests |
-| 13 new test files (see §3) | added |
-| `PHASE-11-COMPLETE.md` | this report |
+| File                                           | Change                                            |
+| ---------------------------------------------- | ------------------------------------------------- |
+| `src/lib/research/errors.ts`                   | `isAppError` tightened to `APP_ERROR_CODES`       |
+| `src/lib/search/errors.ts`                     | `isSearchError` tightened to `SEARCH_ERROR_CODES` |
+| `src/lib/research/__tests__/documents.test.ts` | extended 8 → 37 tests                             |
+| `src/lib/research/__tests__/questions.test.ts` | extended 4 → 31 tests                             |
+| 13 new test files (see §3)                     | added                                             |
+| `PHASE-11-COMPLETE.md`                         | this report                                       |
 
 ## 10. Status
 

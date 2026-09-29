@@ -72,7 +72,7 @@ describe("relevance check prompt sizing", () => {
     const summary = await readyDocumentsSummary(
       fakeSupabase,
       researchId,
-      "Is extreme precipitation increasing in the study region?"
+      "Is extreme precipitation increasing in the study region?",
     );
     expect(summary).not.toBeNull();
     expect(summary!.length).toBeLessThanOrEqual(4_000);
@@ -81,8 +81,8 @@ describe("relevance check prompt sizing", () => {
     await expect(
       checkDocumentRelevance(
         "Is extreme precipitation increasing in the study region?",
-        summary!
-      )
+        summary!,
+      ),
     ).resolves.toMatchObject({
       relevant: true,
       confidence: 0.9,
@@ -93,7 +93,7 @@ describe("relevance check prompt sizing", () => {
     expect(sentPrompt.length).toBeLessThan(40_000);
     expect(sentPrompt).toContain("The study PDF");
     expect(sentPrompt).toContain(
-      "Is extreme precipitation increasing in the study region?"
+      "Is extreme precipitation increasing in the study region?",
     );
   });
 });
@@ -107,7 +107,7 @@ describe("relevance check targets question-relevant passages", () => {
   it("sees a significance-level answer that sits past the old 4000-char excerpt cutoff", async () => {
     const filler =
       "Regional rainfall and climate variability are discussed across the study area. ".repeat(
-        90
+        90,
       );
     const methods =
       "Trend detection was carried out with the Mann-Kendall test for each station. " +
@@ -130,7 +130,7 @@ describe("relevance check targets question-relevant passages", () => {
     const summary = await readyDocumentsSummary(
       fakeSupabase,
       researchId,
-      "At what statistical significance level were trends evaluated?"
+      "At what statistical significance level were trends evaluated?",
     );
 
     expect(summary).not.toBeNull();
@@ -141,8 +141,8 @@ describe("relevance check targets question-relevant passages", () => {
     await expect(
       checkDocumentRelevance(
         "At what statistical significance level were trends evaluated?",
-        summary!
-      )
+        summary!,
+      ),
     ).resolves.toMatchObject({ relevant: true });
   });
 });

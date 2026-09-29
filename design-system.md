@@ -6,18 +6,18 @@
 
 ## 1. Color
 
-| Token | Hex | Use |
-|---|---|---|
-| `paper` | `#EDEEEA` | Base background — cool stone, not cream |
-| `paper-raised` | `#F5F5F2` | Cards, input surface, hover surface |
-| `ink` | `#1F2421` | Primary text |
-| `ink-soft` | `#3A3F3A` | Secondary body text |
-| `muted` | `#63675F` | Labels, timestamps, placeholder text |
-| `rule` | `#D8D6CE` | Hairline borders, dividers |
-| `pine` | `#3B6E63` | Accent — links, focus ring, active nav, primary button |
-| `pine-dim` | `#2C5049` | Pine hover/pressed state |
-| `ochre` | `#84651A` | Citations, highlight marks, source underline |
-| `error` | `#A23B2E` | Errors only — desaturated brick, not stock red |
+| Token          | Hex       | Use                                                    |
+| -------------- | --------- | ------------------------------------------------------ |
+| `paper`        | `#EDEEEA` | Base background — cool stone, not cream                |
+| `paper-raised` | `#F5F5F2` | Cards, input surface, hover surface                    |
+| `ink`          | `#1F2421` | Primary text                                           |
+| `ink-soft`     | `#3A3F3A` | Secondary body text                                    |
+| `muted`        | `#63675F` | Labels, timestamps, placeholder text                   |
+| `rule`         | `#D8D6CE` | Hairline borders, dividers                             |
+| `pine`         | `#3B6E63` | Accent — links, focus ring, active nav, primary button |
+| `pine-dim`     | `#2C5049` | Pine hover/pressed state                               |
+| `ochre`        | `#84651A` | Citations, highlight marks, source underline           |
+| `error`        | `#A23B2E` | Errors only — desaturated brick, not stock red         |
 
 > The light-mode `muted` (`#63675F`) and `ochre` (`#84651A`) shades are tuned
 > for WCAG 2.1 AA: ≥ 4.5:1 against the `paper` background, since both are used
@@ -30,16 +30,16 @@ No gradients. No glassmorphism. Shadows are a single `0 1px 2px rgba(31,36,33,0.
 
 ```css
 :root {
-  --paper: #EDEEEA;
-  --paper-raised: #F5F5F2;
-  --ink: #1F2421;
-  --ink-soft: #3A3F3A;
-  --muted: #63675F;
-  --rule: #D8D6CE;
-  --pine: #3B6E63;
-  --pine-dim: #2C5049;
-  --ochre: #84651A;
-  --error: #A23B2E;
+  --paper: #edeeea;
+  --paper-raised: #f5f5f2;
+  --ink: #1f2421;
+  --ink-soft: #3a3f3a;
+  --muted: #63675f;
+  --rule: #d8d6ce;
+  --pine: #3b6e63;
+  --pine-dim: #2c5049;
+  --ochre: #84651a;
+  --error: #a23b2e;
 
   --radius-sm: 3px;
   --radius-md: 4px;
@@ -53,51 +53,51 @@ Radius stays small and uniform (3–4px). No fully-rounded buttons or bubble cor
 
 ## 2. Type
 
-| Role | Family | Notes |
-|---|---|---|
-| Reading / answers | **Newsreader** | Optical-size serif built for long text. Used at 17–19px for assistant answers, italic for asides |
-| UI chrome | **Work Sans** | Nav, buttons, labels, composer placeholder |
-| Data / citations | **IBM Plex Mono** | Source metadata, timestamps, token counts, code |
+| Role              | Family            | Notes                                                                                            |
+| ----------------- | ----------------- | ------------------------------------------------------------------------------------------------ |
+| Reading / answers | **Newsreader**    | Optical-size serif built for long text. Used at 17–19px for assistant answers, italic for asides |
+| UI chrome         | **Work Sans**     | Nav, buttons, labels, composer placeholder                                                       |
+| Data / citations  | **IBM Plex Mono** | Source metadata, timestamps, token counts, code                                                  |
 
 ```css
---font-reading: 'Newsreader', Georgia, serif;
---font-ui: 'Work Sans', system-ui, sans-serif;
---font-mono: 'IBM Plex Mono', monospace;
+--font-reading: "Newsreader", Georgia, serif;
+--font-ui: "Work Sans", system-ui, sans-serif;
+--font-mono: "IBM Plex Mono", monospace;
 ```
 
 Next.js (App Router) font setup:
 
 ```ts
 // app/fonts.ts
-import { Newsreader, Work_Sans, IBM_Plex_Mono } from 'next/font/google'
+import { Newsreader, Work_Sans, IBM_Plex_Mono } from "next/font/google";
 
 export const newsreader = Newsreader({
-  subsets: ['latin'],
-  variable: '--font-reading',
-  style: ['normal', 'italic'],
-})
+  subsets: ["latin"],
+  variable: "--font-reading",
+  style: ["normal", "italic"],
+});
 
 export const workSans = Work_Sans({
-  subsets: ['latin'],
-  variable: '--font-ui',
-})
+  subsets: ["latin"],
+  variable: "--font-ui",
+});
 
 export const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
-  variable: '--font-mono',
-})
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+});
 ```
 
 Type scale (rem, 16px base):
 
-| Use | Size | Line-height | Family |
-|---|---|---|---|
-| Answer body | 1.0625 | 1.65 | reading |
-| Answer heading | 1.375 | 1.3 | reading, medium |
-| UI label | 0.8125 | 1.4 | ui, uppercase, 0.03em tracking |
-| Button | 0.875 | 1 | ui, medium |
-| Citation/meta | 0.75 | 1.4 | mono |
+| Use            | Size   | Line-height | Family                         |
+| -------------- | ------ | ----------- | ------------------------------ |
+| Answer body    | 1.0625 | 1.65        | reading                        |
+| Answer heading | 1.375  | 1.3         | reading, medium                |
+| UI label       | 0.8125 | 1.4         | ui, uppercase, 0.03em tracking |
+| Button         | 0.875  | 1           | ui, medium                     |
+| Citation/meta  | 0.75   | 1.4         | mono                           |
 
 ---
 
@@ -124,29 +124,29 @@ export default {
   theme: {
     extend: {
       colors: {
-        paper: { DEFAULT: '#EDEEEA', raised: '#F5F5F2' },
-        ink: { DEFAULT: '#1F2421', soft: '#3A3F3A' },
-        muted: '#63675F',
-        rule: '#D8D6CE',
-        pine: { DEFAULT: '#3B6E63', dim: '#2C5049' },
-        ochre: '#84651A',
-        error: '#A23B2E',
+        paper: { DEFAULT: "#EDEEEA", raised: "#F5F5F2" },
+        ink: { DEFAULT: "#1F2421", soft: "#3A3F3A" },
+        muted: "#63675F",
+        rule: "#D8D6CE",
+        pine: { DEFAULT: "#3B6E63", dim: "#2C5049" },
+        ochre: "#84651A",
+        error: "#A23B2E",
       },
       fontFamily: {
-        reading: ['var(--font-reading)'],
-        ui: ['var(--font-ui)'],
-        mono: ['var(--font-mono)'],
+        reading: ["var(--font-reading)"],
+        ui: ["var(--font-ui)"],
+        mono: ["var(--font-mono)"],
       },
       maxWidth: {
-        reading: '68ch',
+        reading: "68ch",
       },
       borderRadius: {
-        sm: '3px',
-        md: '4px',
+        sm: "3px",
+        md: "4px",
       },
     },
   },
-}
+};
 ```
 
 ---
@@ -189,8 +189,14 @@ Minimal, on purpose — excess motion is what makes AI UIs feel synthetic.
 
 ```css
 @keyframes rise-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .answer-enter {
@@ -198,7 +204,9 @@ Minimal, on purpose — excess motion is what makes AI UIs feel synthetic.
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .answer-enter { animation: none; }
+  .answer-enter {
+    animation: none;
+  }
 }
 ```
 

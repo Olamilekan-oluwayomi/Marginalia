@@ -8,11 +8,7 @@ type AppShellProps = {
   showTitle?: boolean;
 };
 
-export function AppShell({
-  children,
-  title,
-  showTitle = true,
-}: AppShellProps) {
+export function AppShell({ children, title, showTitle = true }: AppShellProps) {
   return (
     <div className="flex min-h-screen bg-paper text-ink">
       <a

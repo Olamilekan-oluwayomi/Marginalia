@@ -1,21 +1,11 @@
 import "server-only";
 
-import {
-  isSearchError,
-  searchError,
-  type SearchError,
-} from "./errors";
-import {
-  normalizeResults,
-  SEARCH_QUERY_MAX_LENGTH,
-} from "./normalize";
+import { isSearchError, searchError, type SearchError } from "./errors";
+import { normalizeResults, SEARCH_QUERY_MAX_LENGTH } from "./normalize";
 import { TavilyWebSearchProvider } from "./providers/tavily";
 import type { WebSearchResult } from "./types";
 
-export {
-  MAX_SEARCH_RESULTS,
-  SEARCH_QUERY_MAX_LENGTH,
-} from "./normalize";
+export { MAX_SEARCH_RESULTS, SEARCH_QUERY_MAX_LENGTH } from "./normalize";
 export type { WebSearchResult } from "./types";
 
 /**
@@ -46,7 +36,7 @@ function toSearchError(error: unknown): SearchError {
   }
   console.error(
     "[search] web search failed:",
-    error instanceof Error ? error.message : String(error)
+    error instanceof Error ? error.message : String(error),
   );
   return searchError("PROVIDER_ERROR", "Web search could not be completed.");
 }
@@ -63,17 +53,14 @@ function toSearchError(error: unknown): SearchError {
 export async function searchWeb(query: string): Promise<WebSearchResult[]> {
   const trimmed = (query ?? "").trim();
   if (trimmed.length === 0 || trimmed.length > SEARCH_QUERY_MAX_LENGTH) {
-    throw searchError(
-      "PROVIDER_ERROR",
-      "Search query is empty or too long."
-    );
+    throw searchError("PROVIDER_ERROR", "Search query is empty or too long.");
   }
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(
       () => reject(searchError("PROVIDER_ERROR", "Web search timed out.")),
-      SEARCH_TIMEOUT_MS
+      SEARCH_TIMEOUT_MS,
     );
   });
 

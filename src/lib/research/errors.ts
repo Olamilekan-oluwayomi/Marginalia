@@ -1,8 +1,5 @@
 export type AppErrorCode =
-  | "UNAUTHORIZED"
-  | "NOT_FOUND"
-  | "VALIDATION_ERROR"
-  | "DATABASE_ERROR";
+  "UNAUTHORIZED" | "NOT_FOUND" | "VALIDATION_ERROR" | "DATABASE_ERROR";
 
 export type AppError = {
   code: AppErrorCode;
@@ -34,13 +31,13 @@ export function appError(code: AppErrorCode, message: string): AppError {
 }
 
 export function unauthorized(
-  message = "You must be signed in to do that."
+  message = "You must be signed in to do that.",
 ): AppError {
   return appError("UNAUTHORIZED", message);
 }
 
 export function notFound(
-  message = "The requested item was not found."
+  message = "The requested item was not found.",
 ): AppError {
   return appError("NOT_FOUND", message);
 }
@@ -50,7 +47,7 @@ export function validationError(message: string): AppError {
 }
 
 export function databaseError(
-  message = "Unable to access your data right now. Please try again."
+  message = "Unable to access your data right now. Please try again.",
 ): AppError {
   return appError("DATABASE_ERROR", message);
 }

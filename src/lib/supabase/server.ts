@@ -15,12 +15,14 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value }) => cookieStore.set(name, value));
+            cookiesToSet.forEach(({ name, value }) =>
+              cookieStore.set(name, value),
+            );
           } catch {
             // Called from a Server Component — can be ignored across requests.
           }
         },
       },
-    }
+    },
   );
 }

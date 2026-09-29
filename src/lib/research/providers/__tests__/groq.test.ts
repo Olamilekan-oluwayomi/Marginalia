@@ -16,7 +16,10 @@ vi.mock("@/lib/ai", () => ({
   isAiError: mocks.isAiError,
 }));
 
-import { GroqAnswerProvider, DEFAULT_GROQ_MODEL } from "@/lib/research/providers/groq";
+import {
+  GroqAnswerProvider,
+  DEFAULT_GROQ_MODEL,
+} from "@/lib/research/providers/groq";
 import type { AnswerGenerationInput } from "@/lib/research/providers/types";
 
 const input: AnswerGenerationInput = {
@@ -37,7 +40,7 @@ function okJsonResponse(body: unknown): {
 
 function jsonResponse(
   body: unknown,
-  status: number
+  status: number,
 ): { ok: boolean; status: number; json: () => Promise<unknown> } {
   return { ok: false, status, json: () => Promise.resolve(body) };
 }
@@ -71,7 +74,7 @@ describe("GroqAnswerProvider", () => {
             },
           },
         ],
-      })
+      }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -101,13 +104,13 @@ describe("GroqAnswerProvider", () => {
       ],
     });
     expect(console.log).toHaveBeenCalledWith(
-      `[research] generation:config groqApiKeyConfigured=true model=${DEFAULT_GROQ_MODEL}`
+      `[research] generation:config groqApiKeyConfigured=true model=${DEFAULT_GROQ_MODEL}`,
     );
     expect(console.log).toHaveBeenCalledWith(
-      "[research] generation:groq_start"
+      "[research] generation:groq_start",
     );
     expect(console.log).toHaveBeenCalledWith(
-      "[research] generation:groq_success"
+      "[research] generation:groq_success",
     );
   });
 
@@ -115,8 +118,14 @@ describe("GroqAnswerProvider", () => {
     process.env.GROQ_MODEL = "qwen/qwen3.6-27b";
     const fetchMock = vi.fn().mockResolvedValue(
       okJsonResponse({
-        choices: [{ message: { content: JSON.stringify({ answer: "x", citations: [] }) } }],
-      })
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({ answer: "x", citations: [] }),
+            },
+          },
+        ],
+      }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -127,7 +136,7 @@ describe("GroqAnswerProvider", () => {
     const body = JSON.parse(init.body as string);
     expect(body.model).toBe("qwen/qwen3.6-27b");
     expect(console.log).toHaveBeenCalledWith(
-      "[research] generation:config groqApiKeyConfigured=true model=qwen/qwen3.6-27b"
+      "[research] generation:config groqApiKeyConfigured=true model=qwen/qwen3.6-27b",
     );
   });
 
@@ -143,16 +152,21 @@ describe("GroqAnswerProvider", () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(console.log).toHaveBeenCalledWith(
-      "[research] generation:config groqApiKeyConfigured=false model=openai/gpt-oss-120b"
+      "[research] generation:config groqApiKeyConfigured=false model=openai/gpt-oss-120b",
     );
   });
 
   it("surfaces a non-2xx response as PROVIDER_ERROR with the redacted message and status", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        jsonResponse({ error: { message: "rate limited for key test-key" } }, 429)
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(
+            { error: { message: "rate limited for key test-key" } },
+            429,
+          ),
+        ),
     );
 
     const provider = new GroqAnswerProvider();
@@ -163,7 +177,7 @@ describe("GroqAnswerProvider", () => {
     });
     const errorSpy = vi.mocked(console.error);
     const failureCall = errorSpy.mock.calls.find(
-      ([arg]) => arg === "[research] generation:groq_failure error="
+      ([arg]) => arg === "[research] generation:groq_failure error=",
     );
     expect(failureCall).toBeDefined();
     expect(failureCall![1]).toContain("[redacted]");
@@ -176,8 +190,8 @@ describe("GroqAnswerProvider", () => {
       vi.fn().mockResolvedValue(
         okJsonResponse({
           choices: [{ message: { content: "not-json" } }],
-        })
-      )
+        }),
+      ),
     );
 
     const provider = new GroqAnswerProvider();
@@ -190,7 +204,7 @@ describe("GroqAnswerProvider", () => {
   it("fails with PROVIDER_ERROR when no choices are returned", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(okJsonResponse({ choices: [] }))
+      vi.fn().mockResolvedValue(okJsonResponse({ choices: [] })),
     );
 
     const provider = new GroqAnswerProvider();
@@ -213,8 +227,8 @@ describe("GroqAnswerProvider", () => {
               error.name = "AbortError";
               reject(error);
             });
-          })
-      )
+          }),
+      ),
     );
 
     const provider = new GroqAnswerProvider();
@@ -226,7 +240,7 @@ describe("GroqAnswerProvider", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     await assertion;
     expect(console.error).toHaveBeenCalledWith(
-      "[research] generation:groq_failure error=The AI provider timed out."
+      "[research] generation:groq_failure error=The AI provider timed out.",
     );
   });
 });

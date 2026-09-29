@@ -40,7 +40,7 @@ function pdfFormData(): FormData {
   const file = new File(
     [new Uint8Array([0x25, 0x50, 0x44, 0x46])],
     "paper.pdf",
-    { type: "application/pdf" }
+    { type: "application/pdf" },
   );
   formData.set("file", file);
   return formData;
@@ -100,7 +100,10 @@ describe("addDocumentAction", () => {
   it("rejects an empty file", async () => {
     const formData = new FormData();
     formData.set("researchId", RESEARCH_ID);
-    formData.set("file", new File([], "paper.pdf", { type: "application/pdf" }));
+    formData.set(
+      "file",
+      new File([], "paper.pdf", { type: "application/pdf" }),
+    );
 
     const state = await addDocumentAction(initialState, formData);
 
@@ -115,7 +118,7 @@ describe("addDocumentAction", () => {
       "file",
       new File([new Uint8Array(11 * 1024 * 1024)], "paper.pdf", {
         type: "application/pdf",
-      })
+      }),
     );
 
     const state = await addDocumentAction(initialState, formData);
@@ -127,7 +130,10 @@ describe("addDocumentAction", () => {
   it("rejects a non-PDF file name", async () => {
     const formData = new FormData();
     formData.set("researchId", RESEARCH_ID);
-    formData.set("file", new File(["hello"], "notes.txt", { type: "text/plain" }));
+    formData.set(
+      "file",
+      new File(["hello"], "notes.txt", { type: "text/plain" }),
+    );
 
     const state = await addDocumentAction(initialState, formData);
 
@@ -140,7 +146,7 @@ describe("addDocumentAction", () => {
     formData.set("researchId", RESEARCH_ID);
     formData.set(
       "file",
-      new File(["hello"], "paper.pdf", { type: "application/zip" })
+      new File(["hello"], "paper.pdf", { type: "application/zip" }),
     );
 
     const state = await addDocumentAction(initialState, formData);
@@ -183,10 +189,13 @@ describe("addDocumentAction", () => {
     expect(mocks.upload).toHaveBeenCalledOnce();
     const [pathArg, fileArg, optionsArg] = mocks.upload.mock.calls[0];
     expect(pathArg).toMatch(
-      new RegExp(`^${USER_ID}/${RESEARCH_ID}/[0-9a-f-]{36}\\.pdf$`)
+      new RegExp(`^${USER_ID}/${RESEARCH_ID}/[0-9a-f-]{36}\\.pdf$`),
     );
     expect(fileArg.name).toBe("paper.pdf");
-    expect(optionsArg).toEqual({ contentType: "application/pdf", upsert: false });
+    expect(optionsArg).toEqual({
+      contentType: "application/pdf",
+      upsert: false,
+    });
 
     expect(mocks.createDocument).toHaveBeenCalledOnce();
     const createArgs = mocks.createDocument.mock.calls[0];
@@ -199,11 +208,11 @@ describe("addDocumentAction", () => {
     expect(mocks.processDocument).toHaveBeenCalledWith(
       expect.anything(),
       createArgs[2].id,
-      RESEARCH_ID
+      RESEARCH_ID,
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/documents");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
-      `/research/${RESEARCH_ID}`
+      `/research/${RESEARCH_ID}`,
     );
   });
 

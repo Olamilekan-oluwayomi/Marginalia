@@ -197,7 +197,10 @@ describe("createSource", () => {
         ],
         error: null,
       },
-      insertResult: { data: makeSource({ url: "https://other.org/paper" }), error: null },
+      insertResult: {
+        data: makeSource({ url: "https://other.org/paper" }),
+        error: null,
+      },
     });
 
     const result = await createSource(supabase, RESEARCH_ID, {

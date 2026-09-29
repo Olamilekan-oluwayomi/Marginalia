@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 
 type AuthContextValue = {
@@ -39,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!mounted) return;
           setUser(event === "SIGNED_OUT" ? null : (session?.user ?? null));
           setLoading(false);
-        }
+        },
       );
 
       unsubRef.current = () => subscription.subscription.unsubscribe();

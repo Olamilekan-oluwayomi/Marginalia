@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/Label";
 
 export const metadata: Metadata = {
   title: "New research",
-  description: "Start a research workspace for a question you're trying to answer.",
+  description:
+    "Start a research workspace for a question you're trying to answer.",
 };
 
 export default function NewResearchPage() {

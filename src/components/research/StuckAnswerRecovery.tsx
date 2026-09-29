@@ -43,14 +43,14 @@ export function StuckAnswerRecovery({
 }) {
   const [state, formAction, pending] = useActionState(
     recoverStuckAnswerAction.bind(null, researchId),
-    initialState
+    initialState,
   );
 
   const staleAt = new Date(createdAt).getTime() + STALE_ANSWER_MS;
   const isStale = useSyncExternalStore(
     subscribeToClock,
     () => Date.now() >= staleAt,
-    () => false
+    () => false,
   );
 
   if (!isStale) {

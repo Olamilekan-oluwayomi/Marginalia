@@ -14,12 +14,10 @@ export type CreateResearchState = {
 
 export async function createResearchAction(
   _prevState: CreateResearchState,
-  formData: FormData
+  formData: FormData,
 ): Promise<CreateResearchState> {
   const title = (formData.get("title") as string | null)?.trim() ?? "";
-  const description = (
-    formData.get("description") as string | null
-  )?.trim();
+  const description = (formData.get("description") as string | null)?.trim();
 
   const fieldErrors: CreateResearchState["fieldErrors"] = {};
 

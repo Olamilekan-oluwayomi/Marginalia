@@ -2,7 +2,14 @@ import "server-only";
 
 import { searchWeb, type WebSearchResult } from "@/lib/search";
 import { normalizeUrl } from "@/lib/search/normalize-url";
-import { appError, describeError, fail, ok, validationError, type AppResult } from "./errors";
+import {
+  appError,
+  describeError,
+  fail,
+  ok,
+  validationError,
+  type AppResult,
+} from "./errors";
 import { requireUser } from "./session";
 import { createSource, getSources } from "./sources";
 import type { ResearchContextItem } from "./context";
@@ -55,14 +62,11 @@ export type RunWebResearchResult = {
 export async function runWebResearch(
   supabase: Supabase,
   researchId: string,
-  question: string
+  question: string,
 ): Promise<AppResult<RunWebResearchResult>> {
   const idError = requireUuid(researchId, "Research id");
   if (idError) {
-    return fail(
-      validationError(idError.message),
-      { items: [], addedCount: 0 }
-    );
+    return fail(validationError(idError.message), { items: [], addedCount: 0 });
   }
 
   const session = await requireUser(supabase);
@@ -81,7 +85,7 @@ export async function runWebResearch(
     sourcesResult.data
       .map((source) => source.url)
       .filter((url): url is string => Boolean(url))
-      .map(normalizeUrl)
+      .map(normalizeUrl),
   );
 
   let results: WebSearchResult[];
@@ -92,10 +96,13 @@ export async function runWebResearch(
     // logged with its full underlying cause so a quota, auth, timeout, or
     // grounding failure is distinguishable from "the provider returned
     // nothing", and it surfaces as an error the caller can react to.
-    console.error("[research] webSearch:provider_failure", describeError(error));
+    console.error(
+      "[research] webSearch:provider_failure",
+      describeError(error),
+    );
     return fail(
       appError("DATABASE_ERROR", "Web search could not be completed."),
-      { items: [], addedCount: 0 }
+      { items: [], addedCount: 0 },
     );
   }
 
@@ -103,7 +110,9 @@ export async function runWebResearch(
     console.log("[research] webSearch:provider_empty");
     return ok({ items: [], addedCount: 0 });
   }
-  console.log(`[research] webSearch:provider_success results=${results.length}`);
+  console.log(
+    `[research] webSearch:provider_success results=${results.length}`,
+  );
 
   const items: ResearchContextItem[] = [];
   let addedCount = 0;
@@ -126,7 +135,7 @@ export async function runWebResearch(
       // mistaken for "web search returned nothing".
       console.error(
         "[research] webSearch:source_insert_failure",
-        created.error?.message ?? "missing source row"
+        created.error?.message ?? "missing source row",
       );
       continue;
     }

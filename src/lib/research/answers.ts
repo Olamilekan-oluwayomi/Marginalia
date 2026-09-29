@@ -20,7 +20,7 @@ const MODEL_MAX_LENGTH = 100;
 
 export async function getAnswers(
   supabase: Supabase,
-  questionId: string
+  questionId: string,
 ): Promise<AppResult<AnswerRow[]>> {
   const idError = requireUuid(questionId, "Question id");
   if (idError) {
@@ -51,7 +51,7 @@ export async function getAnswers(
  */
 export async function getAnswerWithCitations(
   supabase: Supabase,
-  answerId: string
+  answerId: string,
 ): Promise<AppResult<AnswerWithCitations | null>> {
   const idError = requireUuid(answerId, "Answer id");
   if (idError) {
@@ -83,7 +83,7 @@ export async function createAnswer(
   supabase: Supabase,
   questionId: string,
   researchId: string,
-  input: CreateAnswerInput
+  input: CreateAnswerInput,
 ): Promise<AppResult<AnswerRow | null>> {
   const idError = requireUuid(questionId, "Question id");
   if (idError) {
@@ -94,11 +94,19 @@ export async function createAnswer(
     return fail(validationError(researchIdError.message), null);
   }
 
-  const contentError = requireText(input.content, "Content", CONTENT_MAX_LENGTH);
+  const contentError = requireText(
+    input.content,
+    "Content",
+    CONTENT_MAX_LENGTH,
+  );
   if (contentError) {
     return fail(validationError(contentError.message), null);
   }
-  const modelError = requireText(input.model ?? "ai", "Model", MODEL_MAX_LENGTH);
+  const modelError = requireText(
+    input.model ?? "ai",
+    "Model",
+    MODEL_MAX_LENGTH,
+  );
   if (modelError) {
     return fail(validationError(modelError.message), null);
   }
@@ -106,7 +114,7 @@ export async function createAnswer(
     const sourceModeError = requireOneOf(
       input.source_mode,
       ["document", "web", "both"] as const,
-      "Source mode"
+      "Source mode",
     );
     if (sourceModeError) {
       return fail(validationError(sourceModeError.message), null);
@@ -140,7 +148,7 @@ export async function createAnswer(
 
 export async function deleteAnswer(
   supabase: Supabase,
-  answerId: string
+  answerId: string,
 ): Promise<AppResult<null>> {
   const idError = requireUuid(answerId, "Answer id");
   if (idError) {

@@ -23,11 +23,13 @@ const SESSION_COOKIE_MARKER = "-auth-token";
  * suffix match — recognizes both the single-cookie and chunked forms.
  */
 function hasSessionCookie(request: NextRequest): boolean {
-  return request.cookies.getAll().some(
-    (cookie) =>
-      cookie.name.startsWith("sb-") &&
-      cookie.name.includes(SESSION_COOKIE_MARKER)
-  );
+  return request.cookies
+    .getAll()
+    .some(
+      (cookie) =>
+        cookie.name.startsWith("sb-") &&
+        cookie.name.includes(SESSION_COOKIE_MARKER),
+    );
 }
 
 export async function proxy(request: NextRequest) {

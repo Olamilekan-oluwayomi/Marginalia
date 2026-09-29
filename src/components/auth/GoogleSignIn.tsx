@@ -40,7 +40,7 @@ export function GoogleSignIn({ source, error, redirectTo }: GoogleSignInProps) {
 
     if (redirectTo) {
       document.cookie = `auth_destination=${encodeURIComponent(
-        redirectTo
+        redirectTo,
       )}; path=/; samesite=lax; max-age=600${secure}`;
     }
 

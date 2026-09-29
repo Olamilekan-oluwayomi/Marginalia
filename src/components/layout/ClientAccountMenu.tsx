@@ -3,11 +3,10 @@
 import { Suspense, lazy } from "react";
 import { UserRound } from "lucide-react";
 
-const AccountMenu = lazy(
-  () =>
-    import("@/components/layout/AccountMenu").then((m) => ({
-      default: m.AccountMenu,
-    })),
+const AccountMenu = lazy(() =>
+  import("@/components/layout/AccountMenu").then((m) => ({
+    default: m.AccountMenu,
+  })),
 );
 
 function AccountMenuFallback() {
