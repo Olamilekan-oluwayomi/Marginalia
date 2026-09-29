@@ -5,9 +5,6 @@ import { extractText, getDocumentProxy } from "unpdf";
 /** Upper bound on extracted body text kept per document. */
 const MAX_CONTENT_CHARS = 200_000;
 
-/** Maximum accepted upload size (must stay in sync with the storage bucket limit). */
-export { MAX_UPLOAD_BYTES as MAX_DOCUMENT_BYTES } from "./document-upload";
-
 type DocumentKind = "pdf" | "text";
 
 /**

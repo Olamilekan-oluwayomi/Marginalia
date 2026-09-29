@@ -124,23 +124,6 @@ export function parseGeneratedAnswerOutput(
   };
 }
 
-export type ResolvedCitation = {
-  citation_number: number;
-  document_id?: string;
-  source_id?: string;
-};
-
-export type ResolveCitationsResult = {
-  citations: ResolvedCitation[];
-  /** Number of generated citations dropped because they could not be verified. */
-  rejectedCount: number;
-  /**
-   * The answer text with citation markers for dropped citations removed, so
-   * the persisted answer can never display a dangling `[n]`.
-   */
-  answer: string;
-};
-
 /**
  * Repairs the most common malformed citation marker: a bare sentence-final
  * integer the model wrote instead of a bracketed `[n]` (e.g. "...anomalies 1."
@@ -203,49 +186,6 @@ function stripUnresolvedCitationMarkers(
     cleaned = cleaned.replace(/[ ]{2,}/g, " ").replace(/[ ]+([.,;:!?])/g, "$1");
   }
   return cleaned;
-}
-
-/**
- * Resolves each generated citation's evidence index to the context item it
- * refers to, producing exactly the ids to persist.
- *
- * An evidence index is rejected when it points outside the provided context
- * or at an item without real body content. The model may only cite evidence
- * it was actually given — never an item's reference metadata — so citations
- * to content-less items are dropped, never persisted. Markers for dropped
- * citations are also stripped from the answer so no dangling `[n]` can be
- * rendered.
- */
-export function resolveCitations(
-  output: GeneratedAnswerOutput,
-  context: ResearchContext,
-): ResolveCitationsResult {
-  const resolved: ResolvedCitation[] = [];
-  let rejectedCount = 0;
-
-  for (const citation of output.citations) {
-    const item = context.items[citation.evidence - 1];
-
-    if (!item || item.content.trim().length === 0) {
-      rejectedCount += 1;
-      continue;
-    }
-
-    resolved.push({
-      citation_number: citation.citation_number,
-      ...(item.kind === "document"
-        ? { document_id: item.id }
-        : { source_id: item.id }),
-    });
-  }
-
-  resolved.sort((a, b) => a.citation_number - b.citation_number);
-  const normalized = normalizeMalformedMarkers(output.answer, resolved);
-  return {
-    citations: resolved,
-    rejectedCount,
-    answer: stripUnresolvedCitationMarkers(normalized, resolved),
-  };
 }
 
 /**

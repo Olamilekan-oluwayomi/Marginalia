@@ -25,14 +25,6 @@ const GROQ_CHAT_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
  */
 export const GROQ_TIMEOUT_MS = 30_000;
 
-/**
- * Whether the Groq API key is present in the environment. Used to log
- * configuration presence without ever logging the key itself.
- */
-export function isGroqConfigured(): boolean {
-  return Boolean(process.env[GROQ_API_KEY_ENV]);
-}
-
 type GroqMessage = { role: "system" | "user"; content: string };
 
 type GroqChatResponse = {

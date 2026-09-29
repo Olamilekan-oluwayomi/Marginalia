@@ -9,7 +9,6 @@ import {
   generateJson,
   generateText,
   isTransientProviderError,
-  searchWebWithGrounding,
   toAiError,
 } from "@/lib/ai";
 
@@ -194,39 +193,6 @@ describe("transient retry", () => {
       generateText({ prompt: "hi", timeoutMs: 5 }),
     ).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
     expect(mocks.generateContent).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("searchWebWithGrounding", () => {
-  beforeEach(() => {
-    mocks.generateContent.mockReset();
-  });
-
-  it("returns grounded web results as title and url pairs", async () => {
-    mocks.generateContent.mockResolvedValue({
-      candidates: [
-        {
-          groundingMetadata: {
-            groundingChunks: [
-              { web: { title: "Example", uri: "https://example.com" } },
-              { web: { uri: "https://no-title.example" } },
-              { web: {} },
-            ],
-          },
-        },
-      ],
-    });
-
-    await expect(searchWebWithGrounding("cats")).resolves.toEqual([
-      { title: "Example", url: "https://example.com" },
-      { title: "https://no-title.example", url: "https://no-title.example" },
-    ]);
-  });
-
-  it("returns an empty array when no grounded chunks exist", async () => {
-    mocks.generateContent.mockResolvedValue({ candidates: [] });
-
-    await expect(searchWebWithGrounding("cats")).resolves.toEqual([]);
   });
 });
 

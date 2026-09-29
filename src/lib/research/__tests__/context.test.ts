@@ -4,7 +4,6 @@ import {
   retrieveResearchContext,
   selectRelevantPassages,
 } from "@/lib/research/context";
-import { resolveCitations } from "@/lib/research/citation-generation";
 import type { DocumentRow, SourceRow, Supabase } from "@/lib/research/types";
 
 const mocks = vi.hoisted(() => ({
@@ -143,35 +142,6 @@ describe("retrieveResearchContext", () => {
 
     expect(context.items[0].id).toBe("22222222-2222-4222-8222-222222222222");
     expect(context.items[0].kind).toBe("document");
-  });
-
-  it("links a retrieved document to a document_id through citation resolution", async () => {
-    mocks.getDocuments.mockResolvedValue({
-      error: null,
-      data: [
-        makeDocument({
-          id: "22222222-2222-4222-8222-222222222222",
-          content: "Extreme rainfall trends were studied.",
-        }),
-      ],
-    });
-
-    const context = await retrieve("extreme rainfall");
-    const result = resolveCitations(
-      {
-        answer: "text",
-        citations: [{ citation_number: 1, evidence: 1 }],
-      },
-      context,
-    );
-
-    expect(result.citations).toEqual([
-      {
-        citation_number: 1,
-        document_id: "22222222-2222-4222-8222-222222222222",
-      },
-    ]);
-    expect(result.rejectedCount).toBe(0);
   });
 
   it("ranks the document whose content matches the question above an irrelevant one", async () => {

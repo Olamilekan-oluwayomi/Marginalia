@@ -1,5 +1,3 @@
-import { Citation } from "./Citation";
-
 type AnswerProps = {
   children: React.ReactNode;
 };
@@ -11,5 +9,3 @@ export function Answer({ children }: AnswerProps) {
     </article>
   );
 }
-
-export { Citation };
