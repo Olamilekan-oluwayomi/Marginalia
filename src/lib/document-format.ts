@@ -1,3 +1,19 @@
+import type { DocumentStatus } from "@/lib/research/types";
+
+const STATUS_LABELS: Record<DocumentStatus, string> = {
+  pending: "Pending",
+  processing: "Processing",
+  ready: "Ready",
+  failed: "Failed",
+};
+
+const STATUS_CLASSES: Record<DocumentStatus, string> = {
+  pending: "text-muted",
+  processing: "text-muted",
+  ready: "text-pine",
+  failed: "text-error",
+};
+
 export function fileTypeFromName(fileName: string): string {
   const index = fileName.lastIndexOf(".");
   if (index <= 0 || index === fileName.length - 1) {
@@ -14,15 +30,12 @@ export function formatFileSize(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function documentStatusLabel(status: string): string {
-  if (status === "ready") return "Ready";
-  if (status === "processing") return "Processing";
-  if (status === "failed") return "Failed";
-  return "Pending";
+/** Takes a validated `DocumentStatus` — narrow the raw column first. */
+export function documentStatusLabel(status: DocumentStatus): string {
+  return STATUS_LABELS[status];
 }
 
-export function documentStatusClass(status: string): string {
-  if (status === "ready") return "text-pine";
-  if (status === "failed") return "text-error";
-  return "text-muted";
+/** Takes a validated `DocumentStatus` — narrow the raw column first. */
+export function documentStatusClass(status: DocumentStatus): string {
+  return STATUS_CLASSES[status];
 }

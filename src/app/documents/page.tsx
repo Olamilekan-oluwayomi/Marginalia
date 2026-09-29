@@ -16,6 +16,7 @@ import {
   createSupabaseClient,
   getAllDocuments,
   getResearchList,
+  toDocumentStatus,
   type DocumentSummary,
 } from "@/lib/research";
 
@@ -127,75 +128,77 @@ export default async function DocumentsPage() {
             </div>
           ) : (
             <div>
-              {documents.map((document) => (
-                <article
-                  key={document.id}
-                  className="flex items-start gap-4 border-b border-rule py-5 sm:grid sm:grid-cols-[1fr_120px_auto] sm:items-center sm:gap-x-8"
-                >
-                  <div className="min-w-0 flex-1 sm:flex-none">
-                    <div className="flex min-w-0 items-start gap-4">
-                      <div className="mt-0.5 shrink-0 text-pine">
-                        <FileText size={18} strokeWidth={1.6} />
-                      </div>
+              {documents.map((document) => {
+                const status = toDocumentStatus(document.status);
 
-                      <div className="min-w-0">
-                        <h2 className="break-words font-reading text-lg text-ink">
-                          {document.title}
-                        </h2>
+                return (
+                  <article
+                    key={document.id}
+                    className="flex items-start gap-4 border-b border-rule py-5 sm:grid sm:grid-cols-[1fr_120px_auto] sm:items-center sm:gap-x-8"
+                  >
+                    <div className="min-w-0 flex-1 sm:flex-none">
+                      <div className="flex min-w-0 items-start gap-4">
+                        <div className="mt-0.5 shrink-0 text-pine">
+                          <FileText size={18} strokeWidth={1.6} />
+                        </div>
 
-                        <p className="mt-1 font-mono text-xs text-muted">
-                          {/* Each part stays intact (no lone "2026" wraps);
+                        <div className="min-w-0">
+                          <h2 className="break-words font-reading text-lg text-ink">
+                            {document.title}
+                          </h2>
+
+                          <p className="mt-1 font-mono text-xs text-muted">
+                            {/* Each part stays intact (no lone "2026" wraps);
                               the group wraps between parts instead. */}
-                          {[
-                            document.fileType,
-                            formatFileSize(document.fileSize),
-                            `Added ${document.addedAt}`,
-                          ]
-                            .filter(Boolean)
-                            .map((part, index) => (
-                              <span key={index} className="whitespace-nowrap">
-                                {index > 0 ? " · " : ""}
-                                {part}
-                              </span>
-                            ))}
-                        </p>
+                            {[
+                              document.fileType,
+                              formatFileSize(document.fileSize),
+                              `Added ${document.addedAt}`,
+                            ]
+                              .filter(Boolean)
+                              .map((part, index) => (
+                                <span key={index} className="whitespace-nowrap">
+                                  {index > 0 ? " · " : ""}
+                                  {part}
+                                </span>
+                              ))}
+                          </p>
 
-                        <p className="mt-2 font-mono text-xs sm:hidden">
-                          <span
-                            className={documentStatusClass(document.status)}
-                          >
-                            {documentStatusLabel(document.status)}
-                          </span>
-                        </p>
+                          <p className="mt-2 font-mono text-xs sm:hidden">
+                            <span className={documentStatusClass(status)}>
+                              {documentStatusLabel(status)}
+                            </span>
+                          </p>
 
-                        <div className="mt-3 sm:hidden">
-                          <DocumentActions
-                            documentId={document.id}
-                            title={document.title}
-                            status={document.status}
-                          />
+                          <div className="mt-3 sm:hidden">
+                            <DocumentActions
+                              documentId={document.id}
+                              title={document.title}
+                              status={status}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <p
-                    className={`hidden font-mono text-xs sm:block ${documentStatusClass(
-                      document.status,
-                    )}`}
-                  >
-                    {documentStatusLabel(document.status)}
-                  </p>
+                    <p
+                      className={`hidden font-mono text-xs sm:block ${documentStatusClass(
+                        status,
+                      )}`}
+                    >
+                      {documentStatusLabel(status)}
+                    </p>
 
-                  <div className="hidden sm:block">
-                    <DocumentActions
-                      documentId={document.id}
-                      title={document.title}
-                      status={document.status}
-                    />
-                  </div>
-                </article>
-              ))}
+                    <div className="hidden sm:block">
+                      <DocumentActions
+                        documentId={document.id}
+                        title={document.title}
+                        status={status}
+                      />
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

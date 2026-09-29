@@ -10,6 +10,7 @@ import {
   type DeleteDocumentState,
   type RetryDocumentState,
 } from "@/app/documents/actions";
+import type { DocumentStatus } from "@/lib/research/types";
 
 const deleteInitialState: DeleteDocumentState = { error: null };
 const retryInitialState: RetryDocumentState = { error: null, success: false };
@@ -44,7 +45,7 @@ export function DocumentActions({
 }: {
   documentId: string;
   title: string;
-  status: string;
+  status: DocumentStatus;
 }) {
   const [retryState, retryFormAction, retryPending] = useActionState(
     retryDocumentAction,

@@ -28,6 +28,44 @@ export const DOCUMENT_STATUSES = [
 ] as const;
 export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 
+export const SOURCE_MODES = ["document", "web", "both"] as const;
+/** Which search mode an answer was generated from. */
+export type SourceMode = (typeof SOURCE_MODES)[number];
+
+/**
+ * Narrows a raw status column to its union type.
+ *
+ * `src/types/database.ts` is Supabase codegen output and types `text` columns
+ * as `string`, so the `check` constraints declared in the migrations are not
+ * visible to TypeScript. These helpers restore that boundary: every value read
+ * out of the database is checked against the constraint's real value set
+ * before it reaches the UI, instead of being asserted with a cast. An
+ * unexpected value falls back to the column's initial state rather than
+ * reaching a switch that assumes it was validated.
+ */
+function narrow<T extends string>(
+  values: readonly T[],
+  value: string,
+  fallback: T,
+): T {
+  return values.find((candidate) => candidate === value) ?? fallback;
+}
+
+/** Narrows `research_questions.answer_status` to `AnswerStatus`. */
+export function toAnswerStatus(value: string): AnswerStatus {
+  return narrow(ANSWER_STATUSES, value, "pending");
+}
+
+/** Narrows `documents.status` to `DocumentStatus`. */
+export function toDocumentStatus(value: string): DocumentStatus {
+  return narrow(DOCUMENT_STATUSES, value, "pending");
+}
+
+/** Narrows `answers.source_mode` to `SourceMode`. */
+export function toSourceMode(value: string): SourceMode {
+  return narrow(SOURCE_MODES, value, "document");
+}
+
 export type CreateResearchInput = {
   title: string;
   description?: string;
@@ -81,8 +119,9 @@ export type CreateAnswerInput = {
   /**
    * The search mode the answer was generated from. Derived from the research
    * context actually provided at generation time; persisted on the row.
+   * The column is `not null`, so this is optional but never null.
    */
-  source_mode?: SourceMode | null;
+  source_mode?: SourceMode;
 };
 
 export type CreateCitationInput = {
@@ -95,9 +134,6 @@ export type CreateCitationInput = {
 export type AnswerWithCitations = AnswerRow & {
   citations: CitationRow[];
 };
-
-/** Which search mode an answer was generated from. */
-export type SourceMode = "document" | "web" | "both";
 
 /**
  * A citation attached to an answer, after the model's numbered evidence

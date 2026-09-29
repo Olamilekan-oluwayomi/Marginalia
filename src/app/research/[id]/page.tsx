@@ -31,9 +31,12 @@ import {
 import {
   createSupabaseClient,
   getResearchWorkspace,
-  type AnswerStatus,
+  toAnswerStatus,
+  toDocumentStatus,
+  toSourceMode,
   type CitationRow,
   type ResearchWorkspace,
+  type SourceMode,
 } from "@/lib/research";
 
 /**
@@ -79,7 +82,7 @@ type CitationNote = {
 };
 
 /** Display label for the persisted source mode of a completed answer. */
-const SOURCE_MODE_LABELS: Record<string, string> = {
+const SOURCE_MODE_LABELS: Record<SourceMode, string> = {
   document: "Document",
   web: "Web",
   both: "Document + web",
@@ -303,7 +306,7 @@ export default async function ResearchWorkspacePage({
 
                         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
                           <QuestionStatusBadge
-                            status={question.answer_status as AnswerStatus}
+                            status={toAnswerStatus(question.answer_status)}
                           />
 
                           <span className="font-mono text-xs text-muted">
@@ -312,8 +315,11 @@ export default async function ResearchWorkspacePage({
 
                           {latest?.source_mode ? (
                             <span className="font-mono text-xs text-muted">
-                              {SOURCE_MODE_LABELS[latest.source_mode] ??
-                                latest.source_mode}
+                              {
+                                SOURCE_MODE_LABELS[
+                                  toSourceMode(latest.source_mode)
+                                ]
+                              }
                             </span>
                           ) : null}
                         </div>
@@ -457,65 +463,69 @@ export default async function ResearchWorkspacePage({
             </div>
           ) : (
             <div className="mt-4">
-              {documents.map((document) => (
-                <div
-                  key={document.id}
-                  className="border-b border-rule py-4 sm:flex sm:items-start sm:justify-between sm:gap-4"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-col gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
-                      <h3 className="break-words font-reading text-lg leading-snug text-ink">
-                        {document.title}
-                      </h3>
+              {documents.map((document) => {
+                const status = toDocumentStatus(document.status);
 
-                      <span
-                        className={`font-mono text-xs sm:whitespace-nowrap ${documentStatusClass(
-                          document.status,
-                        )}`}
-                      >
-                        {documentStatusLabel(document.status)}
-                      </span>
+                return (
+                  <div
+                    key={document.id}
+                    className="border-b border-rule py-4 sm:flex sm:items-start sm:justify-between sm:gap-4"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-col gap-y-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
+                        <h3 className="break-words font-reading text-lg leading-snug text-ink">
+                          {document.title}
+                        </h3>
+
+                        <span
+                          className={`font-mono text-xs sm:whitespace-nowrap ${documentStatusClass(
+                            status,
+                          )}`}
+                        >
+                          {documentStatusLabel(status)}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 font-mono text-xs text-muted">
+                        {/* Each part stays intact (no lone "2026" wraps);
+                          the group wraps between parts instead. */}
+                        {[
+                          fileTypeFromName(document.file_name),
+                          formatFileSize(document.file_size),
+                          `Added ${formatDisplayDate(document.created_at)}`,
+                        ]
+                          .filter(Boolean)
+                          .map((part, index) => (
+                            <span key={index} className="whitespace-nowrap">
+                              {index > 0 ? " · " : ""}
+                              {part}
+                            </span>
+                          ))}
+                      </p>
+
+                      {status !== "ready" ? (
+                        <p className="mt-1 font-ui text-xs text-muted">
+                          {status === "failed"
+                            ? "Processing failed — this document can&rsquo;t be used as evidence."
+                            : "This document isn&rsquo;t searchable yet."}
+                        </p>
+                      ) : (
+                        <p className="mt-1 font-ui text-xs text-pine">
+                          Searchable as evidence.
+                        </p>
+                      )}
                     </div>
 
-                    <p className="mt-1 font-mono text-xs text-muted">
-                      {/* Each part stays intact (no lone "2026" wraps);
-                          the group wraps between parts instead. */}
-                      {[
-                        fileTypeFromName(document.file_name),
-                        formatFileSize(document.file_size),
-                        `Added ${formatDisplayDate(document.created_at)}`,
-                      ]
-                        .filter(Boolean)
-                        .map((part, index) => (
-                          <span key={index} className="whitespace-nowrap">
-                            {index > 0 ? " · " : ""}
-                            {part}
-                          </span>
-                        ))}
-                    </p>
-
-                    {document.status !== "ready" ? (
-                      <p className="mt-1 font-ui text-xs text-muted">
-                        {document.status === "failed"
-                          ? "Processing failed — this document can&rsquo;t be used as evidence."
-                          : "This document isn&rsquo;t searchable yet."}
-                      </p>
-                    ) : (
-                      <p className="mt-1 font-ui text-xs text-pine">
-                        Searchable as evidence.
-                      </p>
-                    )}
+                    <div className="mt-3 sm:mt-0 sm:shrink-0">
+                      <DocumentActions
+                        documentId={document.id}
+                        title={document.title}
+                        status={status}
+                      />
+                    </div>
                   </div>
-
-                  <div className="mt-3 sm:mt-0 sm:shrink-0">
-                    <DocumentActions
-                      documentId={document.id}
-                      title={document.title}
-                      status={document.status}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
