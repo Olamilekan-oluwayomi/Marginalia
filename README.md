@@ -90,7 +90,7 @@ sources.
 | Generation fallback | Groq (OpenAI-compatible API) — default `openai/gpt-oss-120b`       |
 | Web search          | Tavily API                                                         |
 | PDF text extraction | `unpdf` (server-side)                                              |
-| Testing             | Vitest (478 unit tests across 33 files)                            |
+| Testing             | Vitest (474 unit tests across 36 files)                            |
 | Lint / types        | ESLint, `tsc --noEmit`                                             |
 
 ---
@@ -312,7 +312,7 @@ PDF or add a source to start asking questions.
 
 ## Testing
 
-The suite is **478 unit tests across 33 files** (`npx vitest run`). The
+The suite is **474 unit tests across 36 files** (`npx vitest run`). The
 highest-value coverage is in `src/lib/research/`:
 
 - **`context.test.ts`** — passage selection, keyword expansion, relevance
